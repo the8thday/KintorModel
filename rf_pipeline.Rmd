@@ -1,0 +1,136 @@
+---
+title: "rf_pipeline"
+author: "liuc"
+date: "4/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r message=FALSE}
+library(caret)
+library(glmnet)
+
+# library()
+```
+
+read data
+```{r}
+expr_file <- "/Users/congliu/OneDrive/kintor/script/prostat.expr.symbol.txt"
+metadata_file <- "/Users/congliu/OneDrive/kintor/script/prostat.metadata.txt"
+expr_mat <- read.table(expr_file, row.names = 1, header = T, sep="\t", 
+                       stringsAsFactors =T)
+# 处理异常的基因名字
+rownames(expr_mat) <- make.names(rownames(expr_mat))
+metadata <- read.table(metadata_file, row.names=1, header=T, sep="\t", stringsAsFactors =T)
+table(metadata)
+expr_mat <- t(expr_mat)
+expr_mat_sampleL <- rownames(expr_mat)
+metadata_sampleL <- rownames(metadata)
+common_sampleL <- intersect(expr_mat_sampleL, metadata_sampleL)
+
+expr_mat <- expr_mat[common_sampleL,,drop=F]
+metadata <- metadata[common_sampleL,,drop=F]
+
+```
+```{r}
+set.seed(42)
+
+train_index <- createDataPartition(metadata$class, p=0.75, list = F)
+train_data <- expr_mat[train_index,]
+train_data_group <- metadata[["class"]][train_index]
+
+test_data <- expr_mat[-train_index,]
+test_data_group <- metadata[["class"]][-train_index]
+
+dim(train_data)
+dim(test_data)
+```
+
+## 建模
+特征选择
+```{r}
+library(Boruta)
+
+boruta <- Boruta::Boruta(x = train_data, y = train_data_group, pValue=0.01, mcAdj=T, maxRuns=300)
+table(boruta$finalDecision)
+```
+提取重要变量, 其结果为Tentative+Confirmed
+```{r}
+boruta.finalVarsWithTentative <- data.frame(Item=getSelectedAttributes(boruta, withTentative = T), 
+                                            Type="Boruta_with_tentative")
+caret::featurePlot(train_data[,boruta.finalVarsWithTentative$Item], train_data_group, plot="box")
+
+boruta_train_data <- train_data[, boruta.finalVarsWithTentative$Item]
+boruta_test_data <- test_data[, boruta.finalVarsWithTentative$Item]
+```
+
+```{r}
+generateTestVariableSet <- function(num_toal_variable){
+  max_power <- ceiling(log10(num_toal_variable))
+  tmp_subset <- c(unlist(sapply(1:max_power, function(x) (1:10)^x, simplify = F)), ceiling(max_power/3))
+  #return(tmp_subset)
+  base::unique(sort(tmp_subset[tmp_subset<num_toal_variable]))
+}
+
+trControl <- trainControl(method = 'repeatedcv', number = 10, repeats = 3)
+# 在设置mtry时，可以随机选择，也可以Random generate 15 mtry values with tuneLength = 15
+mtry <- generateTestVariableSet(ncol(boruta_train_data))
+tuneGrid <- expand.grid(.mtry=mtry)
+
+rf <- train(x = boruta_train_data, 
+            y = train_data_group,
+            method = 'rf',
+            tuneGrid = tuneGrid,
+            trControl = trControl,
+            metric = 'Accuracy'
+            )
+
+print(rf)
+plot(rf)
+```
+对于mtry亦可通过tuneRF筛选最佳mtry，以下为按照OOBEError
+```{r}
+# dont run this
+bestMtry <- tuneRF(x,y, stepFactor = 1.5, 
+                   improve = 1e-5, ntree = 500)
+```
+
+# 可视化top20特征，并提取final model
+```{r}
+dotPlot(varImp(rf), top = 20)
+
+rf_finalModel <- rf$finalModel
+```
+
+# 模型评价
+```{r}
+library(pROC)
+
+prediction_prob <- predict(rf_finalModel, newdata = boruta_test_data, type = 'prob')
+predictions <- predict(rf_finalModel, newdata = boruta_test_data)
+confusionMatrix(predictions, test_data_group)
+
+roc_curve <- roc(test_data_group, prediction_prob[,1])
+roc <- roc(test_data_group, factor(predictions, ordered=T))
+plot(roc)
+
+best_thresh <- data.frame(coords(roc=roc_curve, x = "best", input="threshold", 
+                                 transpose = F, best.method = "youden"))
+# youden指数求roc曲线的最佳点
+best_thresh$best <- apply(best_thresh, 1, function (x) 
+  paste0('threshold: ', x[1], ' (', round(1-x[2],3), ", ", round(x[3],3), ")"))
+
+print(best_thresh)
+
+ROC_data <- data.frame(FPR = 1- roc_curve$specificities, TPR=roc_curve$sensitivities)
+ROC_data <- ROC_data[with(ROC_data, order(FPR,TPR)),]
+
+
+```
+
+
