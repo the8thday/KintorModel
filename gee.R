@@ -1,4 +1,0 @@
-# gee
-
-library(geepack)
-library()

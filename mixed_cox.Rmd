@@ -1,0 +1,23 @@
+---
+title: "mixed_cox"
+author: "liuc"
+date: "10/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Mixed effects cox regression models are used to model survival data when there
+are repeated measures on an individual, individuals nested within some other
+hierarchy, or some other reason to have both fixed and random effects
+
+```{r}
+library(survival)
+library(coxme)
+
+m <- coxme(Surv(time, status) ~ age + sex + (1|ph.ecog), 
+           lung)
+           
+```
