@@ -11,5 +11,80 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # gee
 
+广义估计方程是
+
+
+```{r}
 library(geepack)
-library()
+library(tidyverse)
+
+```
+
+
+在对重复测量资料展开广义估计方程分析时，首先要确定需要选择的作业相关矩阵；其次在建模时
+基于对具体问题的了解考虑变量间的交互效应，主效应分析等。
+
+### 首先是考虑主效应的结果
+```{r}
+jisu_sheet <- 'Ddimer'
+sex <- 'males'
+
+mt_ESR <- readxl::read_excel(glue::glue('/Users/congliu/OneDrive/kintor/Daily_Work/{sex}_treated.xlsx'),
+                             sheet = jisu_sheet
+                             ) %>%
+  select(-BMI) %>%
+  drop_na()
+mn_ESR <- readxl::read_excel(glue::glue('/Users/congliu/OneDrive/kintor/Daily_Work/{sex}_untreated.xlsx'),
+                             sheet = jisu_sheet
+                             ) %>%
+  select(-BMI) %>%
+  drop_na()
+
+df2 <- mt_ESR %>%
+  mutate(class = 'Treated') %>%
+  bind_rows(
+    mn_ESR %>% mutate(class = 'Untreated')
+  ) %>%
+  pivot_longer(cols = -c(`Patient ID`, class, AGE), names_to = 'time', values_to = 'score') %>%
+  arrange(`Patient ID`) %>%
+  rename('PatientID'='Patient ID') %>%
+  mutate(class=if_else(class=='Treated',1,0)) %>%
+  rstatix::convert_as_factor(PatientID, class, time) %>% 
+  drop_na()
+df2$class <- fct_relevel(df2$class, '0')
+
+df2
+```
+
+```{r}
+geefit_main <- geeglm(
+  score ~ time + class,
+  id=`PatientID`,
+  corstr='exchangeable', # 对于作业相关矩阵的选择依据Y变量的特征知识或是按照相关性矩阵进行选择
+  family="gaussian",
+  data=df2,
+  std.err = 'san.se'
+)
+summary(geefit_main)
+
+broom::tidy(geefit_main)
+
+```
+*结果解读：*对于主效应分析而言，其是基于所有人（不分组）的结果，上表中(Intercept)为timeDay0的数据，time作为我们within的变量结果也是主要的within分类结果；class1为组间差值，即是基于所有人的数据class1组比class0组降低了457；timeDay1为相对于timeDay0的估计值差值，即是在第1周比timeDay0降低了147，以此类推。
+__以上结果__总体而言表明class分组对于Y值是具有统计学意义的影响因素；随着时间的变化Y值也是在变化的，虽则在timeDay7 p值为0.458，但以上结果都是在*整体*层面的分析。
+
+```{r}
+# 加入交互效应，并考虑age作为协变量
+geefit3 <- geeglm(score ~ time * class + AGE,
+                  id=interaction(time, `PatientID`),
+                  corstr='exchangeable',
+                  family="gaussian",
+                  data=df2,
+                  std.err = 'san.se')
+broom::tidy(geefit3)
+
+```
+**结果解读**在加入交互效应之后，组别与时间点反应的不再是主效应而是单独效应，即是每一个具体分组的效应值。
+
+
+
