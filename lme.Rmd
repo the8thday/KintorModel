@@ -31,7 +31,7 @@ lme_model <-
 summary(lme_model)
 ```
 
-**结果解读：**lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距的情况下，发现
+**结果解读：**lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距的情况下，Fixed effects中Estimate值和gee结果保持一致，说明自变量。
 
 ```{r}
 # to see all 134 models
@@ -42,6 +42,28 @@ library(ggeffects)
 plot(ggemmeans(lme_model, terms = c("time", "class"), 
                condition = c(diagnose = "severe"))) + 
   ggplot2::ggtitle("GLMER Effect plot")
+```
+
+```{r}
+
+ggpredict(
+  model = lme_model,
+  terms = c('time', 'class')
+)
+
+(lme_pre <- ggpredict(
+  model = lme_model,
+  terms = c('time', 'class'),
+  type = 'random'
+))
+```
+
+use easystats to get model parameter or effectsize or performance
+
+```{r}
+performance::performance(lme_model)
+
+insight::get_variance(lme_model)
 ```
 
 use glmer

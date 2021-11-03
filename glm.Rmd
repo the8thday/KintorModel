@@ -11,9 +11,36 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
+library(easystats)
 library(glmnet)
 
+```
 
+
+## interpret glm results
+
+```{r}
+glm_model <- glm(
+  formula = score ~ time * class + AGE,
+  data = df2,
+  family = 'gaussian'
+)
+
+summary(glm_model)
+```
+
+**interpret the results:** 首先是Coefficients, 可以看到，对于这批次数据而言，lme/gee的结果极为类似
+
+
+## interpret lm results
+```{r}
 
 ```
+
+
+## by glmnet
+```{r}
+
+```
+
 

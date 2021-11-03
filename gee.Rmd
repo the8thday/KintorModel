@@ -107,13 +107,27 @@ anova(geefit_main, geefit3)
 
 ```
 
-plot effect
+plot effect by emmeans
 
 ```{r}
 plot(ggemmeans(geefit3, terms = c("time", "class"),
                condition = c(diagnose = "severe"))) + 
   ggplot2::ggtitle("GEE Effect plot")
 ```
+plot effects
+```{r}
+# ggpredict(geefit3,
+#           terms = c('time', 'class')
+#           )
+
+(geefit3_effect <- ggeffect(geefit3,
+         terms = c('time', 'class')
+         ))
+
+plot(geefit3_effect)
+```
+
+
 
 ## 一些补充信息
 
