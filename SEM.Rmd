@@ -11,9 +11,35 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Structural Equation Modeling
 
+结构方程模型是一类将两个或多个结构模型联合起来，以实现对多元关系进行建模的的统计框架。
+
 ```{r}
+library(easystats)
 library(lavaan)
+library(tidySEM)
 ```
+
+
+## path analysis
+```{r}
+# 没有潜在变量的SEM模型
+
+```
+
+## confirmatory factor analysis
+```{r}
+# measurement model
+
+
+```
+
+## Latent Variable Structural Model
+## growth curve models
+
+# piecewise structural equation modeling
+
+
+
 
 
 
