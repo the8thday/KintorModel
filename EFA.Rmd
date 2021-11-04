@@ -1,0 +1,14 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+类似主成分分析（Principal Component Analysis，PCA），探索性因子分析（Exploratory Factor Analysis，EFA）也是常用于探索和简化多变量复杂关系的常用方法，它们之间有联系也有区别。二者相比，如果期望使用一组较少的不相关特征（主成分）来代替大量相关变量，通常使用PCA；EFA则更多用于发现一组可观测变量背后潜在的或无法观测的结构（因子）
+
+
+
+```{r}
+library(psych)
+```
+
+

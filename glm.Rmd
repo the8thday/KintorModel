@@ -44,3 +44,14 @@ summary(glm_model)
 ```
 
 
+## different family
+```{r}
+
+```
+
+
+
+
+
+
+
