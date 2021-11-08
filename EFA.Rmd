@@ -12,3 +12,23 @@ library(psych)
 ```
 
 
+```{r}
+url <- 'https://raw.githubusercontent.com/housecricket/data/main/efa/sample1.csv'
+data_survey <- read.csv(url, sep = ',')
+```
+
+KMO
+The Kaiser-Meyer-Olkin (KMO) used to measure sampling adequacy is a better measure of factorability.
+
+```{r}
+X <- data[,-c(13)]
+Y <- data[,13]
+
+
+KMO(r=cor(X))
+
+cortest.bartlett(X) # Bartlett’s Test of Sphericity
+
+
+```
+
