@@ -19,24 +19,131 @@ library(lavaan)
 library(tidySEM)
 ```
 
+## model syntax in lavaan
+```{r}
+myModel <- ' # regressions
+             y1 + y2 ~ f1 + f2 + x1 + x2
+                  f1 ~ f2 + f3
+                  f2 ~ f3 + x1 + x2
+
+             # latent variable definitions 
+               f1 =~ y1 + y2 + y3 
+               f2 =~ y4 + y5 + y6 
+               f3 =~ y7 + y8 + y9 + y10
+
+             # variances and covariances 
+               y1 ~~ y1 
+               y1 ~~ y2 
+               f1 ~~ f2
+
+             # intercepts 
+               y1 ~ 1 
+               f1 ~ 1
+           '
+```
+
 
 ## path analysis
 ```{r}
 # 没有潜在变量的SEM模型
+ # https://benwhalley.github.io/just-enough-r/path-models.html
+
+mm <- ''
+
+path <- sem(
+  model = mm,
+  data = data,
+  
+)
 
 ```
+*interpret results: * summary有几个参数可供选择，fit.measure = TRUE,standardized = TRUE.
+参数估计（Parameter Estimates），观测变量到潜在因子的标准化权重；
+潜在变量（Latent Variables），估计的潜在因子的因子得分；
+因子协方差（Covariances），潜在因子之间的协方差；
+误差方差（Variances），每个观测变量的误差方差的估计值
+
+
 
 ## confirmatory factor analysis
 ```{r}
 # measurement model
+# CFA从先验知识出发，预先确定一组简单的因子结构
+data(HolzingerSwineford1939)
 
+hs.model <- '
+visual =~ x1 + x2 + x3
+textual =~ x4 + x5 + x6
+speed =~ x7 + x8 + x9
+'
 
+# fit the model
+fit <- cfa(hs.model, data = HolzingerSwineford1939)
+
+summary(fit, fit.measure = TRUE)
+
+# 整体拟合度
+fitmeasures(fit,
+            c('cfi', 'rmsea', 'rmsea.ci.upper', 'bic')
+            )
+performance::performance(fit)
+
+graph_sem(fit)
 ```
 
 ## Latent Variable Structural Model
+```{r}
+model <- '
+  # measurement model
+    ind60 =~ x1 + x2 + x3
+    dem60 =~ y1 + y2 + y3 + y4
+    dem65 =~ y5 + y6 + y7 + y8
+  # regressions
+    dem60 ~ ind60
+    dem65 ~ ind60 + dem60
+  # residual correlations
+    y1 ~~ y5
+    y2 ~~ y4 + y6
+    y3 ~~ y7
+    y4 ~~ y8
+    y6 ~~ y8
+'
+
+fit <- sem(model, data = PoliticalDemocracy)
+summary(fit, standardized = TRUE)
+
+```
+
+
 ## growth curve models
+```{r}
+model <- ' i =~ 1*t1 + 1*t2 + 1*t3 + 1*t4
+           s =~ 0*t1 + 1*t2 + 2*t3 + 3*t4 '
+fit <- growth(model, data=Demo.growth)
+summary(fit)
+
+# a linear growth model with a time-varying covariate
+model2 <- '
+  # intercept and slope with fixed coefficients
+    i =~ 1*t1 + 1*t2 + 1*t3 + 1*t4
+    s =~ 0*t1 + 1*t2 + 2*t3 + 3*t4
+  # regressions
+    i ~ x1 + x2
+    s ~ x1 + x2
+  # time-varying covariates
+    t1 ~ c1
+    t2 ~ c2
+    t3 ~ c3
+    t4 ~ c4
+'
+fit2 <- growth(model2, data = Demo.growth)
+summary(fit2)
+```
 
 # piecewise structural equation modeling
+```{r}
+
+```
 
 
 
