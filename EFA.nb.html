@@ -224,8 +224,31 @@ pre code {
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudXJsIDwtICdodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vaG91c2Vjcmlja2V0L2RhdGEvbWFpbi9lZmEvc2FtcGxlMS5jc3YnXG5kYXRhX3N1cnZleSA8LSByZWFkLmNzdih1cmwsIHNlcCA9ICcsJylcbmBgYCJ9 -->
+<pre class="r"><code>url &lt;- &#39;https://raw.githubusercontent.com/housecricket/data/main/efa/sample1.csv&#39;
+data_survey &lt;- read.csv(url, sep = &#39;,&#39;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>KMO The Kaiser-Meyer-Olkin (KMO) used to measure sampling adequacy is a better measure of factorability.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuWCA8LSBkYXRhWywtYygxMyldXG5ZIDwtIGRhdGFbLDEzXVxuXG5cbktNTyhyPWNvcihYKSlcblxuY29ydGVzdC5iYXJ0bGV0dChYKSAjIEJhcnRsZXR04oCZcyBUZXN0IG9mIFNwaGVyaWNpdHlcblxuXG5gYGAifQ== -->
+<pre class="r"><code>X &lt;- data[,-c(13)]
+Y &lt;- data[,13]
 
-<div id="rmd-source-code">LS0tCnRpdGxlOiAiUiBOb3RlYm9vayIKb3V0cHV0OiBodG1sX25vdGVib29rCi0tLQoK57G75Ly85Li75oiQ5YiG5YiG5p6Q77yIUHJpbmNpcGFsIENvbXBvbmVudCBBbmFseXNpc++8jFBDQe+8ie+8jOaOoue0ouaAp+WboOWtkOWIhuaekO+8iEV4cGxvcmF0b3J5IEZhY3RvciBBbmFseXNpc++8jEVGQe+8ieS5n+aYr+W4uOeUqOS6juaOoue0ouWSjOeugOWMluWkmuWPmOmHj+WkjeadguWFs+ezu+eahOW4uOeUqOaWueazle+8jOWug+S7rOS5i+mXtOacieiBlOezu+S5n+acieWMuuWIq+OAguS6jOiAheebuOavlO+8jOWmguaenOacn+acm+S9v+eUqOS4gOe7hOi+g+WwkeeahOS4jeebuOWFs+eJueW+ge+8iOS4u+aIkOWIhu+8ieadpeS7o+abv+Wkp+mHj+ebuOWFs+WPmOmHj++8jOmAmuW4uOS9v+eUqFBDQe+8m0VGQeWImeabtOWkmueUqOS6juWPkeeOsOS4gOe7hOWPr+ingua1i+WPmOmHj+iDjOWQjua9nOWcqOeahOaIluaXoOazleingua1i+eahOe7k+aehO+8iOWboOWtkO+8iQoKCgpgYGB7cn0KbGlicmFyeShwc3ljaCkKYGBgCgoK</div>
+
+KMO(r=cor(X))
+
+cortest.bartlett(X) # Bartlett’s Test of Sphericity
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiUiBOb3RlYm9vayIKb3V0cHV0OiBodG1sX25vdGVib29rCi0tLQoK57G75Ly85Li75oiQ5YiG5YiG5p6Q77yIUHJpbmNpcGFsIENvbXBvbmVudCBBbmFseXNpc++8jFBDQe+8ie+8jOaOoue0ouaAp+WboOWtkOWIhuaekO+8iEV4cGxvcmF0b3J5IEZhY3RvciBBbmFseXNpc++8jEVGQe+8ieS5n+aYr+W4uOeUqOS6juaOoue0ouWSjOeugOWMluWkmuWPmOmHj+WkjeadguWFs+ezu+eahOW4uOeUqOaWueazle+8jOWug+S7rOS5i+mXtOacieiBlOezu+S5n+acieWMuuWIq+OAguS6jOiAheebuOavlO+8jOWmguaenOacn+acm+S9v+eUqOS4gOe7hOi+g+WwkeeahOS4jeebuOWFs+eJueW+ge+8iOS4u+aIkOWIhu+8ieadpeS7o+abv+Wkp+mHj+ebuOWFs+WPmOmHj++8jOmAmuW4uOS9v+eUqFBDQe+8m0VGQeWImeabtOWkmueUqOS6juWPkeeOsOS4gOe7hOWPr+ingua1i+WPmOmHj+iDjOWQjua9nOWcqOeahOaIluaXoOazleingua1i+eahOe7k+aehO+8iOWboOWtkO+8iQoKCgpgYGB7cn0KbGlicmFyeShwc3ljaCkKYGBgCgoKYGBge3J9CnVybCA8LSAnaHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2hvdXNlY3JpY2tldC9kYXRhL21haW4vZWZhL3NhbXBsZTEuY3N2JwpkYXRhX3N1cnZleSA8LSByZWFkLmNzdih1cmwsIHNlcCA9ICcsJykKYGBgCgpLTU8KVGhlIEthaXNlci1NZXllci1PbGtpbiAoS01PKSB1c2VkIHRvIG1lYXN1cmUgc2FtcGxpbmcgYWRlcXVhY3kgaXMgYSBiZXR0ZXIgbWVhc3VyZSBvZiBmYWN0b3JhYmlsaXR5LgoKYGBge3J9ClggPC0gZGF0YVssLWMoMTMpXQpZIDwtIGRhdGFbLDEzXQoKCktNTyhyPWNvcihYKSkKCmNvcnRlc3QuYmFydGxldHQoWCkgIyBCYXJ0bGV0dOKAmXMgVGVzdCBvZiBTcGhlcmljaXR5CgoKYGBgCgo=</div>
 
 
 
