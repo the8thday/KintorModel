@@ -1,7 +1,7 @@
 ---
-title: "Hidden Markov Models"
+title: "Correspondence analysis"
 author: "liuc"
-date: "11/7/2021"
+date: "11/9/2021"
 output: html_document
 ---
 
@@ -9,10 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Hidden Markov Models
+## Correspondence analysis
 
-```{r}
-library(depmixS4)
-```
+对应分析用于分类
+
 
 
