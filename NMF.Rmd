@@ -1,0 +1,52 @@
+---
+title: "NMF"
+author: "liuc"
+date: "11/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+NMF的思想：V=WH（W权重矩阵、H特征矩阵、V原矩阵），通过计算从原矩阵提取权重和特征两个不同的矩阵出来。属于一个无监督学习的算法，其中限制条件就是W和H中的所有元素都要大于0.
+W又称为基矩阵、H称为系数矩阵。
+```{r}
+library(NMF)
+
+# introduction to NMF package
+
+nmfAlgorithm() # 查看NMF包内的算法
+nmfAlgorithm('brunet')
+```
+
+
+```{r}
+data(esGolub)
+
+estim.r <- nmf(esGolub, 2:6, nrun=10,seed=42)
+plot(estim.r)
+# plot(2:6,estim.r$measures$cophenetic, 
+#      type="b",col="purple")
+
+# 判断最佳rank值的准则就是，cophenetic值随K变化的最大变动的前点
+```
+```{r}
+ nmfEstimateRank(x, range,
+    method = nmf.getOption("default.algorithm"), nrun = 30,
+    model = NULL, ..., verbose = FALSE, stop = FALSE)
+```
+
+```{r}
+res1 <- nmf(x = esGolub, 
+            rank = 4, 
+            nrun=50,
+            method = "brunet",
+            seed=123)
+
+w <- basis(res1)
+h <- coef(res1)
+```
+

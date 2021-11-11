@@ -9,31 +9,130 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Mixed effects cox regression
+
 Mixed effects cox regression models are used to model survival data when there
 are repeated measures on an individual, individuals nested within some other
 hierarchy, or some other reason to have both fixed and random effects
 
 ```{r}
+library(tidyverse)
 library(survival)
 library(coxme)
 
 m <- coxme(Surv(time, status) ~ age + sex + (1|ph.ecog), 
-           lung)
-           
+           data = lung)
+
+summary(m)           
 ```
 
+# Competing Risks Regression
 
 竞争风险模型是指event有多种，一种发生则另外一种不发生。在竞争事件存在的情况下各个结局事件的累计发病函数是如何随着时间变化的，以及如何来比较不同的累计发病函数，以及如何探讨影响因素
 ```{r}
 library(cmprsk)
 library(finalfit)
+# The crr() syntax differs from survival::coxph() but finalfit brings these together
+# https://finalfit.org/articles/survival.html
+
+data(melanoma, package = 'boot')
+
+melanoma <- melanoma %>%
+  mutate(
+    # Overall survival
+    status_os = ifelse(status == 2, 0, # "still alive"
+                                         1), # "died of melanoma" or "died of other causes"
+    
+    # Diease-specific survival
+    status_dss = case_when(
+        status == 2 ~ 0, # "still alive"
+      status == 1 ~ 1, # "died of melanoma"
+      TRUE ~  0),     # "died of other causes is censored"
+
+    # Competing risks regression
+    status_crr = case_when(
+        status == 2 ~ 0, # "still alive"
+      status == 1 ~ 1, # "died of melanoma"
+      TRUE ~ 2),       # "died of other causes"
+    
+    # Label and recode other variables
+    age = ff_label(age, "Age (years)"), # ff_label to make table friendly var labels
+    thickness = ff_label(thickness, "Tumour thickness (mm)"), # ff_label to make table friendly var labels
+    sex = factor(sex) %>% 
+        fct_recode("Male" = "1", 
+                             "Female" = "0") %>% 
+        ff_label("Sex"),
+    ulcer = factor(ulcer) %>% 
+        fct_recode("No" = "0",
+                             "Yes" = "1") %>% 
+        ff_label("Ulcerated tumour")
+  )
+
+explanatory   <- c("age", "sex", "thickness", "ulcer")
+dependent_dss <- "Surv(time, status_dss)"
+dependent_crr <- "Surv(time, status_crr)"
+
+melanoma %>%
+    # Summary table
+  summary_factorlist(dependent_dss, explanatory, 
+                     column = TRUE, fit_id = TRUE) %>%
+    # CPH univariable
+      ff_merge(
+    melanoma %>%
+      coxphmulti(dependent_dss, explanatory) %>%
+      fit2df(estimate_suffix = " (DSS CPH univariable)")
+    ) %>%
+    # CPH multivariable
+  ff_merge(
+    melanoma %>%
+      coxphmulti(dependent_dss, explanatory) %>%
+      fit2df(estimate_suffix = " (DSS CPH multivariable)")
+    ) %>%
+    # Fine and Gray competing risks regression
+  ff_merge(
+    melanoma %>%
+      crrmulti(dependent_crr, explanatory) %>%
+      fit2df(estimate_suffix = " (competing risks multivariable)")
+    ) %>%
+  select(-fit_id, -index) %>%
+  dependent_label(melanoma, "Survival")
 
 
 # 固定时间点的累计发病置信区间
 CumIncidence
 ```
 
+```{r}
+# competing HM by cmprsk
 
+attach(melanoma)
+fit=cuminc (ftime = time, 
+            fstatus = status_crr, sex, cencode = 0) 
+plot(fit) # 各个分组的累计发病曲线
+fit
+
+detach()
+```
+```{r}
+# 上面介绍的方法相当于没有竞争风险的时候的KM法，通过上面的方法我们知道有了不同风险结局累计发病曲线的差异，继续我们会继续看影响因素，要做的就是竞争风险回归模型了，需要用到的函数就是crr
+cov1 = model.matrix(as.formula(paste0("~", paste0(explanatory, 
+        collapse = "+"))), melanoma)[, -1]
+
+mod_crr <- crr(
+  ftime = time,
+  fstatus = status_crr,
+  cov1 = cov1
+)
+
+summary(mod_crr)
+```
+
+```{r}
+# equal 
+melanoma %>%
+      crrmulti(dependent_crr, explanatory) %>%
+      fit2df(estimate_suffix = " (competing risks multivariable)")
+```
 
 
 
