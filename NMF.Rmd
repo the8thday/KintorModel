@@ -17,22 +17,39 @@ W又称为基矩阵、H称为系数矩阵。
 library(NMF)
 
 # introduction to NMF package
+# 输入矩阵为常见的gene counts矩阵
+# For example, if min(transposed_data) outputs -3.1, I add 3.100001 to the matrix
 
 nmfAlgorithm() # 查看NMF包内的算法
 nmfAlgorithm('brunet')
+
+nmfSeed() # 查看seed的用法
+# number value is used to set the state of the RNG, and the initialization is performed by the built-in seeding method ’random’
+# Note that if the seeding method is deterministic there is no need to perform multiple run anymore
 ```
 
 
 ```{r}
 data(esGolub)
 
-estim.r <- nmf(esGolub, 2:6, nrun=10,seed=42)
+# 为避免过拟合，此处数据可randomized
+V.random <- randomize(esGolub)
+
+estim.r <- nmf(esGolub, 2:6, 
+               nrun=30,
+               seed=123456
+               )
 plot(estim.r)
 # plot(2:6,estim.r$measures$cophenetic, 
 #      type="b",col="purple")
 
 # 判断最佳rank值的准则就是，cophenetic值随K变化的最大变动的前点
+
+consensusmap(estim.r,
+             annCol=esGolub, labCol=NA, labRow=NA
+             )
 ```
+
 ```{r}
  nmfEstimateRank(x, range,
     method = nmf.getOption("default.algorithm"), nrun = 30,
@@ -42,11 +59,52 @@ plot(estim.r)
 ```{r}
 res1 <- nmf(x = esGolub, 
             rank = 4, 
-            nrun=50,
+            nrun=100,
             method = "brunet",
-            seed=123)
+            seed=123456)
 
 w <- basis(res1)
 h <- coef(res1)
+V.hat <- fitted(res1)
+
+fit(res1) # model info
+summary(res1) #  quality measures 
+summary(res1, class=esGolub$Cell)
+
+
+dim(res1[1:10, 1:10])
 ```
+特征提取
+```{r}
+# only compute the scores
+s <- featureScore(res1)
+summary(s)
+
+
+# compute the scores and characterize each metagene
+s <- extractFeatures(res1)
+str(s)
+
+
+```
+
+comparing algorithms
+```{r}
+#  To enable a fair comparison, a deterministic seeding method should also be used. Here we fix the random seed to 123456.
+
+res.multi.method <- nmf(esGolub, 3, list('brunet', 'lee', 'ns'), 
+                        seed=123456, 
+                        .options='t')
+compare(res.multi.method)
+```
+
+# 针对W H矩阵的热图绘制
+```{r}
+# basis components
+basismap(res1, subsetRow=TRUE)
+# mixture coefficients
+coefmap(res1)
+```
+
+
 
