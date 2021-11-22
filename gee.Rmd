@@ -79,6 +79,7 @@ broom::tidy(geefit_main)
 coef(geefit_main)
 #
 vcov(geefit_main)
+
 # anova analysis tests whether the model terms are significant
 anova(geefit_main)
 ```
