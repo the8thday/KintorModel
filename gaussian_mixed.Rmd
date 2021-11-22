@@ -1,0 +1,34 @@
+---
+title: "gaussian mixed model"
+author: "liuc"
+date: "11/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 高斯混合模型
+
+```{r}
+library('tidyverse')
+library('mixtools')
+library('ClusterR')
+
+```
+
+```{r}
+GMM(data, gaussian_comps = 1, dist_mode = "eucl_dist",
+    seed_mode = "random_subset", km_iter = 10, em_iter = 5,
+    verbose = FALSE, var_floor = 1e-10, seed = 1)
+
+data(dietary_survey_IBS)
+dat = as.matrix(dietary_survey_IBS[, -ncol(dietary_survey_IBS)])
+dat = center_scale(dat)
+gmm = GMM(dat, 2, "maha_dist", "random_subset", 10, 10)
+
+summary(gmm)
+```
+
+
