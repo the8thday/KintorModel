@@ -1,0 +1,97 @@
+---
+title: "time series analysis"
+author: "liuc"
+date: "11/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## time series analysis in R
+
+时间序列数据首先应该符合时间单位。不是所有等step的数据都叫做时序数据。
+```{r}
+library(lubridate)
+library(forecast)
+```
+
+
+### stats package
+
+```{r}
+x <- c(580, 7813, 28266, 59287, 75700,
+       87820, 95314, 126214, 218843, 
+       471497, 936851, 1508725, 2072113)
+  
+# creating time series object
+# from date 22 January, 2020
+mts <- ts(x, start = decimal_date(ymd("2020-01-22")),
+                            frequency = 12)
+   
+# forecasting model using arima model
+fit <- auto.arima(mts)
+   
+# Next 5 forecasted values
+forecast(fit, 5)
+   
+# plotting the graph with next5 weekly forecasted values
+plot(forecast(fit, 5), xlab ="Weekly Data",
+ylab ="Total Positive Cases",
+main ="COVID-19 Pandemic", col.main ="darkgreen")
+```
+
+### use modeltime
+
+```{r}
+library(timetk)
+library(modeltime)
+```
+
+```{r}
+dat <- timetk::tk_tbl(mts) %>%
+  rename('date' = 'index')
+
+# Model 1: auto_arima ----
+model_fit_arima_no_boost <- arima_reg() %>%
+    set_engine(engine = "auto_arima") %>%
+    fit(value ~ date, data = dat)
+
+# Model 2: arima_boost ----
+model_fit_arima_boosted <- arima_boost(
+    min_n = 2,
+    learn_rate = 0.015
+) %>%
+    set_engine(engine = "auto_arima_xgboost") %>%
+    fit(value ~ date + as.numeric(date) + factor(month(date, label = TRUE), ordered = F),
+        data = dat)
+
+models_tbl <- modeltime_table(
+    model_fit_arima_no_boost,
+    model_fit_arima_boosted
+    )
+
+
+models_tbl %>%
+    modeltime_forecast(h = "3 years", actual_data = m750) %>%
+    plot_modeltime_forecast(
+      .legend_max_width = 25, # For mobile screens
+      .interactive      = interactive
+    )
+
+```
+
+
+### tidyverts
+
+```{r}
+library(TSstudio)
+```
+
+
+
+
+
+
+
