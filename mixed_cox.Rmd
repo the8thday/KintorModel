@@ -128,12 +128,55 @@ summary(mod_crr)
 ```
 
 ```{r}
-# equal 
+# equal to above 
 melanoma %>%
       crrmulti(dependent_crr, explanatory) %>%
-      fit2df(estimate_suffix = " (competing risks multivariable)")
+      fit2df(estimate_suffix = "(competing risks multivariable)")
 ```
 
+### ROC曲线绘制, 列线图，校准曲线
+```{r}
+library(riskRegression)
+library(pec)
+library(timeROC)
+library(regplot)
+
+fgr1<-FGR(Hist(time,status_crr)~age+thickness+sex+ulcer,
+          data = melanoma,cause = 1)
+summary(fgr1)
+```
+绘制某指标预测复发的time-dependent-ROC曲线
+```{r}
+tROC<-timeROC(T=melanoma$time,
+              delta = melanoma$status_crr,
+              weighting = "aalen",
+              marker = melanoma$age,cause = 1,times =c(185,204,232))
+tROC
+
+plotAUCcurve(tROC,col="darkcyan")
+
+
+## 计算C-index(复发，6、12、18...等月复发的C-index)
+cindex(fgr,data = melanoma,cause = 1,eval.times = seq(6,131,6))
+
+
+calPlot(fgr1,time = 131,xlim = c(0,0.8),ylim = c(0,0.8))
+
+# 绘制交互列线图(查看某位患者的生存率)
+library(mstate)
+dat.w<-crprep("ftime","Status",
+              data = melanoma,
+              trans = c(1,2),cens = 0,id="ID",
+              keep = c("Age","Gender","Diagnosis","phase_cr","source"))
+dat.w$Time<-dat.w$Tstop-dat.w$Tstart
+
+crm<-coxph(Surv(Time,status==1)~Age+Gender+Diagnosis+phase_cr+source,
+           data = dat.w[dat.w$failcode==1,],weights = weight.cens,subset = failcode==1)
+summary(crm)
+
+regplot(crm,observation = dat.w[dat.w$ID==66&dat.w$failcode==1,],
+        failtime = c(12,36,60),prfail = T, droplines=T)
+```
 
 
 
