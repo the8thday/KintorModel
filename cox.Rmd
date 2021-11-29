@@ -1,0 +1,23 @@
+---
+title: "cox regression"
+author: "liuc"
+date: "11/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## cox regression
+
+```{r}
+library(survival)
+```
+
+Landmark分析：如果随访的不同时间段间基础风险发生变化，需要分时间段分别分析
+
+```{r}
+
+```
+
