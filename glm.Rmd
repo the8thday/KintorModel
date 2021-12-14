@@ -48,8 +48,10 @@ summary(lm_fit)
 ## by glmnet
 
 ```{r}
-
-lm_fit2 <- glmnet::glmnet(family = 'gaussian')
+X <- df2 %>% dplyr::select()
+lm_fit2 <- glmnet::glmnet(x = X, 
+                          y = y,
+                          family = 'gaussian')
 
 summary(lm_fit2)
 ```
@@ -57,5 +59,53 @@ summary(lm_fit2)
 ## different family
 
 ```{r}
+# 负二项分布
+# 负二项分布回归一般用于count数据，尤其较为离散分布的count数据
+# negative binomial models assume the conditional means are not equal to the conditional variances
+library(MASS)
+dat <- read_csv('./datasets/Lab_exp.csv')
 
+m1 <- MASS::glm.nb(formula = Diplo_intensity~Treatment,
+                   data = dat)
+
+summary(m1)
 ```
+
+```{r}
+library(mvabund)
+
+mm1 <- manyglm(
+  formula = Diplo_intensity~Treatment,
+  data = dat,
+  family = 'negative.binomial'
+)
+
+summary(mm1)
+summary.manyglm(mm1, test = 'wald', nBoot = 9999)
+```
+
+
+*结果解读* 
+
+多变量的二者的对比
+
+```{r}
+m2 <- MASS::glm.nb(Diplo_intensity~Treatment+Fish_family+Fish_sex+Initial_weight_g, 
+                   data = dat)
+summary(m2)
+
+mm2 <- manyglm(Diplo_intensity~Treatment+Fish_family+Fish_sex+Initial_weight_g, 
+                   data = dat,
+                   family = 'negative.binomial')
+summary.manyglm(mm2, test = 'wald', nBoot = 9999)
+```
+
+评估负二项分布, 对于mvabund包performance上不支持，不过mvabund有提供一些手段。
+
+```{r}
+performance::check_model(m2)
+```
+
+
+
+
