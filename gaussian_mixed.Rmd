@@ -1,5 +1,5 @@
 ---
-title: "gaussian mixed model"
+title: "gaussian mixture model"
 author: "liuc"
 date: "11/11/2021"
 output: html_document
@@ -11,24 +11,88 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 高斯混合模型
 
+https://towardsdatascience.com/mixture-modelling-from-scratch-in-r-5ab7bfc83eef
+高斯混合模型是非监督的聚类方法，其和kmeans都是利用EM(Expectation-Maximization) algorithm
+
 ```{r}
-library('tidyverse')
-library('mixtools')
-library('ClusterR')
+library('easystats')
+library(mclust)
+# library('mixtools')
+# library('ClusterR')
 
 ```
 
-```{r}
-GMM(data, gaussian_comps = 1, dist_mode = "eucl_dist",
-    seed_mode = "random_subset", km_iter = 10, em_iter = 5,
-    verbose = FALSE, var_floor = 1e-10, seed = 1)
+首先利用stats包自带的kmeans & mclust::Mclust 进行聚类
 
-data(dietary_survey_IBS)
-dat = as.matrix(dietary_survey_IBS[, -ncol(dietary_survey_IBS)])
-dat = center_scale(dat)
-gmm = GMM(dat, 2, "maha_dist", "random_subset", 10, 10)
+```{r}
+X <- iris[,1:4]
+y <- iris$Species
+
+set.seed(42)
+km_res <- kmeans(X, 3)
+km_res
+gmm.mclust <- Mclust(X, 3)
+summary(gmm.mclust)
+
+table(y, km_res$cluster)
+table(y, gmm.mclust$classification) # 结果可以看到GMM 对iris数据集的聚类效果更好一些
+```
+
+## 如何确定最佳的K值
+
+```{r}
+# mlust BIC 确认最佳的K值
+BIC <- mclust::mclustBIC(X)
+summary(BIC) # 结果显示K=2 为最佳，和实际出入较大
+plot(BIC)
+
+mod1 <- Mclust(X, x = BIC)
+summary(mod1, parameters = TRUE)
+
+plot(mod1, what = "classification")
+
+# ICL 推测最佳K值
+ICL <- mclustICL(X)
+summary(ICL)
+
+plot(ICL)
+
+#
+d_clust <- Mclust(as.matrix(X), G=1:15, 
+                  modelNames = mclust.options("emModelNames"))
+d_clust$BIC
+plot(d_clust)
+```
+
+继续最佳K值
+
+```{r}
+# the elbow method
+k.max <- 15
+wss <- sapply(1:k.max, 
+              function(k){kmeans(X, k)$tot.withinss})
+wss
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares") # 也显示K为2为好。。这个。。。
+
+# The Silhouette Method
+
+```
+
+
+use clustR package for GMM
+
+```{r}
+gmm = GMM(X, 2, "maha_dist", "random_subset", 10, 10)
 
 summary(gmm)
+
+opt_gmm = Optimal_Clusters_GMM(X, max_clusters = 10, criterion = "BIC", 
+                               dist_mode = "maha_dist", seed_mode = "random_subset",
+                               km_iter = 10, em_iter = 10, var_floor = 1e-10,
+                               plot_data = T)
 ```
 
 
