@@ -26,9 +26,14 @@ library(discrim)
 http://www.sthda.com/english/articles/36-classification-methods-essentials/146-discriminant-analysis-essentials-in-r/
 
 判别分析包括有多个变种，包括线性判别分析、mixture DA, Flexible DA....
+下面为lda线性判别分析的一般过程
 
 ```{r}
 # preprocess the data
+df_split <- initial_split(iris, prop = 0.8)
+X_train <- training(df_split)
+X_test <- testing(df_split)
+# lda 可以考虑对输入矩阵进行标准化scale
 
 
 # build model
@@ -36,12 +41,36 @@ discrim_linear_MASS_spec <-
   discrim_linear() %>%
   set_engine('MASS')
 
+discrim_fit <- discrim_linear_MASS_spec %>% 
+  fit(Species ~ ., data = X_train)
 
+fit_res <- X_test %>% 
+  dplyr::select(Species) %>% 
+  bind_cols(predict(discrim_fit, X_test))
+
+predict(discrim_fit$fit)
+```
+
+metrics
+
+```{r}
+conf_mat(fit_res, truth = Species, estimate = .pred_class)
 ```
 
 
+### use MASS for lda analysis
 
+```{r}
+model <- lda(
+  Species ~ ., data = X_train
+)
 
+model
+
+ggplot(cbind(X_train, predict(model)$x), aes(LD1, LD2, color = Species)) +
+  geom_point() +
+  stat_ellipse(level = 0.95, show.legend = FALSE)
+```
 
 
 
