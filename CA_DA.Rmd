@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Correspondence analysis
 
-对应分析用于分类
+对应分析,以及去势对应分析用于分类
 
 ```{r}
 library(medicaldata)
@@ -51,7 +51,7 @@ fit_res <- X_test %>%
 predict(discrim_fit$fit)
 ```
 
-metrics
+metrics, 以及提取模型本身的参数
 
 ```{r}
 conf_mat(fit_res, truth = Species, estimate = .pred_class)
@@ -59,17 +59,37 @@ conf_mat(fit_res, truth = Species, estimate = .pred_class)
 
 
 ### use MASS for lda analysis
+tidymodels 似乎还没有特别成熟
 
 ```{r}
 model <- lda(
   Species ~ ., data = X_train
 )
 
-model
+model # 和discrim_fit$fit不一致就很烦人了
 
 ggplot(cbind(X_train, predict(model)$x), aes(LD1, LD2, color = Species)) +
   geom_point() +
-  stat_ellipse(level = 0.95, show.legend = FALSE)
+  stat_ellipse(level = 0.95, show.legend = FALSE) + theme_bw()
+
+```
+
+### 二次判别分析
+
+二次判别分析由于不假定个类别的协方差相等，因此比lda较为灵活一些，对于样本量较大的数据可以采用qda
+
+```{r}
+pda_moodel <- qda(
+  Species ~ ., data = X_train
+)
+
+```
+
+
+### 混合判别分析
+
+```{r}
+library(mda)
 ```
 
 
