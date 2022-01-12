@@ -1,0 +1,17 @@
+---
+title: "pharmacokinetics modelling"
+author: "liuc"
+date: "1/12/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## pharmacokinetics modelling by R
+
+```{r}
+
+```
+
