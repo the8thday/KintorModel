@@ -10,8 +10,54 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## pharmacokinetics modelling by R
+http://sia.webpopix.org/pharmacokinetics.html
+Once a drug is administered, we usually describe subsequent processes within the organism by the pharmacokinetics (PK) process known as ADME: absorption, distribution, metabolism, excretion.
+
+```{r}
+# library(saemix)
+library(nlmixr)
+library(ggPMX)
+# library(ubiquity)
+```
+
+### single-dose
+ fitting a simple one-compartment PK model 
+
+```{r}
+one.compartment.saem <- function() {
+    ini({
+        tka <- .5   # Log Ka
+        tcl <- -3.2 # Log Cl
+        tv <- -1    # Log V
+        eta.ka ~ 1
+        eta.cl ~ 2
+        eta.v ~ 1
+        add.err <- 0.1 # residual variability
+    })
+    model({
+        ka <- exp(tka + eta.ka)
+        cl <- exp(tcl + eta.cl)
+        v <- exp(tv + eta.v)
+        d/dt(depot) = -ka * depot
+        d/dt(center) = ka * depot - cl / v * center
+        cp = center / v 
+        cp ~ add(add.err)
+    })
+}
+
+fit <- nlmixr(one.compartment.saem, theo_sd, est="saem")
+
+print(fit)
+```
+
+```{r}
+plot(fit)
+```
+
+本文主要从处方前研究、剂型开发、食物效应、预测人体药代动力学以及仿制药的生物等效性研究等方面介绍了PBPK 建模在药剂学领域中的应用
 
 ```{r}
 
 ```
+
 
