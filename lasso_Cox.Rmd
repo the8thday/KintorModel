@@ -9,6 +9,50 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## 
+## lasso cox 回归
 
+lasso cox 回归主要是用于对cox回归中的系数进行筛选，并在此基础之上进一步建模分析。在对于变量间的多重共线性，以及变量多于样本的情况下，可以发挥较好的作用。
+
+```{r}
+library(glmnet)
+
+# data(lung, package = 'survival')
+lung <- na.omit(lung)
+X <- model.matrix(~sex+age+ph.ecog+ph.karno+pat.karno+meal.cal+wt.loss, 
+                  data=lung)[,-1]
+# 注意NA值要删除
+
+y = Surv(lung$time, lung$status)
+```
+
+
+```{r}
+
+fitcv <- cv.glmnet(X,y,family="cox", 
+                   alpha=1,
+                   nfolds=10)
+
+plot(fitcv)
+plot(fitcv, xvar='lambda', label = TRUE)
+
+best_lambda <- fitcv$lambda.min # find optimal lambda value that minimizes test MSE
+coef(fitcv, s = 'lambda.min')
+```
+
+```{r}
+#find coefficients of best model
+best_model <- glmnet(X, y, family="cox", 
+                     alpha = 1, # alpha=1 is the lasso penalty, and alpha=0 the ridge penalty
+                     lambda = best_lambda
+                     )
+coef(best_model)
+plot(best_model, xvar='lambda', label = TRUE)
+```
+
+meal.cal变量没有系数，是因为被lasso算法所drop了
+
+
+```{r}
+
+```
 
