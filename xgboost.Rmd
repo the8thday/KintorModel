@@ -1,0 +1,29 @@
+---
+title: "xgboost"
+author: "liuc"
+date: "1/17/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## xgboost
+
+```{r}
+library(tidymodels)
+library(xgboost)
+```
+
+
+
+```{r}
+boost_tree_xgboost_spec <-
+  boost_tree(tree_depth = tune(), trees = tune(), learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune()) %>%
+  set_engine('xgboost') %>%
+  set_mode('classification')
+
+
+```
+
