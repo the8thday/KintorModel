@@ -11,7 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # gee
 
-广义估计方程是
+广义估计方程. 在医学研究中每个受试者有多次随访的数值型观测值，则每个受试者的每次观测值是相关的，不同受试者之间可以认为是独立的，但是模型误差是不相等的。
+以基线为协变量，
 
 ```{r}
 library(geepack)
@@ -83,6 +84,8 @@ vcov(geefit_main)
 # anova analysis tests whether the model terms are significant
 anova(geefit_main)
 ```
+
+### 加入交互效应
 
 ```{r}
 # 加入交互效应，并考虑age作为协变量

@@ -12,12 +12,16 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(easystats)
 library(glmnet)
+library(glm2)
+library(logbin)
 
 ```
 
 ## interpret glm results
 
 ```{r}
+df2 <- readRDS('./df2.rds')
+
 glm_model <- glm(
   formula = score ~ time * class + AGE,
   data = df2,
@@ -33,6 +37,7 @@ summary(glm_model)
 
 ```{r}
 # 线性回归需要符合LINE条件，其在临床预测模型和诊断模型. 模型自身的评价标准和对test数据集的评价
+# 线性模型里面能用*号吗？按照模型的定义应该是不可以的。
 
 lm_fit <- lm(
   score ~ class*time + AGE,
@@ -43,6 +48,7 @@ summary(lm_fit)
 ```
 
 *interpret results:* Residuals指的是模型的每一个预测值和真实值间的差值，通过`summary(df2$score-lm_fit$fitted.values)`可以得到类似的结果. 在利用QQplot图观察时，可以进一步分析模型在两端的预测情况。Coefficients中Estimate指的是在利用诸如最小二乘法估计最小离差平方和得到的slope和intercept，再加入交互效应时，SE可以用来计算estimate的CI（比如1.96*SE+—）,而且一般而言SE大于estimate值，其P值一般没有意义。t值为Estimate/SE。P值为系数为0的概率，比如我们可以说class0的timeDay7在模型中是有意义的变量, class1没有统计学意义，则样本在两分组中没有差异。Residual standard error指的是残差的均值(the average amount that the actual values of Y (the dots) differ from the predictions (the line) in units of Y. In general, we want the smallest residual standard error possible, because that means our model’s prediction line is very close to the actual values, on average)。对于R2, multiple 一般用于简单线性模型，adjusted一般用于多变量模型。F-statistic和p-value是模型整体假设检验，可以理解为其null假设为模型的所有系数都是0。
+在线性回归中，对于简单的一元线性回归，t检验值和F检验值是一样的，在多元线性回归中F检验假设模型整体。
 
 
 ## by glmnet
@@ -57,6 +63,7 @@ summary(lm_fit2)
 ```
 
 ## different family
+对于广义线性模型，对不同数据具有不同的模型选择。
 
 ```{r}
 # 负二项分布
@@ -72,6 +79,7 @@ summary(m1)
 ```
 
 ```{r}
+# mvabund 负二项分布建模
 library(mvabund)
 
 mm1 <- manyglm(
@@ -106,6 +114,126 @@ summary.manyglm(mm2, test = 'wald', nBoot = 9999)
 performance::check_model(m2)
 ```
 
+### log binomial
 
+log binomial is a cousin to logistic regression, log link rather than logit link. Can be used to estimate adjusted
+relative risk. 
+log binomial对于common outcome计算时的RR值更为接近真实情况，而罗辑回归在rare outcome时所得到的OR可近似为RR。
+Odds ratios are not good effect measures when the outcome of interest is common.
+
+```{r}
+# logbin package is a good choice
+data("PimaIndiansDiabetes2", package = "mlbench")
+PimaIndiansDiabetes2 <- na.omit(PimaIndiansDiabetes2)
+
+# first we fit a logistic regression
+l_reg <- glm(
+  diabetes ~ glucose,
+  data = PimaIndiansDiabetes2, family = 'binomial'
+)
+performance::performance(l_reg)
+
+
+# then we fit a log binomial,but an error reporte
+log_bin <- glm2(
+  diabetes ~ glucose,
+  data = PimaIndiansDiabetes2, family=binomial(link=log),
+  start = c(log(mean()), rep(0, 1)) # https://stats.stackexchange.com/questions/105633/what-to-do-when-a-log-binomial-models-convergence-fails
+  )
+
+
+# then we use logbin package to fit a model
+library(logbin)
+
+lb <- logbin(
+  diabetes ~ glucose,
+  data = PimaIndiansDiabetes2, model = FALSE, 
+  method = 'cem' # method有多种选择，分别对应不同的
+)
+performance::performance(lb)
+```
+
+### modified Poisson regression
+
+Modified Poisson regression, which combines a log Poisson regression model with robust variance estimation, is a useful alternative to log binomial regression for estimating relative risks.
+
+```{r}
+# https://charliemarks.com/r-tutorials/modifiedpoissonregression
+# https://rstudio-pubs-static.s3.amazonaws.com/5752_fc41dca85dd24539bc99868697de83d0.html
+
+library(lmtest)
+library(sandwich)
+
+## Define a function to obtain ratio
+..glm.ratio <- function(GLM.RESULT, DIGITS = 2, P.DIGITS = 3, CONF.LEVEL = 0.95) {
+
+    if (GLM.RESULT$family$family == "binomial") {
+        LABEL <- "OR"
+    } else if (GLM.RESULT$family$family == "poisson") {
+        LABEL <- "RR"
+    } else {
+        stop("Not logistic or Poisson model")
+    }
+
+    ## Extract coefficients and confidence interval
+    COEF      <- stats::coef(GLM.RESULT)
+    CONFINT   <- suppressMessages(stats::confint(GLM.RESULT, level = CONF.LEVEL))
+    TABLE     <- cbind(coef = COEF, CONFINT)
+
+    ## Turn them into OR
+    TABLE.EXP <- round(exp(TABLE), DIGITS)
+
+    colnames(TABLE.EXP)[1] <- LABEL
+
+    ## Extract p-value
+    PVAL <- round(summary(GLM.RESULT)$coef[,4], P.DIGITS)
+
+    TABLE.EXP <- cbind(TABLE.EXP, "P" = PVAL)    
+    TABLE.EXP
+}
+
+#First, I need to make a new variable, which will be 1 if the state’s life expectancy is at least 71 years and 0 otherwise
+state.x77_2 <- as.data.frame(state.x77)
+state.x77_2$seventyone <- ifelse(state.x77_2$`Life Exp`>=71, 1, 0)
+state.x77_2$HSGrad <- state.x77_2$`HS Grad`
+state.x77_2$ID <- 1:nrow(state.x77_2)
+
+mp0 <- glm(seventyone ~ Illiteracy + Murder + HSGrad, 
+             data=state.x77_2,
+             family = binomial(link = "logit")
+             )
+
+# Fit by glm() then test using robust SE estimator
+mp <- glm(seventyone ~ Illiteracy + Murder + HSGrad, 
+             data=state.x77_2,
+             family = poisson(link="log")
+             )
+
+res_p <- coeftest(mp, vcov = sandwich)
+
+parameters::parameters(mp)
+
+# this is the results
+model_results <- round(cbind(exp(cbind(RR = res_p[,1], 
+                                       LCI = res_p[,1] + qnorm(0.05/2)*res_p[,2],
+                                       UCI = res_p[,1] - qnorm(0.05/2)*res_p[,2])),
+                                       P = res_p[,4]),4)
+
+## same results as model_results
+geeglm.log.poisson <- geepack::geeglm(formula = seventyone ~ Illiteracy + Murder + HSGrad,
+                             data    = state.x77_2,
+                             family  = poisson(link = "log"),
+                             id      = ID,
+                             corstr  = "exchangeable")
+summary(geeglm.log.poisson)
+
+
+## The intercepts correspond to the baseline risk and baseline odds
+cbind(
+  RiskRatio = exp(coef(mp)),
+  RR2 = exp(coef(geeglm.log.poisson)),
+  OddsRatio = exp(coef(mp0))
+)
+```
 
 

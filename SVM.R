@@ -41,21 +41,21 @@ glue::glue('Training data shape: {dim(df_train)}')
 # model -------------------------------------------------------------------
 
 # parsnip_addin() could help you generate the model
-svm_C <- svm_poly(cost = tune(), degree = tune()) %>% 
-  set_mode('regression') %>% 
+svm_C <- svm_poly(cost = tune()) %>%
+  set_mode('regression') %>%
   set_engine('kernlab')
 
 # recipes for feature engineering
-svm_recipes <- 
+svm_recipes <-
   recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
          data = df_train) %>%
-  step_log(Gr_Liv_Area, base = 10) %>% 
+  step_log(Gr_Liv_Area, base = 10) %>%
   step_dummy(all_nominal_predictors())
 tidy(svm_recipes)
 
 # 交叉验证，网格搜索超参数
-svm_wf <- workflow() %>% 
-  add_model(svm_C %>% set_args(cost = tune())) %>% 
+svm_wf <- workflow() %>%
+  add_model(svm_C %>% set_args(cost = tune())) %>%
   add_recipe(svm_recipes)
 
 set.seed(42)
@@ -84,23 +84,23 @@ svm_C_fit <- svm_C_final %>% fit(sim_data) # this is the final model
 
 
 # 如何查看模型自身的参数和performance
-svm_C_fit %>% 
+svm_C_fit %>%
   purrr::pluck('fit')
-svm_C_fit %>% 
+svm_C_fit %>%
   predict(new_data = sim_data_test)
-svm_C_fit %>% 
-  extract_fit_engine() %>% 
+svm_C_fit %>%
+  extract_fit_engine() %>%
   plot()
 
 # 在test data performance
-augment(svm_C_fit, 
+augment(svm_C_fit,
         new_data = sim_data_test
-        ) %>% 
+        ) %>%
   conf_mat(truth = y, estimate = .pred_class)
 
-augment(svm_C_fit, 
+augment(svm_C_fit,
         new_data = sim_data_test) %>%
-  roc_curve(truth = y, estimate = .pred_1) %>% 
+  roc_curve(truth = y, estimate = .pred_1) %>%
   autoplot()
 
 svm_C_fit %>% predict(sim_data_test)

@@ -10,13 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## linear mixed effect model
+对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值仍可以认为独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*。
 
 ```{r}
 library(tidyverse)
 library(easystats)
 library(lme4)
 library(lmerTest)
-
+library(ggeffects)
 
 # data(package = 'lme4')
 ```
@@ -24,7 +25,8 @@ library(lmerTest)
 ## use lmer
 
 ```{r}
-# df2 data as in gee.Rmd
+# same df2 data as in gee.Rmd
+# 以入组后的2次测量值为因变量， 以处理效应、时间效应等为固定效应， 以不同病人作为随机效
 lme_model <- 
   lme4::lmer(score ~ time * class + AGE + (1|`PatientID`),
              data = df2
@@ -69,7 +71,7 @@ performance::performance(lme_model)
 parameters::parameters(lme_model)
 ```
 
-use glmer
+use glmer 广义混合模型
 
 ```{r}
 glme_model <- 

@@ -20,6 +20,7 @@ library(tidySEM)
 ```
 
 ## model syntax in lavaan
+
 ```{r}
 myModel <- ' # regressions
              y1 + y2 ~ f1 + f2 + x1 + x2
@@ -44,6 +45,7 @@ myModel <- ' # regressions
 
 
 ## path analysis
+
 ```{r}
 # 没有潜在变量的SEM模型
  # https://benwhalley.github.io/just-enough-r/path-models.html
@@ -66,6 +68,7 @@ path <- sem(
 
 
 ## confirmatory factor analysis
+
 ```{r}
 # measurement model
 # CFA从先验知识出发，预先确定一组简单的因子结构
@@ -92,6 +95,7 @@ graph_sem(fit)
 ```
 
 ## Latent Variable Structural Model
+
 ```{r}
 model <- '
   # measurement model
@@ -116,6 +120,7 @@ summary(fit, standardized = TRUE)
 
 
 ## growth curve models
+
 ```{r}
 model <- ' i =~ 1*t1 + 1*t2 + 1*t3 + 1*t4
            s =~ 0*t1 + 1*t2 + 2*t3 + 3*t4 '
@@ -141,6 +146,7 @@ summary(fit2)
 ```
 
 # piecewise structural equation modeling
+
 ```{r}
 
 ```
