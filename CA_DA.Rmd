@@ -11,17 +11,38 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Correspondence analysis
 
-对应分析,以及去势对应分析用于分类
+对应分析,以及去势对应分析等常用于分类数据，当研究多个分类变量的关系时，用卡方检验或对数优势线性模型难以直观简单的
+给出各变量间的关系。而对应分析可以给出直观的结果解释。它把R型因子分析和Q型因子分析结合起来，以少数几个公共因子的综合指标去描述研究对象在空间上的联系。
+CA有时会产生弓形效应，DCA可用以消除这个问题。
 
 ```{r}
 library(medicaldata)
+library(FactoMineR)
 library(tidymodels)
 library(MASS)
 library(discrim)
 ```
 
+### 对应分析的一个小事例
 
-## Discriminant Analysis is more stable than logistic regression for multi-class 
+```{r}
+# 以列联表数据为例子
+# http://www.sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/113-ca-correspondence-analysis-in-r-essentials/
+data(housetasks, package = 'factoextra')
+gplots::balloonplot(t(as.table(as.matrix(housetasks))))
+
+
+res.ca <- FactoMineR::CA(housetasks)
+
+# Eigenvalue
+eig.val = get_eigenvalue(res.ca)
+eig.val
+```
+_结果解读_: 
+
+
+
+### Discriminant Analysis is more stable than logistic regression for multi-class 
 
 http://www.sthda.com/english/articles/36-classification-methods-essentials/146-discriminant-analysis-essentials-in-r/
 
