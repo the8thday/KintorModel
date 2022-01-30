@@ -38,7 +38,7 @@ res.ca <- FactoMineR::CA(housetasks)
 eig.val = get_eigenvalue(res.ca)
 eig.val
 ```
-_结果解读_: 
+_结果解读_: 对应分析用于多个变量间关系的分析，类似于卡方检验。
 
 
 

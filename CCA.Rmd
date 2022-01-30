@@ -1,0 +1,23 @@
+---
+title: "CANONICAL CORRELATION ANALYSIS"
+author: "liuc"
+date: "1/25/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## CANONICAL CORRELATION ANALYSIS
+https://stats.oarc.ucla.edu/r/dae/canonical-correlation-analysis/
+
+Canonical correlation analysis is used to identify and measure the associations among two sets of variables. Canonical correlation is appropriate in the same situations where multiple regression would be, but where are there are multiple intercorrelated outcome variables. Canonical correlation analysis determines a set of canonical variates, orthogonal linear combinations of the variables within each set that best explain the variability both within and between sets.
+
+
+```{r}
+require(ggplot2)
+require(GGally)
+require(CCA)
+```
+
