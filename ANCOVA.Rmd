@@ -1,0 +1,96 @@
+---
+title: "ANCOVA"
+author: "liuc"
+date: "2/11/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 协方差分析
+
+此文通过一个小示例记录协方差分析在计算 emmeans 中的应用。
+
+
+```{r}
+library(tidyverse)
+library(rstatix)
+library(emmeans)
+```
+
+```{r}
+df <- readr::read_rds('./datasets/foo3.rds')
+
+# 此数据集中以W24D1作为主要结局指标。
+# W1D1作为协变量，可以理解为W1为basline数据
+
+skimr::skim(df)
+```
+
+首先是否满足的分析条件，和一般线性回归一样，需要满足LINE，同时还需要协变量和因变量之间不存在交互效应。
+
+```{r}
+# 正态性
+df %>% group_by(`研究项目分组`) %>% identify_outliers(diffW24)
+df %>% group_by(`研究项目分组`) %>% shapiro_test(diffW24)
+df %>% levene_test(diffW24 ~ `研究项目分组`)
+
+# 线性
+ggpubr::ggscatter(
+  df, x = "W1D1", y = "W24D1",
+  color = "研究项目分组", add = "reg.line"
+)+
+  ggpubr::stat_regline_equation(
+    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = `研究项目分组`)
+  )
+
+# 因变量和协变量的交互效应
+anova_test(data = foo3,
+       formula = diffW24 ~ `研究项目分组`* W1D
+       )
+
+```
+
+构建模型。在R中需要注意*aov函数要求协变量写在效应变量前面*。
+
+```{r}
+# 
+aov_res <- aov(diffW24 ~ W1D1 + `研究项目分组`,
+               data = df)
+
+# type III
+car::Anova(aov_res, type =  'III')
+
+# 两两post hoc 分析
+pwc3 <- emmeans_test(
+  W24D1 ~ `研究项目分组`,
+  covariate = W1D1,
+  p.adjust.method = "fdr",
+  data = df
+  )
+pwc3
+get_emmeans(pwc3)
+```
+
+emmeans 计算以及分析
+
+```{r}
+(emm_res <- emmeans(aov_res, specs = '研究项目分组'))
+
+pairs(emm_res, adjust = 'none', infer = c(TRUE, TRUE))
+
+plot(emm_res, comparisons = TRUE) + theme_bw() +
+  labs(x = "Estimated Marginal Mean")
+```
+
+### 和线性模型的对比
+
+```{r}
+# ?aov 本就是利用线性模型得到的分析
+
+lm_fit <- lm(diffW24 ~ W1D1 + `研究项目分组`,
+               data = df)
+```
+
