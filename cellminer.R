@@ -32,10 +32,10 @@ i_cells <- Hmisc::Cs(
 )
 i_cells <- gsub('_', '-', i_cells)
 
-rt %<>% filter(`FDA status` %in% c('Clinical trial', 'FDA approved')) %>% 
+rt %<>% filter(`FDA status` %in% c('Clinical trial', 'FDA approved')) %>%
   dplyr::select(-`Total experiments`, -`Total after quality control`)
-drug <- rt[,-c(2:6)] %>% 
-  dplyr::select(`NSC # b`, starts_with(c('LC:','LE:'))) %>% 
+drug <- rt[,-c(2:6)] %>%
+  dplyr::select(`NSC # b`, starts_with(c('LC:','LE:'))) %>%
   # select(any_of(i_cells))
   column_to_rownames('NSC # b')
 
@@ -43,8 +43,8 @@ rna  <-  read_excel('/Users/congliu/OneDrive/kintor/nci60/RNA__RNA_seq_composite
                     skip = 10
                     )
 
-rna <- rna[,-c(2:6)] %>% 
-  dplyr::select(`Gene name d`, starts_with(c('LC:','LE:'))) %>% 
+rna <- rna[,-c(2:6)] %>%
+  dplyr::select(`Gene name d`, starts_with(c('LC:','LE:'))) %>%
   column_to_rownames('Gene name d')
 
 sum(is.na(drug))
@@ -78,6 +78,13 @@ for(Gene in row.names(rna)){
 }
 
 outTab <- outTab[order(as.numeric(as.vector(outTab$pvalue))),]
+write_excel_csv(outTab, file = '/Users/congliu/OneDrive/kintor/nci60/cor_res.csv')
+
+myc_drug <- outTab %>% filter(Gene == 'MYC') %>% pull(Drug)
+# read_excel('/Users/congliu/OneDrive/kintor/nci60/DTP_NCI60_ZSCORE.xlsx',
+#            skip = 8
+# ) %>% janitor::clean_names() %>% filter(nsc_number_b %in% myc_drug) %>%
+#   write_excel_csv(file = '/Users/congliu/OneDrive/kintor/nci60/MYC_drug.csv')
 
 
 # plot，展示基因表达和药物IC50之间的关系
