@@ -1,0 +1,42 @@
+---
+title: "modelStudio"
+author: "liuc"
+date: '2022-03-01'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## modelStudio
+
+# everybody love modelStudio!!
+
+```{r}
+library("DALEX")
+library("ranger")
+library("modelStudio")
+
+```
+
+explain model
+
+```{r}
+# fit a model
+model <- ranger(score ~., data = happiness_train)
+
+# create an explainer for the model    
+explainer <- explain(model,
+                     data = happiness_test,
+                     y = happiness_test$score,
+                     label = "Random Forest")
+
+# make a studio for the model
+modelStudio(explainer)
+```
+
+
+
+
+
