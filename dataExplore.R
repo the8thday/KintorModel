@@ -4,6 +4,7 @@ library(mice)
 library(VIM)
 library(visdat)
 library(DataExplorer)
+library(janitor) # 较为方便整理数据的R包
 
 
 # 数据探索 --------------------------------------------------------------------

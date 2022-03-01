@@ -11,12 +11,17 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 协方差分析
 
-此文通过一个小示例记录协方差分析在计算 emmeans 中的应用。
+此文通过一个小示例记录协方差分析在计算 emmeans 中的应用。 比如在具有主要结局指标的重复测量数据分析中， 以baseline作为协变量，以某一时期的结果作为主要结局变量，则通常会采用协变量的方法进行分析。
 
 
 ```{r}
 library(tidyverse)
 library(rstatix)
+```
+
+
+```{r}
+library(grafify)
 library(emmeans)
 ```
 
@@ -92,5 +97,14 @@ plot(emm_res, comparisons = TRUE) + theme_bw() +
 
 lm_fit <- lm(diffW24 ~ W1D1 + `研究项目分组`,
                data = df)
+```
+
+### 多因素协方差分析
+
+多因素方差分析和多因素协方差分析类同。
+在进行post hoc分析时，要依据交互效应是否有统计学意义，进行不同的分析思路。
+
+```{r}
+
 ```
 

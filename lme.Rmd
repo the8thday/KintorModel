@@ -10,6 +10,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## linear mixed effect model
+https://m-clark.github.io/mixed-models-with-R/random_intercepts.html
+https://poissonisfish.com/2017/12/11/linear-mixed-effect-models-in-r/
+
 对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值仍可以认为独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*。
 
 ```{r}
@@ -18,13 +21,38 @@ library(easystats)
 library(lme4)
 library(lmerTest)
 library(ggeffects)
+library(emmeans)
 
 # data(package = 'lme4')
 ```
 
 ## use lmer
 
+https://ase.tufts.edu/bugs/guide/assets/mixed_model_guide.html
+首先是检验数据因变量的概率分布，在这一点上似乎和广义线性模型相似，线性混合模型需要因变量满足正态性.
+如果不符合正态性检验，需选择正确的建模方法，比如penalized quasilikelihood (PQL) 、
+
 ```{r}
+car::qqPlot(df2$score)
+```
+
+寻找最佳随机效应结构,找到了模型最好的随机效应结构，接下来我们就给模型加入固定效应。
+lme模型的构建在先验知识外，可以展开随机效应结构的筛选。
+但怎么判定一个变量是固定效应变量还是随机效应变量呢
+
+REML estimation is unbiased but does not allow for comparing models with different fixed structures. Only use the REML estimation on the optimal model
+
+```{r}
+nullmodel1 <- lmer( mood ~ 1 + (1|subject), data = pizzadata, REML=FALSE)
+nullmodel2 <- lmer( mood ~ 1 + (1 + pizza |subject), data = pizzadata, REML=FALSE)
+nullmodel3 <- lmer( mood ~ 1 + (1 + pizza * time |subject), data = pizzadata, REML=FALSE)
+anova (nullmodel1, nullmodel2, nullmodel3) #  基于LRT比的模型间的对比，同时还考虑模型的AIC/BIC/
+```
+
+假如固定效应
+
+```{r}
+# https://rpubs.com/rslbliss/r_mlm_ws#:~:text=To%20run%20a%20multilevel%20linear,we%20have%20used%20thus%20far.&text=Note%20that%20R%20uses%20restricted%20maximum%20likelihood%20to%20fit%20the%20model.
 # same df2 data as in gee.Rmd
 # 以入组后的2次测量值为因变量， 以处理效应、时间效应等为固定效应， 以不同病人作为随机效
 lme_model <- 
@@ -32,9 +60,21 @@ lme_model <-
              data = df2
              )
 summary(lme_model)
+
+lme_model2 <- 
+  lme4::lmer(score ~ time + class + AGE + (0 + class |`PatientID`),
+             data = df2
+             )
+lme_model3 <- update(lme_model2, .~.-AGE)
+# To keep the intercept fixed while keeping the random slope, replace the “1” with a “0”
 ```
 
-**结果解读：**lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距的情况下，Fixed effects中Estimate值和gee结果保持一致，说明自变量。random effects为随机效应， Group列为随机效应因素
+**结果解读：**everything to the left of the | indicates the effects that should be random, and the variable to the right of the | is the grouping variable across which the effects should vary. What is the “1”? It’s the way we refer to the intercept.
+lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距的情况下，Fixed effects中Estimate值和gee结果保持一致，说明自变量。random effects为随机效应， Groups列为随机效应因素, 此处只对Intercept的PatientID考虑了随机因素.
+*REML criterion at convergence: *REML(restricted maximum likelihood), 
+*Random effects: * The “Residual” standard deviation refers to σ. 如果Variance太小的话，则随机效应可能不太重要。
+*Fixed Effects: *
+
 
 ```{r}
 # to see all 134 models
@@ -48,7 +88,7 @@ plot(ggemmeans(lme_model, terms = c("time", "class"),
 ```
 
 ```{r}
-
+# ggpredict 得到的为
 ggpredict(
   model = lme_model,
   terms = c('time', 'class')
@@ -71,7 +111,7 @@ performance::performance(lme_model)
 parameters::parameters(lme_model)
 ```
 
-use glmer 广义混合模型
+use glmer 广义混合模型, glmer可以用于处理因变量为分类数据，即是*Multilevel logistic models*
 
 ```{r}
 glme_model <- 
@@ -82,6 +122,11 @@ glme_model <-
   )
 
 summary(glme_model)
+
+# Run logistic model with random intercept and slope
+model <- glmer(white ~ homework + (1 + homework | schid), data=mlmdata,
+               family=binomial(link="logit"))
+summary(model)
 ```
 
 ```{r}
