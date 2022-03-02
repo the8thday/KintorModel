@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ## 协方差分析
 
 此文通过一个小示例记录协方差分析在计算 emmeans 中的应用。 比如在具有主要结局指标的重复测量数据分析中， 以baseline作为协变量，以某一时期的结果作为主要结局变量，则通常会采用协变量的方法进行分析。
+协变量分析的效应值就是矫正过的在各个分组中的均值，协方差分析的自变量至少包括一个分类变量和一个数值型变量。
+emmenas为在各个分组中outcome的均值；contrasts为不同分组间的差异，汇报的结果一般还需要包括Pvalue和95%CI。
 
 
 ```{r}
@@ -30,11 +32,13 @@ df <- readr::read_rds('./datasets/foo3.rds')
 
 # 此数据集中以W24D1作为主要结局指标。
 # W1D1作为协变量，可以理解为W1为basline数据
+# 研究项目分组 为分类变量。
 
 skimr::skim(df)
 ```
 
 首先是否满足的分析条件，和一般线性回归一样，需要满足LINE，同时还需要协变量和因变量之间不存在交互效应。
+以下分步骤所做的检测，亦可在模型建立后performance::check_model进行（推荐）。
 
 ```{r}
 # 正态性
@@ -42,27 +46,29 @@ df %>% group_by(`研究项目分组`) %>% identify_outliers(diffW24)
 df %>% group_by(`研究项目分组`) %>% shapiro_test(diffW24)
 df %>% levene_test(diffW24 ~ `研究项目分组`)
 
-# 线性
+# 线性，不同分组
 ggpubr::ggscatter(
-  df, x = "W1D1", y = "W24D1",
+  df, x = "W1D1", y = "diffW24",
   color = "研究项目分组", add = "reg.line"
 )+
   ggpubr::stat_regline_equation(
     aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = `研究项目分组`)
   )
 
-# 因变量和协变量的交互效应
-anova_test(data = foo3,
-       formula = diffW24 ~ `研究项目分组`* W1D
+# 因变量和协变量的交互效应, 如果有交互效应应该怎么处理呢
+anova_test(data = df,
+       formula = diffW24 ~ `研究项目分组`* W1D1
        )
 
 ```
 
+当以上条件基本满足后就可以展开协方差分析。作为其实本质是线性分析的方法，其可以纳入的协变量的个数不应该只有一个吧。。。
+one-way ANCOVA
 构建模型。在R中需要注意*aov函数要求协变量写在效应变量前面*。
 
 ```{r}
 # 
-aov_res <- aov(diffW24 ~ W1D1 + `研究项目分组`,
+aov_res <- aov(diffW24 ~ W1D1 + `研究项目分组`, # W1D1为需考虑的协变量
                data = df)
 
 # type III
@@ -70,21 +76,30 @@ car::Anova(aov_res, type =  'III')
 
 # 两两post hoc 分析
 pwc3 <- emmeans_test(
-  W24D1 ~ `研究项目分组`,
+  diffW24 ~ `研究项目分组`,
   covariate = W1D1,
-  p.adjust.method = "fdr",
-  data = df
+  p.adjust.method = "bonferroni",
+  data = df,
+  detailed = TRUE
   )
-pwc3
+pwc3 # pairwise comparison p-value, 可以看到其95%CI没有经过矫正
 get_emmeans(pwc3)
+
+grafify::posthoc_Levelwise(Model = aov_res,
+                           Fixed_Factor = c("研究项目分组"),
+                           infer = c(TRUE, TRUE)
+                           )
 ```
 
-emmeans 计算以及分析
+emmeans 计算以及分析.
+以上所用到的函数emmeans_test和posthoc_Levelwise的结果在95%CI上有些许出入，应该和不同的矫正方法有关。
+下面对协方差的emmeans利用emmeans包分步进行。可以看到emmeans_test的结果没有经过P值矫正，而posthoc_Levelwise的
+95%CI经过了bonferroni矫正。
 
 ```{r}
 (emm_res <- emmeans(aov_res, specs = '研究项目分组'))
 
-pairs(emm_res, adjust = 'none', infer = c(TRUE, TRUE))
+pairs(emm_res, adjust = 'bonferroni', infer = c(TRUE, TRUE))
 
 plot(emm_res, comparisons = TRUE) + theme_bw() +
   labs(x = "Estimated Marginal Mean")
@@ -92,19 +107,96 @@ plot(emm_res, comparisons = TRUE) + theme_bw() +
 
 ### 和线性模型的对比
 
+将下面的模型和aov_res对比，可以见到二者是一致的。
+
 ```{r}
 # ?aov 本就是利用线性模型得到的分析
 
 lm_fit <- lm(diffW24 ~ W1D1 + `研究项目分组`,
                data = df)
+
+summary(lm_fit)
+car::Anova(lm_fit, type = 'III')
 ```
 
 ### 多因素协方差分析
 
 多因素方差分析和多因素协方差分析类同。
 在进行post hoc分析时，要依据交互效应是否有统计学意义，进行不同的分析思路。
+如果没有交互效应则按照一个分组分别汇报另一个分组的主效应。
+如果交互效应有统计学意义，则可以按照dislevel的分组分别对`研究项目分组`进行oneway ANCOVA的分析. 然后Compute pairwise comparisons between treatment groups 
+
 
 ```{r}
+aov.res2 <- aov(formula = diffW24 ~ W1D1 + `研究项目分组` * dislevel,
+                data = df
+                )
 
+performance(aov.res2)
+car::Anova(aov.res2, type = 'III')
 ```
+
+下面进行post-hoc 分析. 考虑没有交互效应。
+按照dislevel分组，分别计算`研究项目分组`分组中的emmeans。
+
+```{r}
+pc <- emmeans::emmeans(aov.res2,
+                       specs = trt.vs.ctrl ~ `研究项目分组`|dislevel,
+                       type = "response",
+                       ref = 1,
+                       adjust = 'fdr', infer = c(TRUE, TRUE))
+pc
+
+(emm_res <- emmeans(aov.res2, specs = c("研究项目分组", 'dislevel')))
+contrast(emm_res, method = 'trt.vs.ctrl',
+         type = 'response', adjust = 'fdr',by = 'dislevel', infer = c(TRUE, TRUE))
+```
+
+####  将结果输出成所需要的表格并绘制森林图
+
+```{r}
+con_p <- pc$contrasts %>% as.data.frame() %>% 
+  as_tibble()
+
+plot(pc) + theme_bw()
+```
+
+下面利用forestplot包进行绘制，不过此包的使用主要是还是以整理成其所需要的数据格式为主，似乎可操作性差一些。
+
+```{r}
+library(forestplot)
+
+ss <- tibble(mean  = 0.531, 
+             lower = 0.386,
+             upper = 0.731,
+             dislevel = "Summary",
+             contrast = NA,
+             summary = TRUE)
+
+header <- tibble(dislevel = c("Dislevel"),
+                 contrast = c("Contrast"),
+                 summary = TRUE)
+
+empty_row <- tibble(mean = NA_real_)
+
+con_p <- con_p %>% 
+  rename('mean'=estimate,
+         'lower' = lower.CL,
+         'upper' = upper.CL
+         ) %>% select(dislevel, contrast, mean, lower, upper)
+
+header %>% bind_rows(con_p) %>% bind_rows(empty_row) %>% bind_rows(ss) %>% 
+  forestplot(
+    labeltext = c(dislevel, contrast),
+    hrzl_lines = gpar(col = "#444444"),
+    is.summary = summary,
+    grid = structure(c(10), 
+                     gp = gpar(lty = 2, col = "#CCCCFF")),
+    col = fpColors(box = "royalblue",
+                   line = "darkblue",
+                   summary = "royalblue")
+  )
+```
+
+
 
