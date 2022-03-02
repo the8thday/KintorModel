@@ -188,15 +188,48 @@ con_p <- con_p %>%
 header %>% bind_rows(con_p) %>% bind_rows(empty_row) %>% bind_rows(ss) %>% 
   forestplot(
     labeltext = c(dislevel, contrast),
+    mean = mean,
+    lower = lower,
+    upper = upper,
     hrzl_lines = gpar(col = "#444444"),
     is.summary = summary,
+    zero = 12,
     grid = structure(c(10), 
                      gp = gpar(lty = 2, col = "#CCCCFF")),
     col = fpColors(box = "royalblue",
                    line = "darkblue",
-                   summary = "royalblue")
+                   summary = "royalblue"),
+    title = 'Forest Plot'
   )
 ```
+forest plot by forester
+麻烦的永远是整理森林图的数据。不知能否基于某些模型的输出自动整理待分析的数据。
 
+```{r}
+# devtools::install_github("rdboyes/forester")
+library(forester)
+
+
+demo_data <- read_csv('/Users/congliu/Downloads/forest_data.csv')
+demo_data$dislevel <- ifelse(is.na(demo_data$contrast),
+                          demo_data$dislevel,
+                          paste0("  ", demo_data$dislevel))
+
+
+forester(left_side_data = demo_data[,1:2],
+         estimate = demo_data$mean,
+         ci_low = demo_data$lower,
+         ci_high = demo_data$upper,
+         display = FALSE,
+         null_line_at = 10,
+         font_family = "sans",
+         estimate_col_name = "Estimate (95% CI)",
+         file_path = here::here("/Users/congliu/Downloads/forester_plot.png"),
+         xlim = c(-10, 50),
+         ggplot_width = 20,
+         arrows = TRUE,
+         arrow_labels = c("kx826 Better", "Placebo Better"),
+         )
+```
 
 
