@@ -15,6 +15,9 @@ https://poissonisfish.com/2017/12/11/linear-mixed-effect-models-in-r/
 
 对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值仍可以认为独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*。
 
+线性混合模型的应用较多，此处只针对医学研究中常见的重复测量数据分析。
+
+
 ```{r}
 library(tidyverse)
 library(easystats)
@@ -30,24 +33,33 @@ library(emmeans)
 
 https://ase.tufts.edu/bugs/guide/assets/mixed_model_guide.html
 首先是检验数据因变量的概率分布，在这一点上似乎和广义线性模型相似，线性混合模型需要因变量满足正态性.
-如果不符合正态性检验，需选择正确的建模方法，比如penalized quasilikelihood (PQL) 、
+如果不符合正态性检验，需选择正确的建模方法，比如penalized quasilikelihood (PQL) 、Laplace approximation and Markov chain Monte Carlo algorithms (MCMC).
+
+不过通过performance::check_models似乎更安全 ，不确定此处的正态性检验是对因变量还是残差。    
 
 ```{r}
+df2 <- readRDS('./df2.rds')
+
 car::qqPlot(df2$score)
 ```
 
 寻找最佳随机效应结构,找到了模型最好的随机效应结构，接下来我们就给模型加入固定效应。
 lme模型的构建在先验知识外，可以展开随机效应结构的筛选。
-但怎么判定一个变量是固定效应变量还是随机效应变量呢
+但怎么判定一个变量是固定效应变量还是随机效应变量呢？有人讲尝试每一个变量作为随机效应，但似乎并不可取。通过对项目本身的知识来选择似乎更靠谱。
 
-REML estimation is unbiased but does not allow for comparing models with different fixed structures. Only use the REML estimation on the optimal model
+REML estimation is unbiased but does not allow for comparing models with different fixed structures. Only use the REML estimation on the optimal model.
+
+所以在进行效应选择的时候，用ML算法。
+
 
 ```{r}
-nullmodel1 <- lmer( mood ~ 1 + (1|subject), data = pizzadata, REML=FALSE)
-nullmodel2 <- lmer( mood ~ 1 + (1 + pizza |subject), data = pizzadata, REML=FALSE)
-nullmodel3 <- lmer( mood ~ 1 + (1 + pizza * time |subject), data = pizzadata, REML=FALSE)
-anova (nullmodel1, nullmodel2, nullmodel3) #  基于LRT比的模型间的对比，同时还考虑模型的AIC/BIC/
+nullmodel1 <- lmer( score ~ 1 + (1|PatientID), data = df2, REML=FALSE)
+nullmodel2 <- lmer( score ~ 1 + (1 + class |PatientID), data = df2, REML=FALSE)
+nullmodel3 <- lmer( score ~ 1 + (1 + class * time |PatientID), data = df2, REML=FALSE)
+anova (nullmodel1, nullmodel2) #  基于LRT比的模型间的对比，同时还考虑模型的AIC/BIC/
 ```
+
+上面的结果可以看到，nullmodel1有较好的指标，所以只选择随机intersect即可，不用考虑其他变量的随机slope。
 
 假如固定效应
 
@@ -56,72 +68,85 @@ anova (nullmodel1, nullmodel2, nullmodel3) #  基于LRT比的模型间的对比�
 # same df2 data as in gee.Rmd
 # 以入组后的2次测量值为因变量， 以处理效应、时间效应等为固定效应， 以不同病人作为随机效
 lme_model <- 
-  lme4::lmer(score ~ time * class + AGE + (1|`PatientID`),
+  lmerTest::lmer(score ~ time + class + AGE + (1|`PatientID`),
              data = df2
              )
 summary(lme_model)
 
 lme_model2 <- 
-  lme4::lmer(score ~ time + class + AGE + (0 + class |`PatientID`),
+  lme4::lmer(score ~ time * class + AGE + (0 + class |`PatientID`),
              data = df2
              )
 lme_model3 <- update(lme_model2, .~.-AGE)
 # To keep the intercept fixed while keeping the random slope, replace the “1” with a “0”
 ```
 
-**结果解读：**everything to the left of the | indicates the effects that should be random, and the variable to the right of the | is the grouping variable across which the effects should vary. What is the “1”? It’s the way we refer to the intercept.
-lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距的情况下，Fixed effects中Estimate值和gee结果保持一致，说明自变量。random effects为随机效应， Groups列为随机效应因素, 此处只对Intercept的PatientID考虑了随机因素.
+*结果解读：*everything to the left of the | indicates the effects that should be random, and the variable to the right of the | is the grouping variable across which the effects should vary. What is the “1”? It’s the way we refer to the intercept.
+lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距的情况下，Fixed effects中Estimate值和gee结果保持一致，说明自变量。random effects为随机效应， Groups列为随机效应因素, 此处只对Intercept的PatientID考虑了随机因素, 通过其Variance的大小可以判断随机截距效应是否应该考虑.
 *REML criterion at convergence: *REML(restricted maximum likelihood), 
 *Random effects: * The “Residual” standard deviation refers to σ. 如果Variance太小的话，则随机效应可能不太重要。
-*Fixed Effects: *
+*Fixed Effects: * 随机效应的解释可以为timeDay1对比于(Intercept)中的timeDay0，score值减少了-147.260。AGE变量的话是可以不用考虑的。
 
 
 ```{r}
+# type III
+car::Anova(lme_model, type = 'III')
+# Satterthwaite's method
+anova(lme_model)
+
+
 # to see all 134 models
 coef(lme_model)
-
-library(ggeffects)
 
 plot(ggemmeans(lme_model, terms = c("time", "class"), 
                condition = c(diagnose = "severe"))) + 
   ggplot2::ggtitle("GLMER Effect plot")
 ```
 
-```{r}
-# ggpredict 得到的为
-ggpredict(
-  model = lme_model,
-  terms = c('time', 'class')
-)
+*结果interpre* 在模型构建完成后，应该如何展示分析的结果呢？typeIII结果可以表明变量对模型的贡献度。
+同时还可以汇报emmeans，以及不同分组中的emmeans的差值以及对应的95%CI。
 
-(lme_pre <- ggpredict(
-  model = lme_model,
-  terms = c('time', 'class'),
-  type = 'random'
-))
+```{r}
+# 计算emmeans，以及contrasts
+(emm_res <- emmeans(lme_model, specs = c('time', 'class')))
+
+pc <- emmeans::emmeans(lme_model,
+                       specs = trt.vs.ctrl ~ time | class,
+                       type = "response",
+                       ref = 1,
+                       adjust = 'fdr', infer = c(TRUE, TRUE))
+pc
+
+# 当然还可以 通过如下方式，求得两两比对的结果，同paires(emm_res)
+grafify::posthoc_Levelwise(lme_model,
+                           c("time", 'class'))
 ```
 
-use easystats to get model parameter or effectsize or performance
+*use easystats to get model parameter or effectsize or performance*
+下面针对模型的参数和performance进行展示
 
 ```{r}
+# 首先是是否满足线性混合模型的条件
+performance::check_model(lme_model) # 可以看到残差不是很满足正态性分布。
+
+# 其次是模型自身的表现，一般用于模型间的比对
 performance::performance(lme_model)
 
-# insight::get_variance(lme_model) # show all variance
-
+# 相对于summary的结果，多了95%CI,不过通过confint函数也可以计算
 parameters::parameters(lme_model)
 ```
 
-use glmer 广义混合模型, glmer可以用于处理因变量为分类数据，即是*Multilevel logistic models*
+*use glmer 广义混合模型*, glmer可以用于处理因变量为分类数据，即是*Multilevel logistic models*
 
 ```{r}
 glme_model <- 
   lme4::glmer(
-    score ~ time * class + AGE + (1|`PatientID`),
+    score ~ time + class + AGE + (1|`PatientID`),
              data = df2,
              family = 'gaussian'
   )
 
-summary(glme_model)
+summary(glme_model) # same as lme_model
 
 # Run logistic model with random intercept and slope
 model <- glmer(white ~ homework + (1 + homework | schid), data=mlmdata,
