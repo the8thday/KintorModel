@@ -1,6 +1,6 @@
 # bayesian analysis
 
-# a bayesian analysis is always means 
+# a bayesian analysis is always means
 
 library(easystats)
 library(rstanarm)
@@ -25,6 +25,7 @@ map_estimate(posterior2$Petal.Length) # 即是众数
 
 
 # correlation & t-test ----------------------------------------------------
+
 library(BayesFactor)
 
 result <- correlationBF(iris$Sepal.Width, iris$Sepal.Length)
@@ -37,7 +38,7 @@ plot(bayesfactor(result)) +
 
 
 # ttest
-t_res <- ttestBF(formula = Sepal.Width ~ Species, 
+t_res <- ttestBF(formula = Sepal.Width ~ Species,
                  data = data)
 
 

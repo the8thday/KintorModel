@@ -13,9 +13,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # everybody love modelStudio!!
 
+在诸多模型的构建中，对变量的解释，或者说变量对模型的贡献度需要清晰的解释。
+
 ```{r}
+library(tidymodels)
+library(DALEXtra)
 library("DALEX")
-library("ranger")
 library("modelStudio")
 
 ```
@@ -23,17 +26,47 @@ library("modelStudio")
 explain model
 
 ```{r}
-# fit a model
-model <- ranger(score ~., data = happiness_train)
+# load packages and data
 
-# create an explainer for the model    
-explainer <- explain(model,
-                     data = happiness_test,
-                     y = happiness_test$score,
-                     label = "Random Forest")
+data <- DALEX::titanic_imputed
+
+# split the data
+index <- sample(1:nrow(data), 0.7*nrow(data))
+train <- data[index,]
+test <- data[-index,]
+
+# tidymodels fit takes target as factor
+train$survived <- as.factor(train$survived)
+
+# fit a model
+rec <- recipe(survived ~ ., data = train) %>%
+       step_normalize(fare)
+
+clf <- rand_forest(mtry = 2) %>%
+       set_engine("ranger") %>%
+       set_mode("classification")
+
+wflow <- workflow() %>%
+         add_recipe(rec) %>%
+         add_model(clf)
+
+model <- wflow %>% fit(data = train)
+
+# create an explainer for the model
+# 在测试集数据集测试
+explainer <- explain_tidymodels(model,
+                                data = test,
+                                y = test$survived,
+                                label = "tidymodels")
+
+# pick observations
+new_observation <- test[1:2,]
+rownames(new_observation) <- c("id1", "id2")
 
 # make a studio for the model
-modelStudio(explainer)
+modelStudio(explainer, new_observation)
+
+
 ```
 
 

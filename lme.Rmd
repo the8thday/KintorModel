@@ -117,7 +117,8 @@ pc <- emmeans::emmeans(lme_model,
                        adjust = 'fdr', infer = c(TRUE, TRUE))
 pc
 
-# 当然还可以 通过如下方式，求得两两比对的结果，同paires(emm_res)
+# 当然还可以 通过如下方式，求得两两比对的结果，同pairs(emm_res)
+# contrast(emm_res, method='pairwise', by = 'class')
 grafify::posthoc_Levelwise(lme_model,
                            c("time", 'class'))
 ```
