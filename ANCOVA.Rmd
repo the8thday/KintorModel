@@ -210,7 +210,7 @@ forest plot by forester
 library(forester)
 
 
-demo_data <- read_csv('/Users/congliu/Downloads/forest_data.csv')
+demo_data <- read_csv('./datasets/forest_data.csv')
 demo_data$dislevel <- ifelse(is.na(demo_data$contrast),
                           demo_data$dislevel,
                           paste0("  ", demo_data$dislevel))

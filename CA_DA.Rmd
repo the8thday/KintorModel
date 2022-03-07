@@ -15,6 +15,8 @@ knitr::opts_chunk$set(echo = TRUE)
 给出各变量间的关系。而对应分析可以给出直观的结果解释。它把R型因子分析和Q型因子分析结合起来，以少数几个公共因子的综合指标去描述研究对象在空间上的联系。
 CA有时会产生弓形效应，DCA可用以消除这个问题。
 
+FactoMineR 包可以进行CA，MCA，DCA的等计算.
+
 ```{r}
 library(medicaldata)
 library(FactoMineR)
@@ -30,9 +32,10 @@ library(discrim)
 # http://www.sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/113-ca-correspondence-analysis-in-r-essentials/
 data(housetasks, package = 'factoextra')
 gplots::balloonplot(t(as.table(as.matrix(housetasks))))
-
+# 本数据集可以看作x多个变量和y多个变量组成的列联表
 
 res.ca <- FactoMineR::CA(housetasks)
+res.ca # has alot of slots
 
 # Eigenvalue
 eig.val = get_eigenvalue(res.ca)
@@ -47,10 +50,13 @@ _结果解读_: 对应分析用于多个变量间关系的分析，类似于卡�
 http://www.sthda.com/english/articles/36-classification-methods-essentials/146-discriminant-analysis-essentials-in-r/
 
 判别分析包括有多个变种，包括线性判别分析、mixture DA, Flexible DA....
+常用于多分类
+
 下面为lda线性判别分析的一般过程
 
 ```{r}
 # preprocess the data
+set.seed(42)
 df_split <- initial_split(iris, prop = 0.8)
 X_train <- training(df_split)
 X_test <- testing(df_split)
@@ -80,27 +86,30 @@ conf_mat(fit_res, truth = Species, estimate = .pred_class)
 
 
 ### use MASS for lda analysis
-tidymodels 似乎还没有特别成熟
+tidymodels 似乎还没有特别成熟, 下面采用MASS的自身函数进行
 
 ```{r}
-model <- lda(
+model <- MASS::lda(
   Species ~ ., data = X_train
-)
+  )
 
-model # 和discrim_fit$fit不一致就很烦人了
+model # 和discrim_fit$fit 一致
 
 ggplot(cbind(X_train, predict(model)$x), aes(LD1, LD2, color = Species)) +
   geom_point() +
   stat_ellipse(level = 0.95, show.legend = FALSE) + theme_bw()
 
 ```
+*结果解读：*
+
+
 
 ### 二次判别分析
 
-二次判别分析由于不假定个类别的协方差相等，因此比lda较为灵活一些，对于样本量较大的数据可以采用qda
+二次判别分析由于不假定各类别的协方差相等，因此比lda较为灵活一些，对于样本量较大的数据可以采用qda.
 
 ```{r}
-pda_moodel <- qda(
+pda_moodel <- MASS::qda(
   Species ~ ., data = X_train
 )
 
