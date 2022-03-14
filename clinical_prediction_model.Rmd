@@ -1,0 +1,18 @@
+---
+title: "clinical_prediction_model"
+author: "liuc"
+date: '2022-03-14'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 
+
+
+
+
+
+
