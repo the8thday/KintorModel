@@ -3,16 +3,13 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-类似主成分分析（Principal Component Analysis，PCA），探索性因子分析（Exploratory Factor Analysis，EFA）也是常用于探索和简化多变量复杂关系的常用方法，它们之间有联系也有区别。二者相比，如果期望使用一组较少的不相关特征（主成分）来代替大量相关变量，通常使用PCA；EFA则更多用于发现一组可观测变量背后潜在的或无法观测的结构（因子）。
-当获得一些变数的观测值，并希望识别反应数据变化的隐形因子的个数和本质，当想识别一组数据背后的因子结构时，可以采用因子分析。因子和误差均无法直接测量，通过变量间的相互关系推导得到。
-
+类似主成分分析（Principal Component Analysis，PCA），探索性因子分析（Exploratory Factor Analysis，EFA）也是常用于探索和简化多变量复杂关系的常用方法，它们之间有联系也有区别。二者相比，如果期望使用一组较少的不相关特征（主成分）来代替大量相关变量，通常使用PCA；EFA则更多用于发现一组可观测变量背后潜在的或无法观测的结构（因子）。 当获得一些变数的观测值，并希望识别反应数据变化的隐形因子的个数和本质，当想识别一组数据背后的因子结构时，可以采用因子分析。因子和误差均无法直接测量，通过变量间的相互关系推导得到。
 
 ```{r}
 # https://towardsdatascience.com/exploratory-factor-analysis-in-r-e31b0015f224
 library(psych)
 library(FactoMineR)
 ```
-
 
 ```{r}
 url <- 'https://raw.githubusercontent.com/housecricket/data/main/efa/sample1.csv'
@@ -21,7 +18,8 @@ dat <- data_survey[ , -1]
 head(dat)
 ```
 
-KMO
+**KMO** 
+
 The Kaiser-Meyer-Olkin (KMO) used to measure sampling adequacy is a better measure of factorability.
 
 ```{r}
@@ -52,7 +50,6 @@ fa.parallel(X, fa = 'both', n.iter = 100)
 
 EFA中提取因子的方法很多，如最大似然法（ml）、主轴迭代法（pa）、加权最小二乘法（wls）、广义加权最小二乘法（gls）、最小残差法（minres）等。这里选择了主轴迭代法。
 
-
 ```{r}
 #EFA 分析，详情 ?fa
 #输入变量间的相关矩阵，nfactors 指定提取的因子数量，并手动输入原始变量集的对象数量（n.obs）
@@ -65,6 +62,7 @@ fa_varimax2 <- fa(r = X, nfactors = 4, rotate = 'varimax', fm = 'pa', max.iter=1
  
 fa_varimax
 ```
+
 Graph Factor Loading Matrices
 
 ```{r}
@@ -82,8 +80,8 @@ head(fa_var$scores)
 head(fa_var$weight)
 ```
 
-
 ### use FA result in a regression model
+
 ```{r}
 # 在得到目标个数的因子后，可以将因子当成新的变量展开一些回归分析
 
@@ -95,5 +93,3 @@ model.fa.score = lm(QD~., regdata)
 summary(model.fa.score)
 vif(model.fa.score)
 ```
-
-
