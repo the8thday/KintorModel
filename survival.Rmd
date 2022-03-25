@@ -1,0 +1,248 @@
+---
+title: "cox regression"
+author: "liuc"
+date: "11/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 生存分析的COX回归和KM分析
+
+## cox regression
+
+```{r}
+library(tidyverse)
+library(easystats)
+library(survival)
+library(survminer) # for KM plot
+library(riskRegression)
+library(rms)
+library(gtsummary) # for beautiful table
+```
+
+建模.
+对于cox回归其实质同线性回归;
+需要满足等比例假设，对于不满足的自变量采用分层分析的方法。
+
+```{r}
+data('lung', package = 'survival')
+lung <- na.omit(lung) %>% 
+  as_tibble() %>% 
+  rstatix::convert_as_factor(sex, ph.ecog)
+
+mod <- coxph(Surv(time, status==2)~age + sex + ph.ecog + ph.karno + meal.cal + wt.loss, 
+             data = lung, 
+             # y=TRUE, 
+             x = TRUE)
+summary(mod) # Concordance 即是c-index
+
+# 等比例风险假设，cox回归需要满足的假设, 可采用cox.zph函数并结合cumulative incidence plot
+# GLOBAL为整体上是否满足等比例风险，p值大于0.05一般视为满足, 对于某一不满足的自变量采用分层分析的方法进行
+(z <- cox.zph(mod))
+ggcoxzph(z)
+
+# 下面为分层分析后的变量，以下暂不考虑
+mod_strata <- coxph(Surv(time, status)~age + sex + ph.ecog + strata(ph.karno) + meal.cal + wt.loss, 
+             data = lung, 
+             y=TRUE, 
+             x = TRUE)
+mod_strata # 分层变量不在作为自变量因素
+summary(mod_strata)
+
+```
+
+c-index以及校准曲线:
+c-index用于评估模型的区分度，可以理解为模型拟合后自身的区分能力。
+校准曲线用于评估模型的准确性或者说与实际的一致性。
+
+```{r}
+# 基于riskRegression的校准曲线
+mod2 <- coxph(Surv(time, status==2)~age + sex + ph.ecog + ph.karno, 
+             data = lung, x = T)
+xs <- riskRegression::Score(list(model1 = mod, model2 = mod2),
+         Hist(time, status==2)~1,
+         data=lung,
+         plots="calibration",
+         metrics='Brier')
+
+riskRegression::plotCalibration(xs, cens.method="jackknife",
+                col = c('black', 'red')
+                )
+
+plotCalibration(xs,
+                model="model1", # 绘制模型1的校准曲线
+                bars=TRUE,  # 校准曲线为条形图形式
+                show.frequencies = TRUE, # 条形图上显示频率
+                xlab = "预测的风险", # x轴标签
+                ylab = "观察的风险", # y轴标签
+                col = c("#ca3e47","#1ee3cf"), # 设置条形图的颜色
+                names.cex = 1.2, # X轴数字的缩放倍数
+                cex = 2.0) # 设置图例和标签的缩放倍数)
+```
+
+基于riskRegression的ROC曲线:
+survivalROC包和timeROC包也能绘制生存资料的ROC曲线，但是他们一般是基于单因素的。
+
+```{r}
+# 在对cox回归计算ROC时，一般会指定一个时间
+roc_res <- Score(list(model1 = mod), 
+            Hist(time, status==2)~1, 
+            data = lung,
+            # times = 365,
+            plots = 'roc',
+            metrics ="auc")
+
+plotROC(roc_res, 
+        xlab="1-Specificity",
+        ylab="Sensitivity",
+        lty=1,
+        cex=1.1,
+        pch=2,
+        lwd=2,
+        col="red",
+        legend="Model1")
+
+```
+
+
+### 基于rms包的分析:
+列线图的绘制、c-index、校准曲线等
+
+```{r}
+dd <- datadist(lung)
+options(datadist = 'dd')
+
+lung2 <- lung
+label(lung2$age) <- 'Patient Age' # 在nomograph中显示的变量label
+
+coxm <- rms::cph(
+  formula = Surv(time, status==2)~age + sex + ph.ecog + ph.karno + meal.cal + wt.loss,
+  x = T,
+  y = T,
+  surv = T,
+  data = lung2
+)
+coxm # 和mod估计的结果是一致的
+# c-index 的计算
+# Dxy/2+0.5
+c <- validate(coxm, 
+             dxy=T, 
+             B=1000)
+
+## 设置预测时间
+# 预测时间的选择，需要依据具体的数据和time的分布结合临床需求进行操作
+surv <- Survival(coxm)
+surv1 <- function(x)surv(365 * 1, lp=x)
+surv2 <- function(x)surv(365 * 2, lp=x)
+
+nomo <- nomogram(coxm,
+                fun = list(surv1, surv2),
+                funlabel = c('1-year LR probability',
+                             '2-year LR probability'
+                             ),
+                lp = F,
+                maxscale = 100 # 以百分比的形式展示
+                )
+plot(nomo, 
+     #1.变量与图形的占比
+     xfrac=.35, 
+     #2.变量字体加粗
+     cex.var=1, 
+     #3.数轴：字体的大小
+     cex.axis=0.8,
+     #4.数轴：刻度的长度
+     tcl=-0.5,
+     #5.数轴：文字与刻度的距离
+     lmgp=0.3, 
+     #6.数轴：刻度下的文字，1=连续显示，2=隔一个显示一个
+     label.every=1, 
+     #7.1个页面有几个数轴(这个可以压缩行间距)
+     naxes=13,
+     #8.垂直线的颜色.
+     col.grid=gray(c(0.8, 0.95)),
+     #9.线性预测轴名字
+     lplabel="Linear Predictorlp", 
+     #10变量分数名字
+     points.label='Points', 
+     #11总分名字
+     total.points.label='Total Points',
+     force.label=T#没啥用。TRUE强制标记的每个刻度线都绘制标签，我也没研究明白
+     )
+
+```
+
+rms包的校准曲线绘制
+
+```{r}
+p <- rms::calibrate(coxm,#模型名称
+              cmethod='KM',
+              method='boot',#检测方法
+              u=365*2,#评估的时间，注：一定要与模型的时间一致
+              m=50, #每次抽样的样本量，样本总量除以3/4
+              B=1000)#抽样次数
+
+plot(p,
+     add=F,
+     conf.int=T,#95%CI（蓝色线）
+     subtitles = F,#关闭副标题
+     cex.subtitles=0.8, 
+     lwd=2,
+     lty=1,
+     errbar.col="blue",
+     xlim=c(0,1),#调节x.y轴刻度范围
+     ylim=c(0,1),
+     xlab="nomo for two year survival",
+     ylab="actual two year survival",
+     col="red")
+
+# another plot
+plot(cal,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue=255)),
+     xlim=c(0.6,1),ylim=c(0.6,1),
+     xlab="Nomogram-Predicted Probability of 5-Year OS",
+     ylab="Actual 5-Year OS(proportion)", 
+     col=c(rgb(192,98,83,maxColorValue=255)))
+lines(cal[,c("mean.predicted","KM")],type="b",lwd=2,
+      col=c(rgb(192,98,83,maxColorValue=255)), pch=16)
+abline(0,1,lty=3,lwd=2,col=c(rgb(0,118,192,maxColorValue=255)))
+```
+
+ggDCA包的决策曲线分析：
+决策曲线（Decision curve analysis，DCA）
+
+```{r}
+library(ggDCA)
+
+dca1 <- ggDCA::dca(mod,
+            new.data = NULL,
+            times = "median"
+            )
+
+ggDCA::AUDC(dca1)
+
+ggplot(dca1,       
+       model.names="model1",
+       linetype =F,
+       lwd = 1.2) 
+```
+
+
+
+*KM plot*
+Landmark分析：如果随访的不同时间段间基础风险发生变化，需要分时间段分别分析
+
+```{r}
+fit <- survfit()
+
+# 中位生存期、95%CI
+
+
+# KM plot
+```
+
+
+
+
+
