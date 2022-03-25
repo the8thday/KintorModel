@@ -11,14 +11,18 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## time series analysis in R
 
-时间序列数据首先应该符合时间单位。不是所有等step的数据都叫做时序数据。
+时间序列数据首先应该符合时间单位。不是所有等step的数据都叫做时序数据。不过等step的数据应该可以采用同样的分析方法吧。。。
+Arma及其衍生模型，Garch簇模型，滤波技术，傅里叶和小波分析.
+
 ```{r}
+library(tidymodels)
 library(lubridate)
 library(forecast)
 ```
 
 
-### stats package
+### stats:: package
+base R 中的ts函数, forcast函数
 
 ```{r}
 x <- c(580, 7813, 28266, 59287, 75700,
@@ -31,13 +35,13 @@ mts <- ts(x, start = decimal_date(ymd("2020-01-22")),
                             frequency = 12)
    
 # forecasting model using arima model
-fit <- auto.arima(mts)
+m_fit <- auto.arima(mts)
    
 # Next 5 forecasted values
-forecast(fit, 5)
+forecast(m_fit, 5)
    
 # plotting the graph with next5 weekly forecasted values
-plot(forecast(fit, 5), xlab ="Weekly Data",
+plot(forecast(m_fit, 5), xlab ="Weekly Data",
 ylab ="Total Positive Cases",
 main ="COVID-19 Pandemic", col.main ="darkgreen")
 ```
@@ -50,13 +54,15 @@ library(modeltime)
 ```
 
 ```{r}
-dat <- timetk::tk_tbl(mts) %>%
-  rename('date' = 'index')
+# timetk 构建待分析数据
+# dat <- timetk::tk_tbl(mts) %>%
+#   rename('date' = 'index')
+dat <- m4_monthly %>% filter(id == "M750")
 
 # Model 1: auto_arima ----
 model_fit_arima_no_boost <- arima_reg() %>%
     set_engine(engine = "auto_arima") %>%
-    fit(value ~ date, data = dat)
+    fit(value ~ date, data = m750)
 
 # Model 2: arima_boost ----
 model_fit_arima_boosted <- arima_boost(
@@ -85,7 +91,10 @@ models_tbl %>%
 
 ### tidyverts
 
+tidyverts是一个类似tidyverse整合一系列时间序列分析的R包集合.
+
 ```{r}
+library(fable)
 library(TSstudio)
 ```
 

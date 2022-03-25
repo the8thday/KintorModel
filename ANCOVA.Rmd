@@ -40,6 +40,8 @@ skimr::skim(df)
 首先是否满足的分析条件，和一般线性回归一样，需要满足LINE，同时还需要协变量和因变量之间不存在交互效应。
 以下分步骤所做的检测，亦可在模型建立后performance::check_model进行（推荐）。
 
+*对于不满足条件的，可以用sm包的非参数检验方法的sm.ancova()函数进行。*
+
 ```{r}
 # 正态性
 df %>% group_by(`研究项目分组`) %>% identify_outliers(diffW24)

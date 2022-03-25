@@ -43,7 +43,10 @@ car::Anova(dd, type = 'III')
 crf.lm <- lm(formula = Index ~ gender * education, data = df)
 
 car::Anova(crf.lm)
+
+
 ```
+
 
 
 

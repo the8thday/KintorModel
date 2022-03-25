@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## 高斯混合模型
 
 https://towardsdatascience.com/mixture-modelling-from-scratch-in-r-5ab7bfc83eef
-高斯混合模型是非监督的聚类方法，其和kmeans都是利用EM(Expectation-Maximization) algorithm
+高斯混合模型是非监督的聚类方法，其和kmeans都是利用EM(Expectation-Maximization) algorithm 进行的。
 
 ```{r}
 library('easystats')
