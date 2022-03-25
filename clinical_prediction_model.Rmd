@@ -9,8 +9,26 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## 
+## 临床预测模型的一般流程
 
+1. 建模，同时要关注变量的筛选
+2. 验证模型
+3. 列线图等
+
+下面以一个示例记录详细的建模过程。
+
+
+```{r}
+library(easystats)
+library(rms)
+
+```
+
+
+```{r}
+
+
+```
 
 
 
