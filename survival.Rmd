@@ -10,6 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # 生存分析的COX回归和KM分析
+https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html
+
+生存分析所分析的数据特点为time-to-event数据，time总是from to end的，比如Time from response to recurrence
+这类最常见的数据，在面对此类数据时除了period需要考察外还需要考虑起始时间的特点，这一点在删失数据的各种分类更需注意。
+对于左删失和interval censor数据需要别的数据处理方法，此处主要讨论以右删失数据为主。
 
 ## cox regression
 
@@ -53,6 +58,18 @@ mod_strata # 分层变量不在作为自变量因素
 summary(mod_strata)
 
 ```
+
+变量筛选
+
+```{r}
+# 提取模型estimate
+broom::tidy(mod, exp = TRUE)
+
+# 输出漂亮表格
+gtsummary::tbl_regression(mod)
+
+```
+
 
 c-index以及校准曲线:
 c-index用于评估模型的区分度，可以理解为模型拟合后自身的区分能力。
@@ -104,6 +121,18 @@ plotROC(roc_res,
         lwd=2,
         col="red",
         legend="Model1")
+
+```
+
+### 呈现cox回归的结果
+interpret the results is so import!
+
+```{r}
+# The HR is interpreted as the instantaneous rate of occurrence of the event of interest in those who are still at risk for the event. It is not a risk, though it is commonly interpreted as such
+# HR = 0.59 implies that around 0.6 times as many females are dying as males, at any given time
+
+
+
 
 ```
 
@@ -231,18 +260,143 @@ ggplot(dca1,
 
 
 *KM plot*
-Landmark分析：如果随访的不同时间段间基础风险发生变化，需要分时间段分别分析
 
 ```{r}
-fit <- survfit()
+fit <- survfit(Surv(time, status==2) ~ sex, data = lung,
+               conf.int = 0.95,
+               se.fit = TRUE
+               )
+fit # 中位生存期以及95%CI
 
 # 中位生存期、95%CI
+surv_median(fit)
+surv_pvalue(fit)
 
+# Estimating x-year survival
+# 查看某个时间点的生存率, 如下示例为1年时的生存率
+summary(survfit(Surv(time, status) ~ 1, data = lung), times = 365.25)
+
+# 从survdiff中提取pvalue
+sd <- survdiff(Surv(time, status) ~ sex, data = lung)
+1 - pchisq(sd$chisq, length(sd$n) - 1)
 
 # KM plot
+pp <- ggsurvplot(fit, 
+                 data = lung,
+                 surv.median.line = "hv",
+                 legend.title = "Subtype",
+                 legend.labs = c("Male", "Female"),
+                 legend = c(0.9,0.9),
+                 censor.shape="|", censor.size = 4,
+                 pval = TRUE,
+                 pval.method = TRUE,
+                 pval.size = 4,
+                 # pval.coord = c(0, 0.03),
+                 conf.int = FALSE,
+                 conf.int.style = "step",
+                 add.all = FALSE,
+                 risk.table = 'abs_pct',
+                 tables.height = 0.2,
+                 tables.theme = theme_cleantable(),
+                 risk.table.fontsize = 5,
+                 risk.table.y.text = TRUE,
+                 fontsize = 8,
+                 font.x = c(15),
+                 font.y = c(15),
+                 # font.family = 'Book Antiqua',
+                 # font.tickslab = c(20, "plain"),
+                 ncensor.plot = FALSE,
+                 ncensor.plot.height = 0.25,
+                 # cumevents.y.text = 8,
+                 # ylab="Cumulative survival (percentage)",
+                 xlab = " Time(Days)",
+                 break.time.by = 50,
+                 palette = 'aaas',
+                 ggtheme = cowplot::theme_cowplot(font_size = 15) +
+                   theme(axis.text.x = element_text(face = 'bold'),
+                         axis.text.y = element_text(face = 'bold'),
+                         axis.line = element_line(linetype = 'solid',
+                                                  size = 1),
+                         axis.ticks = element_line(size = 1),
+                         axis.title = element_text(face = 'bold')
+                   )
+                 # ggtheme = theme_survminer() +
+                 #   theme(legend.text = element_text(size = 20),
+                 #         legend.title = element_text(size = 20),
+                 #         axis.text.x = element_text(size = 20),
+                 #         text = element_text(size = 20),
+                 #         plot.title = element_text(hjust = 0.0)
+                   # )
+)
+pp$plot <- pp$plot + 
+  labs(title    = "Survival curves",
+       subtitle = "Based on Kaplan-Meier estimates"
+  ) +
+  scale_x_continuous(expand = c(0, 0)) + 
+  scale_y_continuous(expand = c(0, 0))
+pp
+```
+
+*Landmark分析：*如果随访的不同时间段间基础风险发生变化，需要分时间段分别分析。处理KM曲线交叉的情况.
+
+更一般的，当处理非baseline变量时
+
+```{r}
+# landmark 分析, 分时间段分析, 以某个时间点为截断点，分别做KM分析，以解决time-to-treatment bias或immortal time bias
+# https://github.com/jinseob2kim/jskm
+# https://bbisr.shinyapps.winship.emory.edu/CASAS/
+jskm(fit, mark = F,  surv.scale = "percent", pval =T, table = T, 
+     cut.landmark = 500, # 需要修改的函数
+     showpercent = T)
+
+
+p3 <- jskm(fit,
+         pval = T,
+         table = T,
+         label.nrisk = "Numbers at risk",
+         ystrataname = "Treatment",
+         ystratalabs = c("Obs", "Lev", "Lev+5FU"),
+         marks = F,
+         linecols = "Set2",
+         xlabs = "Time (Day)",
+         cut.landmark = 365)#选择分界点
+
+
+# landmark的分析，首先需要选择landmark time
+# 然后再选择time 大于landmark time的人群
+# Calculate follow-up from landmark time and apply traditional log-rank tests or Cox regression
+
+
 ```
 
 
+### Random Forests Model for survival
+
+```{r}
+# ranger model
+r_fit <- ranger(Surv(time, status) ~ trt + celltype + 
+                     karno + diagtime + age + prior,
+                     data = vet,
+                     mtry = 4,
+                     importance = "permutation",
+                     splitrule = "extratrees",
+                     verbose = TRUE)
+
+# Average the survival models
+death_times <- r_fit$unique.death.times 
+surv_prob <- data.frame(r_fit$survival)
+avg_prob <- sapply(surv_prob,mean)
+
+# Plot the survival models for each patient
+plot(r_fit$unique.death.times,r_fit$survival[1,], 
+     type = "l", 
+     ylim = c(0,1),
+     col = "red",
+     xlab = "Days",
+     ylab = "survival",
+     main = "Patient Survival Curves")
+
+```
 
 
 
