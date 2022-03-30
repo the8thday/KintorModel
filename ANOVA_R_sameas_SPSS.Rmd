@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## ANOVA_R_sameas_SPSS
 
+在做方差分析时，R里默认的contrasts和SPSS里面不一致, 现将其一致的结果整理如下：
+
 http://www.statscanbefun.com/rblog/2015/8/27/ensuring-r-generates-the-same-anova-f-values-as-spss
 
 https://medium.com/humansystemsdata/analysis-of-variance-showdown-r-vs-spss-f4e50234a94
@@ -31,7 +33,7 @@ There are three things you need to do to ensure ANOVA F-values in R match those 
 
 options(contrasts = c("contr.helmert", "contr.poly"))
 
-df <- haven::read_sav('')
+df <- haven::read_sav('~/Downloads/两因素方差分析-SPSS教程-医咖会/16 双因素方差分析.sav')
 
 dd <- aov(Index ~ gender * education, data = df)
 car::Anova(dd, type = 'III')
@@ -39,7 +41,7 @@ car::Anova(dd, type = 'III')
 ```
 
 ```{r}
-# same as dd
+# same as dd, 用线性模型得到的结果
 crf.lm <- lm(formula = Index ~ gender * education, data = df)
 
 car::Anova(crf.lm)
@@ -48,7 +50,82 @@ car::Anova(crf.lm)
 ```
 
 
+## 重复测量方差分析
+#### 单因素重复测量方差分析一般指单一的Time因素
+主要讨论
+#### 双因素重复测量方差分析
 
+重复测量方差分析适用于结局变量为连续变量，且因变量符合正态分布 的数据。
+
+比如常见的医学数据，对两组患者的在不同时间采样的某项定量数据，是最为常见的试验设计方式。一般因变量的测量为不同时期测量数据减去baseline数据作为结局变量。
+对于AB两组各10个人的设计，time为within，group为between；对于10个人都进行两组不同的处理，则time和group都是within因素。
+
+Time作为within-Subjects variables
+between-Subject variables是指何种变量呢？group.
+covariates 如何解释呢？
+
+*单独效应：*
+*主效应：*
+*交互效应：*
+
+
+```{r}
+# 注意数据的category变量要变成factor
+df <- haven::read_sav('./datasets/两因素重复测量的方差分析.sav')
+df <- df %>% pivot_longer(cols = starts_with('t'), names_to = 'time', values_to = 'value') %>% 
+  rstatix::convert_as_factor(group, id, time)
+
+# 重复测量方差分析
+aov_res <- aov(value ~ group * time + Error(id/time), data = df)
+
+aov_res
+summary(aov_res)
+
+parameters::model_parameters(aov_res)
+effectsize::eta_squared(aov_res)
+
+# emmeans
+grafify::posthoc_Levelwise(Model = aov_res,
+                           Fixed_Factor = c("group"),
+                           infer = c(TRUE, TRUE)
+                           )
+
+
+## use 
+aov_res2 <- rstatix::anova_test(formula = value ~ group * time + Error(id/time),
+                    data = df
+                    )
+
+
+```
+
+*Repeated-measures ANOVA with the car package*
+https://mspeekenbrink.github.io/sdam-r-companion/repeated-measures-anova.html
+
+```{r}
+library(car)
+library(afex)
+
+# car::Anova()需要宽数据，以下用afex包进行分析
+
+
+# afex provides an abridged ANOVA table, where the Greenhouse-Geisser correction is automatically applied
+afmod <- afex::aov_car(value ~ group * time + Error(id/time), 
+                       data = df)
+afmod
+summary(afmod)
+afex::nice(afmod, es="pes", correction = "none")
+
+em_version <- emmeans::emmeans(afmod, specs = ~ group)
+em_version
+emmeans::contrast(em_version, method=list("group1 - group2" = c(1,-1)))
+
+grafify::posthoc_Levelwise(Model = afmod,
+                           Fixed_Factor = c("group"),
+                           infer = c(TRUE, TRUE)
+                           )
+
+```
 
 
 
