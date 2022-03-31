@@ -27,13 +27,21 @@ There are three things you need to do to ensure ANOVA F-values in R match those 
 3. Conduct analysis using Type III Sums of Squares
 
 
+```{r}
+library(tidyverse)
+library(easystats)
+library(ggeffects)
+library(compareGroups)
+```
+
 
 ```{r}
 # We need to change the default contrast for unordered factors from "cont.treatment" to "contr.helmert". We do this with the command below
 
 options(contrasts = c("contr.helmert", "contr.poly"))
 
-df <- haven::read_sav('~/Downloads/两因素方差分析-SPSS教程-医咖会/16 双因素方差分析.sav')
+df <- haven::read_sav('~/Downloads/两因素方差分析-SPSS教程-医咖会/16 双因素方差分析.sav') %>% 
+  rstatix::convert_as_factor(gender, education)
 
 dd <- aov(Index ~ gender * education, data = df)
 car::Anova(dd, type = 'III')
@@ -48,6 +56,33 @@ car::Anova(crf.lm)
 
 
 ```
+
+一个较为完善的方差分析，post-hoc
+
+```{r}
+# 单因素方差分析
+df %>% group_by(education) %>% 
+  check_outliers(method = c(
+  "mahalanobis",
+  "iqr",
+  "zscore"
+))
+df %>% group_by(education) %>% 
+  shapiro_test(Index)
+
+aov.res.one <- aov(Index ~ education, data = df)
+car::Anova(aov.res.one, type = 'III')
+# 模型检验，符合正态分布、方差齐性等
+check_model(aov.res.one)
+
+
+# 双因素方差分析
+aov.res.two <- aov(Index ~ gender * education, data = df)
+car::Anova(aov.res.two, type = 'III')
+
+
+```
+
 
 
 ## 重复测量方差分析
@@ -71,9 +106,10 @@ covariates 如何解释呢？
 
 ```{r}
 # 注意数据的category变量要变成factor
-df <- haven::read_sav('./datasets/两因素重复测量的方差分析.sav')
-df <- df %>% pivot_longer(cols = starts_with('t'), names_to = 'time', values_to = 'value') %>% 
+df_wider <- haven::read_sav('./datasets/两因素重复测量的方差分析.sav')
+df <- df_wider %>% pivot_longer(cols = starts_with('t'), names_to = 'time', values_to = 'value') %>% 
   rstatix::convert_as_factor(group, id, time)
+df$time <- factor(df$time, levels = c('t0', 't5', 't30', 't60', 't120'))
 
 # 重复测量方差分析
 aov_res <- aov(value ~ group * time + Error(id/time), data = df)
@@ -84,14 +120,14 @@ summary(aov_res)
 parameters::model_parameters(aov_res)
 effectsize::eta_squared(aov_res)
 
-# emmeans
+# emmeans 对aov的协方差似乎不适用。。。
 grafify::posthoc_Levelwise(Model = aov_res,
                            Fixed_Factor = c("group"),
                            infer = c(TRUE, TRUE)
                            )
 
 
-## use 
+## use rstatix package
 aov_res2 <- rstatix::anova_test(formula = value ~ group * time + Error(id/time),
                     data = df
                     )
@@ -106,7 +142,15 @@ https://mspeekenbrink.github.io/sdam-r-companion/repeated-measures-anova.html
 library(car)
 library(afex)
 
-# car::Anova()需要宽数据，以下用afex包进行分析
+# car::Anova()需要宽数据，以下用afex包分析长数据
+df_wider <- df_wider %>%  rstatix::convert_as_factor(group, id)
+
+mvmod <- lm(cbind(t0, t5, t30, t60, t120) ~ group, data=df_wider)
+idata <- data.frame(Time = factor(c("t0", "t5", "t30", "t60", "t120")))
+contrasts(idata$Time) # check the levels, 好像有点搞不懂，还是用afex包吧。
+rmaov <- car::Anova(mvmod, idata=idata, idesign = ~Time,  type=3)
+rmaov
+summary(rmaov, multivariate=FALSE)
 
 
 # afex provides an abridged ANOVA table, where the Greenhouse-Geisser correction is automatically applied
@@ -119,6 +163,10 @@ afex::nice(afmod, es="pes", correction = "none")
 em_version <- emmeans::emmeans(afmod, specs = ~ group)
 em_version
 emmeans::contrast(em_version, method=list("group1 - group2" = c(1,-1)))
+
+plot(ggemmeans(afmod, terms = c("time", "group"),
+               condition = c(diagnose = "severe"))) +
+  ggplot2::ggtitle("EMMEANS Plot")
 
 grafify::posthoc_Levelwise(Model = afmod,
                            Fixed_Factor = c("group"),
