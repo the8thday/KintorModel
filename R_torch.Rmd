@@ -1,0 +1,23 @@
+---
+title: "R torch"
+author: "liuc"
+date: '2022-03-04'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R torch
+
+```{r}
+library(torch)
+```
+
+
+
+```{r}
+
+```
+
