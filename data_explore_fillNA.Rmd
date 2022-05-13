@@ -1,0 +1,17 @@
+---
+title: "data_explore"
+author: "liuc"
+date: '2022-05-05'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Explore
+
+
+
+
+## fill NA
