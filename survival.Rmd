@@ -12,9 +12,13 @@ knitr::opts_chunk$set(echo = TRUE)
 # 生存分析的COX回归和KM分析
 https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html
 
+本笔记主要记录较为完整的Cox回归模型和KM分析，其中对于Lasso-Cox、mixed-Cox等，详见*lasso_cox.Rmd*, *mixed_cox.Rmd*这两个笔记。
+
 生存分析所分析的数据特点为time-to-event数据，time总是from to end的，比如Time from response to recurrence
 这类最常见的数据，在面对此类数据时除了period需要考察外还需要考虑起始时间的特点，这一点在删失数据的各种分类更需注意。
 对于左删失和interval censor数据需要别的数据处理方法，此处主要讨论以右删失数据为主。
+
+
 
 ## cox regression
 
