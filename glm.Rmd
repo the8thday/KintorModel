@@ -67,19 +67,34 @@ summary(lm_fit2)
 ```
 
 ## different family
+
 对于广义线性模型，对不同数据具有不同的模型选择。
+
+
+
+### 负二项分布
 
 ```{r}
 # 负二项分布
-# 负二项分布回归一般用于count数据，尤其较为离散分布的count数据
+# 负二项分布回归一般用于count数据，尤其较为离散over-dispersed分布的count数据，柏松分布假设means和var是same的。
 # negative binomial models assume the conditional means are not equal to the conditional variances
 library(MASS)
 dat <- read_csv('./datasets/Lab_exp.csv')
 
+# check assumptions
+with(dat, tapply(Diplo_intensity, Treatment, function(x) {
+    sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
+}))
+
 m1 <- MASS::glm.nb(formula = Diplo_intensity~Treatment,
-                   data = dat)
+                   data = dat %>% filter(Treatment %in% c('Infected HG', 'Control')))
+
+# 95% CI for estimate
+est <- cbind(Estimate = coef(m1), confint(m1))
+exp(est)
 
 summary(m1)
+anova(m1)
 ```
 
 ```{r}
@@ -93,13 +108,15 @@ mm1 <- manyglm(
 )
 
 summary(mm1)
-summary.manyglm(mm1, test = 'wald', nBoot = 9999)
+# summary.manyglm(mm1, test = 'wald', nBoot = 9999)
 ```
 
 
-*结果解读* 
+*结果解读: *对于MASS包，其summary后的系数和一般线性模型的解释类似，如连续性变量则是其每改变一个单位对outcome的log count的影响，对于离散变量则是和refer group的对比。
 
-多变量的二者的对比
+
+
+多变量的MASS package & manyglm的对比
 
 ```{r}
 m2 <- MASS::glm.nb(Diplo_intensity~Treatment+Fish_family+Fish_sex+Initial_weight_g, 
@@ -112,11 +129,34 @@ mm2 <- manyglm(Diplo_intensity~Treatment+Fish_family+Fish_sex+Initial_weight_g,
 summary.manyglm(mm2, test = 'wald', nBoot = 9999)
 ```
 
-评估负二项分布, 对于mvabund包performance上不支持，不过mvabund有提供一些手段。
+评估负二项分布, 对于mvabund包performance包不支持，不过mvabund自身有提供一些手段; 对于MASS包的结果是支持的。
 
 ```{r}
 performance::check_model(m2)
 ```
+
+
+```{r}
+# 对于两个模型的对比
+m3 <- MASS::glm.nb(Diplo_intensity~Treatment + Fish_family, 
+                   data = dat)
+
+anova(m1, m3)
+
+# 既然nb对于小数据不是很合适，对于DESeq2中的应用是怎么应用的呢
+# To proceed, we need to make distributional assumptions. Essentially, what such assumptions do is that they let us compute the probabilities of rare events in the tails of the distribution – i.e., extraordinarily high or low counts – from a small number of distribution parameters.
+
+```
+
+
+下面是RNA counts数据的一个例子
+https://www.huber.embl.de/msmb/Chap-CountData.html
+```{r}
+
+```
+
+
+
 
 ### log binomial
 
@@ -156,6 +196,8 @@ lb <- logbin(
 )
 performance::performance(lb)
 ```
+
+
 
 ### modified Poisson regression
 
