@@ -17,7 +17,7 @@ Canonical correlation analysis is used to identify and measure the associations 
 
 典型相关可以理解为一组变量和另外一组变量间的关系的方法。比如我们可以把多重线性回归看成是一个变量和一组变量间关系的描述，而CCA则是一组和一组，即是有多个因变量。这些一组变量间一般会归属于一类，nest。 根据变量间的关系，寻找少数几个关系简单的综合变量对，替代关系复杂的实际观察变量。这些综合变量被称为‘典型变量’。
 
-**Examples of canonical correlation analysis** Example 1. A researcher has collected data on three psychological variables, four academic variables (standardized test scores) and gender for 600 college freshman. She is interested in how the set of psychological variables relates to the academic variables and gender. In particular, the researcher is interested in how many dimensions (canonical variables) are necessary to understand the association between the two sets of variables.
+*Examples of canonical correlation analysis* Example 1. A researcher has collected data on three psychological variables, four academic variables (standardized test scores) and gender for 600 college freshman. She is interested in how the set of psychological variables relates to the academic variables and gender. In particular, the researcher is interested in how many dimensions (canonical variables) are necessary to understand the association between the two sets of variables.
 
 Example 2. A researcher is interested in exploring associations among factors from two multidimensional personality tests, the MMPI and the NEO. She is interested in what dimensions are common between the tests and how much variance is shared between them. She is specifically interested in finding whether the neuroticism dimension from the NEO can account for a substantial amount of shared variance between the two tests.
 
@@ -30,7 +30,7 @@ require(CCA)
 
 ```{r}
 # 首先还是对数据的探索和条件的满足，不过此处只考虑数据输入格式和可以解决的问题。
-mm <- read.csv("https://stats.idre.ucla.edu/stat/data/mmreg.csv")
+mm <- read.csv("./datasets/mmreg.csv")
 colnames(mm) <- c("Control", "Concept", "Motivation", "Read", "Write", "Math", 
     "Science", "Sex")
 # 典型相关分析的模型假定
@@ -54,3 +54,7 @@ cc2[3:6]
 
 
 ```
+
+
+interpret results: 
+
