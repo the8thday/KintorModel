@@ -155,6 +155,7 @@ contrast(emm_res, method = 'trt.vs.ctrl',
 ```
 
 ####  将结果输出成所需要的表格并绘制森林图
+*森林图*
 
 ```{r}
 con_p <- pc$contrasts %>% as.data.frame() %>% 
