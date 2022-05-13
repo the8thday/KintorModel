@@ -1,6 +1,7 @@
 # 处理数据的NA值，是常见的操作。在此做一个总结
 
 library(mice)
+library(ggmice)
 library(VIM)
 library(visdat)
 library(DataExplorer)

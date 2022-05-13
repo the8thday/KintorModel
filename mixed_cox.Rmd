@@ -29,6 +29,7 @@ summary(m)
 # Competing Risks Regression
 
 竞争风险模型是指event有多种，一种发生则另外一种不发生。在竞争事件存在的情况下各个结局事件的累计发病函数是如何随着时间变化的，以及如何来比较不同的累计发病函数，以及如何探讨影响因素
+
 ```{r}
 library(cmprsk)
 library(finalfit)
