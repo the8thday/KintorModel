@@ -13,32 +13,90 @@ knitr::opts_chunk$set(echo = TRUE)
 
 lasso cox 回归主要是用于对cox回归中的系数进行筛选，并在此基础之上进一步建模分析。在对于变量间的多重共线性，以及变量多于样本的情况下，可以发挥较好的作用。
 
+The glmnet package provides procedures for fitting the entire lasso or elastic-net regularization path for Cox models. The glmpath package implements a L1 regularised Cox proportional hazards model. An L1 and L2 penalised Cox models are available in penalized.
+
+复现文献：https://bmccancer.biomedcentral.com/articles/10.1186/s12885-021-07916-3
+
+
 ```{r}
 library(glmnet)
 
-# data(lung, package = 'survival')
+data(lung, package = 'survival')
+
+
 lung <- na.omit(lung)
-X <- model.matrix(~sex+age+ph.ecog+ph.karno+pat.karno+meal.cal+wt.loss, 
+X <- model.matrix(~sex+age+ph.ecog+ph.karno+pat.karno+meal.cal+wt.loss,
                   data=lung)[,-1]
 # 注意NA值要删除
 
 y = Surv(lung$time, lung$status)
+
+data(CoxExample)
+X <- CoxExample$x
+y <- CoxExample$y
 ```
 
 
+常见的用法似乎是通过cv进行变量筛选后，再进行常规的cox回归。包括单变量Cox和多变量Cox。
 ```{r}
-
-fitcv <- cv.glmnet(X,y,family="cox", 
+# cross-validation
+fitcv <- cv.glmnet(X,
+                   y,
+                   family="cox", 
                    alpha=1,
+                   type.measure = 'C',
                    nfolds=10)
 
 plot(fitcv)
-plot(fitcv, xvar='lambda', label = TRUE)
+plot(fitcv$glmnet.fit, xvar="lambda")
 
 best_lambda <- fitcv$lambda.min # find optimal lambda value that minimizes test MSE
+fitcv$lambda.1se
+
+# extract the coefficients at certain values of λ
 coef(fitcv, s = 'lambda.min')
+coef(fitcv, s=fitcv$lambda.min)[coef(fitcv, s=fitcv$lambda.min)!=0]
+
+
+broom::tidy(fitcv)
+# lambda 为；estimate为；
 ```
 
+对于上图的解读：第一幅图，the left vertical line in our plot shows us where the CV-error curve hits its minimum.
+The right vertical line shows us the most regularized model with CV-error within 1 standard deviation of the
+minimum。两条线所对应的数值可以分别选择作为选择变量的不同阈值。
+第二幅图，为随着lamda变化变量系数的变化。
+从上述结果可以看到共有10个变量被保留了下来。
+
+
+```{r}
+cv.fit <- fitcv
+
+tidied_cv = broom::tidy(cv.fit)
+ggplot(tidied_cv, aes(lambda, estimate)) +
+ geom_line(color = "red") +
+ geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .3) +
+ scale_x_sqrt() +
+ geom_vline(xintercept = cv.fit$lambda.min, lty=2) +
+ ylab('Partial Likelihood Deviance') +
+ # ylim(0, 200) +
+ ggthemes::theme_excel()
+ 
+tidy_covariates = broom::tidy(cv.fit$glmnet.fit)
+cols = colors()[!grepl("grey", colors()) & ! grepl("gray", colors())]
+col_sam = sample(cols, length(unique(tidy_covariates$term)))
+ggplot(tidy_covariates, aes(x=lambda, y=estimate, color=as.factor(term)))+
+ geom_line() +
+ guides(color='none') +
+ geom_vline(xintercept = cv.fit$lambda.min, lty=2) +
+ scale_x_sqrt()+
+ ggthemes::theme_excel()+
+ scale_color_manual(values=col_sam)+
+ ylab("Coefficients")
+```
+
+
+以下best_lambda似乎有问题
 ```{r}
 #find coefficients of best model
 best_model <- glmnet(X, y, family="cox", 
@@ -46,10 +104,41 @@ best_model <- glmnet(X, y, family="cox",
                      lambda = best_lambda
                      )
 coef(best_model)
+
+best_model$beta
+
+plot(best_model)
 plot(best_model, xvar='lambda', label = TRUE)
 ```
 
-meal.cal变量没有系数，是因为被lasso算法所drop了
+meal.cal变量没有系数，是因为被lasso算法所drop了.
+
+*interpret* 上述的Lasso-Cox回归，首先通过cv得到最佳的lamda参数；然后拟合模型，coef得到的系数中，NA为lasso删除掉的系数。
+
+
+
+对于没有用best_lambda得到的lamda参数绘图，其结果如下，这种和上图best_model的鲜明对比是因为从sequence变成了单个数字
+```{r}
+fit <- glmnet(X, y,
+              alpha = 1,
+              family = 'cox'
+              )
+
+plot(fit)
+```
+
+
+nomograph based on lasso-cox regression
+
+具体的见*survival.Rmd*
+
+
+```{r}
+library(nricens)
+library(stdca)
+library(rmda)
+library(timeROC)
+```
 
 
 ```{r}
