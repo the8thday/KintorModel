@@ -1,0 +1,223 @@
+---
+title: "random_forest_tidymodels"
+author: "liuc"
+date: '2022-05-23'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## random_forest_tidymodels
+
+Random forest model by tidymodels
+
+```{r echo=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(vip)
+
+tidymodels_prefer()
+doParallel::registerDoParallel()
+```
+
+
+prepare input data
+
+```{r}
+expr_file <- "datasets/prostat.expr.symbol.txt"
+metadata_file <- "datasets/prostat.metadata.txt"
+
+expr_mat <- read_delim(expr_file, delim = '\t') %>% 
+  janitor::clean_names()
+metadata <- read_delim(metadata_file, delim = '\t') %>% 
+  janitor::clean_names()
+
+input_data <- expr_mat %>% column_to_rownames('symbol') %>% t() %>% 
+  as.data.frame() %>% rownames_to_column() %>% as_tibble() %>% 
+  janitor::clean_names() %>% 
+  left_join(metadata, by = c('rowname'='sample')) %>% 
+  mutate(class = as_factor(class))
+
+
+# 此处也可以保留rowname列，在下文中通过recipe中的`update_role`进行
+set.seed(42)
+df_split <- initial_split(input_data %>% select(-rowname))
+
+df_train <- training(df_split)
+df_test <- testing(df_split)
+
+```
+
+
+#### rpart 分类问题
+树模型的种类繁多，此处选择`rpart`包。
+
+```{r}
+class_tree_spec <- decision_tree() %>%
+  set_engine('rpart') %>% 
+  set_mode("classification")
+
+# 初步的模型, 进行模型的一些探索性分析
+class_tree_fit <- class_tree_spec %>% 
+  fit(class ~ ., data = df_train)
+
+
+augment(class_tree_fit, new_data = df_train) %>%
+  accuracy(truth = High, estimate = .pred_class)
+
+augment(class_tree_fit, new_data = df_train) %>%
+  conf_mat(truth = High, estimate = .pred_class)
+```
+
+
+`rpart.plot` 可以对rpart数进行可视化，此处做一个展示:
+```{r}
+class_tree_fit %>% 
+  extract_fit_engine() %>% 
+  rpart.plot::rpart.plot()
+
+```
+
+
+交叉验证和网格搜索确定最后的模型
+```{r}
+class_tree_wf <- workflow() %>%
+  add_model(class_tree_spec %>% 
+              set_args(cost_complexity = tune())) %>% # 选择网格搜索的参数
+  add_formula(class ~ .)
+# k-fold cross-validation
+set.seed(42)
+df_fold <- vfold_cv(df_train)
+
+param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
+
+# 运行时间也太长了。。
+tune_res <- tune_grid(
+  class_tree_wf, 
+  resamples = df_fold, 
+  grid = param_grid, 
+  metrics = metric_set(accuracy)
+)
+autoplot(tune_res)
+
+best_complexity <- select_best(tune_res)
+
+class_tree_final <- finalize_workflow(class_tree_wf, best_complexity)
+
+class_tree_final_fit <- fit(class_tree_final, data = df_train)
+class_tree_final_fit
+
+```
+
+
+
+```{r}
+class_tree_final_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+```
+
+
+
+#### Random Forests 分类问题
+
+随机森林的R包中
+
+```{r}
+rf_spec <- rand_forest() %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+# tune the hyperparameters
+class_rf_wf <- workflow() %>% 
+  add_model(rf_spec %>% set_args(
+    mtry = tune(),
+    trees = 1000,
+    min_n = tune()
+  )) %>% 
+  add_formula(class ~.)
+
+
+set.seed(42)
+trees_folds <- vfold_cv(df_train,
+                        v = 10
+                        )
+
+tune_res <- tune_grid(
+  class_rf_wf,
+  resamples = trees_folds,
+  grid = 4
+)
+
+```
+
+
+AUC for `tune_res`: 
+在进行超参数网格搜索时可以先以一些值进行，然后根据模型的表现多尝试几次tune
+```{r}
+tune_res %>%
+  collect_metrics() %>%
+  filter(.metric == "roc_auc") %>%
+  select(mean, min_n, mtry) %>%
+  pivot_longer(min_n:mtry,
+    values_to = "value",
+    names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "AUC")
+
+```
+
+
+*Choosing the best model*
+```{r}
+best_auc <- select_best(tune_res, "roc_auc")
+
+final_rf <- finalize_model(
+  tune_spec,
+  best_auc
+)
+
+final_rf
+
+# This function fits a final model on the entire training set and evaluates on the testing set
+final_wf <- rf_wf %>% finalize_workflow(final_rf)
+final_fit <- final_wf %>% fit(train)
+# final_res <- final_wf %>%
+#   last_fit(trees_split)
+```
+
+variable importance by package `vip`：
+```{r}
+final_rf %>%
+  set_engine("ranger", importance = "permutation") %>%
+  fit(legal_status ~ .,
+    data = juice(tree_prep) %>% select(-tree_id)
+  ) %>%
+  vip(geom = "point")
+```
+
+
+```{r}
+wet_pred <- predict(final_fit, new_data = test) %>%
+  bind_cols(predict(final_fit, test, type = "prob")) %>%
+  bind_cols(test %>% select(class))
+
+wet_pred %>%  roc_auc(truth = class, .pred_wet, event_level="second")
+
+wet_pred %>% accuracy(truth = class, .pred_class)
+```
+
+
+```{r}
+tidypredict_fit(final_rf)[[1]]
+```
+
+
+
+
+
