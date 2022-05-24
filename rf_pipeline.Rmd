@@ -15,13 +15,14 @@ knitr::opts_chunk$set(echo = TRUE)
 library(caret)
 library(glmnet)
 
-# library()
+library(Boruta)
+
 ```
 
 read data
 ```{r}
-expr_file <- "/Users/congliu/OneDrive/kintor/script/prostat.expr.symbol.txt"
-metadata_file <- "/Users/congliu/OneDrive/kintor/script/prostat.metadata.txt"
+expr_file <- "datasets/prostat.expr.symbol.txt"
+metadata_file <- "datasets/prostat.metadata.txt"
 expr_mat <- read.table(expr_file, row.names = 1, header = T, sep="\t", 
                        stringsAsFactors =T)
 # 处理异常的基因名字
@@ -37,6 +38,8 @@ expr_mat <- expr_mat[common_sampleL,,drop=F]
 metadata <- metadata[common_sampleL,,drop=F]
 
 ```
+
+
 ```{r}
 set.seed(42)
 
@@ -51,18 +54,25 @@ dim(train_data)
 dim(test_data)
 ```
 
-## 建模
+
+### 建模
+
 特征选择
 ```{r}
-library(Boruta)
 
 boruta <- Boruta::Boruta(x = train_data, y = train_data_group, pValue=0.01, mcAdj=T, maxRuns=300)
 table(boruta$finalDecision)
+
+Boruta::plotImpHistory(boruta)
 ```
-提取重要变量, 其结果为Tentative+Confirmed
+
+
+提取重要变量, 其结果为Tentative+Confirmed, 如下将提取99个变量
+
 ```{r}
 boruta.finalVarsWithTentative <- data.frame(Item=getSelectedAttributes(boruta, withTentative = T), 
                                             Type="Boruta_with_tentative")
+
 caret::featurePlot(train_data[,boruta.finalVarsWithTentative$Item], train_data_group, plot="box")
 
 boruta_train_data <- train_data[, boruta.finalVarsWithTentative$Item]
@@ -93,28 +103,50 @@ rf <- train(x = boruta_train_data,
 print(rf)
 plot(rf)
 ```
-对于mtry亦可通过tuneRF筛选最佳mtry，以下为按照OOBEError
+
+
+对于mtry亦可通过tuneRF筛选最佳mtry，以下为按照OOBEError进行筛选.
+不过似乎不应该这么跑，报warning
 ```{r}
 # dont run this
-bestMtry <- tuneRF(x,y, stepFactor = 1.5, 
+bestMtry <- randomForest::tuneRF(boruta_train_data,train_data_group, 
+                                 stepFactor = 1.5, 
                    improve = 1e-5, ntree = 500)
+
+trControl <- trainControl(method = 'repeatedcv', number = 10, repeats = 3)
+
+tuneGrid <- expand.grid(.mtry=bestMtry)
+
+rf <- train(x = boruta_train_data, 
+            y = train_data_group,
+            method = 'rf',
+            tuneGrid = tuneGrid,
+            trControl = trControl,
+            metric = 'Accuracy'
+            )
+
+print(rf)
+plot(rf)
 ```
 
-# 可视化top20特征，并提取final model
+#### 可视化top20特征，并提取final model
 ```{r}
 dotPlot(varImp(rf), top = 20)
 
 rf_finalModel <- rf$finalModel
 ```
 
-# 模型评价
+#### 模型评价
 ```{r}
 library(pROC)
 
-prediction_prob <- predict(rf_finalModel, newdata = boruta_test_data, type = 'prob')
+prediction_prob <- predict(rf_finalModel, 
+                           newdata = boruta_test_data, type = 'prob')
+
 predictions <- predict(rf_finalModel, newdata = boruta_test_data)
 confusionMatrix(predictions, test_data_group)
 
+# ROC curve
 roc_curve <- roc(test_data_group, prediction_prob[,1])
 roc <- roc(test_data_group, factor(predictions, ordered=T))
 plot(roc)
