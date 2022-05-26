@@ -1,0 +1,114 @@
+---
+title: "SVM_tidymodels"
+author: "liuc"
+date: '2022-05-26'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## SVM_tidymodels
+
+
+```{r}
+expr_file <- "datasets/prostat.expr.symbol.txt"
+metadata_file <- "datasets/prostat.metadata.txt"
+
+expr_mat <- read_delim(expr_file, delim = '\t') %>% 
+  janitor::clean_names()
+metadata <- read_delim(metadata_file, delim = '\t') %>% 
+  janitor::clean_names()
+
+# 此处或可以加上`Boruta`的结果进行一些变量筛选工作
+input_data <- expr_mat %>% column_to_rownames('symbol') %>% t() %>% 
+  as.data.frame() %>% rownames_to_column() %>% as_tibble() %>% 
+  janitor::clean_names() %>% 
+  left_join(metadata, by = c('rowname'='sample')) %>% 
+  mutate(class = if_else(class=='tumor', 1, 0)) %>% 
+  mutate(class = as_factor(class))
+
+
+# 此处也可以保留rowname列，在下文中通过recipe中的`update_role`进行
+set.seed(42)
+df_split <- initial_split(input_data %>% select(-rowname))
+
+prostat_train <- training(df_split)
+prostat_test <- testing(df_split)
+```
+
+
+
+
+```{r}
+book_folds <- vfold_cv(prostat_train, strata = class)
+
+
+
+svm_spec <- svm_linear(mode = "classification")
+
+prostat_rec <-
+  recipe(class ~ ., data = prostat_train)
+
+## just to see how it is working:
+prep(prostat_rec) %>% bake(new_data = NULL) %>% glimpse()
+
+prostat_wf <- workflow(books_rec, svm_spec)
+prostat_wf
+```
+
+
+
+```{r}
+doParallel::registerDoParallel()
+
+set.seed(123)
+books_metrics <- metric_set(accuracy, sens, spec)
+book_rs <- fit_resamples(book_wf, resamples = book_folds, metrics = books_metrics)
+collect_metrics(book_rs)
+```
+
+
+last_fit() to fit one final time to the training data and evaluate one final time on the testing data
+```{r}
+final_rs <- last_fit(book_wf, books_split, metrics = books_metrics)
+collect_metrics(final_rs)
+```
+
+
+confusion matrix
+```{r}
+collect_predictions(final_rs) %>%
+  conf_mat(total_weeks, .pred_class) %>%
+  autoplot()
+```
+
+
+If we decide this model is good to go and we want to use it in the future, we can extract out the fitted workflow. This object can be used for prediction:
+```{r}
+final_fitted <- extract_workflow(final_rs)
+augment(final_fitted, new_data = slice_sample(books_test, n = 1))
+```
+
+
+We can also examine this model (which is just linear with coefficients) to understand what drives its predictions.
+```{r}
+tidy(final_fitted) %>%
+  slice_max(abs(estimate), n = 20) %>%
+  mutate(
+    term = str_remove_all(term, "tf_author_"),
+    term = fct_reorder(term, abs(estimate))
+  ) %>%
+  ggplot(aes(x = abs(estimate), y = term, fill = estimate > 0)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_fill_discrete(labels = c("Fewer weeks", "More weeks")) +
+  labs(x = "Estimate from linear SVM (absolute value)", y = NULL, 
+       fill = "How many weeks on\nbestseller list?")
+```
+
+
+
+
+
