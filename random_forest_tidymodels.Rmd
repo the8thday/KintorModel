@@ -23,7 +23,10 @@ doParallel::registerDoParallel()
 ```
 
 
-prepare input data
+*prepare input data*:
+以下链接有多了癌症组织表达数据集：https://file.biolab.si/biolab/supp/bi-cancer/projections/
+可以拿来做测试数据。
+The prostate data set (Singh et al.) includes the gene expression measurements for 52 prostate tumors and 50 adjacent normal prostate tissue samples.
 
 ```{r}
 expr_file <- "datasets/prostat.expr.symbol.txt"
@@ -34,10 +37,12 @@ expr_mat <- read_delim(expr_file, delim = '\t') %>%
 metadata <- read_delim(metadata_file, delim = '\t') %>% 
   janitor::clean_names()
 
+# 此处或可以加上`Boruta`的结果进行一些变量筛选工作
 input_data <- expr_mat %>% column_to_rownames('symbol') %>% t() %>% 
   as.data.frame() %>% rownames_to_column() %>% as_tibble() %>% 
   janitor::clean_names() %>% 
   left_join(metadata, by = c('rowname'='sample')) %>% 
+  mutate(class = if_else(class=='tumor', 1, 0)) %>% 
   mutate(class = as_factor(class))
 
 
@@ -123,20 +128,20 @@ class_tree_final_fit %>%
 
 #### Random Forests 分类问题
 
-随机森林的R包中
+随机森林的R包中常用的有`ranger`, `randomForest`包，在此选择用ranger包，其的速度似乎更快。
 
 ```{r}
-rf_spec <- rand_forest() %>%
+rf_spec <- rand_forest(
+  mtry = tune(),
+  trees = 1000,
+  min_n = tune()
+) %>%
   set_engine("ranger") %>%
   set_mode("classification")
 
 # tune the hyperparameters
 class_rf_wf <- workflow() %>% 
-  add_model(rf_spec %>% set_args(
-    mtry = tune(),
-    trees = 1000,
-    min_n = tune()
-  )) %>% 
+  add_model(rf_spec) %>% 
   add_formula(class ~.)
 
 
@@ -148,15 +153,19 @@ trees_folds <- vfold_cv(df_train,
 tune_res <- tune_grid(
   class_rf_wf,
   resamples = trees_folds,
-  grid = 4
+  grid = 20
 )
 
+# save(tune_res, file = './datasets/tune_res_rf.rda')
 ```
 
 
 AUC for `tune_res`: 
-在进行超参数网格搜索时可以先以一些值进行，然后根据模型的表现多尝试几次tune
+在进行超参数网格搜索时可以先设置一些值进行，然后根据模型的表现多尝试几次tune, 再最终选择合适的超参数。
+以下探索在各个参数的情况下，以roc_auc matrics为标准的一些参数变化，为了演示grid设置较少。
 ```{r}
+# load('./datasets/tune_res_rf.rda')
+
 tune_res %>%
   collect_metrics() %>%
   filter(.metric == "roc_auc") %>%
@@ -178,43 +187,84 @@ tune_res %>%
 best_auc <- select_best(tune_res, "roc_auc")
 
 final_rf <- finalize_model(
-  tune_spec,
+  rf_spec,
   best_auc
 )
 
 final_rf
 
+
+# final_wf <- class_rf_wf %>% finalize_workflow(final_rf)
+final_wf <- workflow() %>% add_model(final_rf) %>% 
+  add_formula(class ~ .)
+final_fit <- final_wf %>% fit(df_train)
+
 # This function fits a final model on the entire training set and evaluates on the testing set
-final_wf <- rf_wf %>% finalize_workflow(final_rf)
-final_fit <- final_wf %>% fit(train)
-# final_res <- final_wf %>%
-#   last_fit(trees_split)
+final_res <- final_wf %>%
+  last_fit(split = df_split)
+final_res %>% 
+  collect_metrics()
 ```
 
+
 variable importance by package `vip`：
+变量重要性也是经常的目标。
 ```{r}
 final_rf %>%
   set_engine("ranger", importance = "permutation") %>%
-  fit(legal_status ~ .,
-    data = juice(tree_prep) %>% select(-tree_id)
+  fit(class ~ .,
+    data = df_train
   ) %>%
-  vip(geom = "point")
+  vip::vip(geom = "point")
 ```
 
 
 ```{r}
-wet_pred <- predict(final_fit, new_data = test) %>%
-  bind_cols(predict(final_fit, test, type = "prob")) %>%
-  bind_cols(test %>% select(class))
+cancer_pred <- predict(final_fit, new_data = df_test) %>%
+  bind_cols(predict(final_fit, df_test, type = "prob")) %>%
+  bind_cols(df_test %>% select(class))
 
-wet_pred %>%  roc_auc(truth = class, .pred_wet, event_level="second")
+cancer_pred %>%  roc_auc(truth = class, .pred_tumor, event_level="second")
 
-wet_pred %>% accuracy(truth = class, .pred_class)
+cancer_pred %>% accuracy(truth = class, .pred_class)
+
+# confusion matrix
+final_res %>%
+    collect_predictions() %>%
+    conf_mat(class, .pred_class)
+```
+
+
+绘制ROC曲线
+```{r}
+collect_predictions(final_res) %>%
+  roc_curve(class, .pred_normal) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity)) +
+  geom_line(size = 1.5, color = "midnightblue") +
+  geom_abline(
+    lty = 2, alpha = 0.5,
+    color = "gray50",
+    size = 1.2
+  ) +
+  coord_equal()
+```
+
+
+save model
+```{r}
+crash_wf_model <- final_res$.workflow[[1]]
+predict(crash_wf_model, df_test[10, ])
+
+
+saveRDS(crash_wf_model, here::here("crash-api", "crash-wf-model.rds"))
+
+collect_metrics(crash_res) %>%
+  write_csv(here::here("crash-api", "crash-model-metrics.csv"))
 ```
 
 
 ```{r}
-tidypredict_fit(final_rf)[[1]]
+tidypredict::tidypredict_fit(final_rf)[[1]]
 ```
 
 
