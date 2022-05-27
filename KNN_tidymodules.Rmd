@@ -1,0 +1,143 @@
+---
+title: "KNN_tidymoodels"
+author: "liuc"
+date: '2022-05-26'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## KNN
+依旧使用隔壁prostat的数据集，可以看出大部分`tidymodels`的操作逻辑和`scikit-learn`一样具有模式化，这也是其的主要目的，虽然具体模型在matric等方面不同，不过大部分还是一致的，建模、模型评估、在测试集的评估参数等总是需要的。
+
+#### 1. 加载需要的包
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(usemodels)
+```
+
+
+#### 2. 整理输入数据并考虑好变量所要进行的操作
+
+```{r}
+# 参考SVM数据集
+```
+
+
+
+#### 3. CV+GS 得到一系列表现的模型
+
+一个72个样本、9300个变量的数据集，竟然跑了如此之久！Don't run it on your Mac!!!在服务器10个进程大概40分钟。
+
+```{r}
+kknn_recipe <- 
+  recipe(formula = class ~ ., data = prostat_train) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) 
+
+kknn_spec <- 
+  nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
+  set_mode("classification") %>% 
+  set_engine("kknn") 
+
+kknn_workflow <- 
+  workflow() %>% 
+  add_recipe(kknn_recipe) %>% 
+  add_model(kknn_spec) 
+
+
+doParallel::registerDoParallel()
+prostat_folds <- vfold_cv(prostat_train, strata = class)
+metrics = metric_set(accuracy, roc_auc, sens, spec)
+
+set.seed(42)
+kknn_tune <-
+  tune_grid(kknn_workflow, 
+            resamples = prostat_folds, 
+            grid = 20
+            )
+kknn_tune
+```
+
+
+在tune完多个模型参数后，统一的查看其的metrics以进一步确定所需要的模型参数。
+```{r}
+kknn_tune <- readRDS('./datasets/kknn_tune.rds')
+kknn_tune %>% 
+  collect_metrics()
+```
+
+
+*choose the best model*
+依据roc-auc选择表现最佳的模型
+```{r}
+show_best(kknn_tune)
+best_auc <- select_best(kknn_tune, "roc_auc")
+
+final_mod <- finalize_model(
+  kknn_spec,
+  best_auc
+)
+
+final_mod
+```
+然后用得到的最佳参数重新拟合模型.
+```{r}
+final_wf <- workflow() %>% add_model(final_mod) %>% 
+  add_formula(class ~ .)
+# 此处的fit是否需要呢, final_res$.workflow[[1]]应该就是在训练集上的最后的模型
+final_fit <- final_wf %>% fit(prostat_train)
+
+# last_fit在训练集拟合，在测试集verify performance
+final_res <- final_wf %>%
+  last_fit(split = df_split)
+final_res %>% 
+  collect_metrics()
+```
+
+
+模型评价参数：
+包括混淆矩阵和灵敏度、特异性等指标，不仅在测试集数据上需要，在训练集数据上也需要进行展示
+```{r}
+# confusion matrix
+final_res %>%
+    collect_predictions() %>%
+    conf_mat(class, .pred_class)
+
+# auc-roc
+final_res %>%
+  collect_predictions() %>%
+  roc_curve(class, .pred_0)
+
+final_res %>%
+  collect_predictions() %>%
+  roc_auc(class, .pred_0)
+
+```
+验证是否一致, final_fit & final_res$.workflow[[1]]是否是同一个对象。
+初步验证是一样的。
+```{r}
+cancer_pred <- predict(final_fit, new_data = prostat_test) %>%
+  bind_cols(predict(final_fit, prostat_test, type = "prob")) %>%
+  bind_cols(prostat_test %>% select(class))
+
+cancer_pred2 <- predict(final_res$.workflow[[1]], new_data = prostat_test) %>%
+  bind_cols(predict(final_res$.workflow[[1]], prostat_test, type = "prob")) %>%
+  bind_cols(prostat_test %>% select(class))
+
+cancer_pred
+cancer_pred2
+```
+
+
+
+
+
+
+
+
+
+
