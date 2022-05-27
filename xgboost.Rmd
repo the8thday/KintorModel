@@ -11,18 +11,200 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## xgboost
 
+https://juliasilge.com/blog/board-games/
+
+xgboost对于样本量多，变量没那么多的数据挺合适？This is a pretty sizeable rectangular dataset so let’s use an xgboost model; xgboost is a good fit for that type of dataset.
+
 ```{r}
 library(tidymodels)
 library(xgboost)
+library(textrecipes)
+library(finetune)
+library(vip)
+```
+
+
+```{r}
+# df <- read_delim('./datasets/prostata.tab', delim = '\t') %>% 
+#   select(-t) %>% 
+#   filter(!class %in% c('discrete', 'class')) %>% 
+#   mutate(across(ends_with('_at'), as.numeric))
+# head(df)[1:5]
+# dim(df)
+
+ratings <- read_csv("./datasets/ratings.csv")
+details <- read_csv("./datasets/details.csv")
+
+ratings_joined <-
+  ratings %>%
+  left_join(details, by = "id")
+
+ggplot(ratings_joined, aes(average)) +
+  geom_histogram(alpha = 0.8)
+
+
+ratings_joined %>%
+  filter(!is.na(minage)) %>%
+  mutate(minage = cut_number(minage, 4)) %>%
+  ggplot(aes(minage, average, fill = minage)) +
+  geom_boxplot(alpha = 0.2, show.legend = FALSE)
+```
+
+start our modeling
+```{r}
+set.seed(123)
+game_split <-
+  ratings_joined %>%
+  select(name, average, matches("min|max"), boardgamecategory) %>%
+  na.omit() %>%
+  initial_split(strata = average)
+game_train <- training(game_split)
+game_test <- testing(game_split)
+
+set.seed(234)
+game_folds <- vfold_cv(game_train, strata = average)
+game_folds
+```
+
+
+set up our feature engineering
+```{r}
+split_category <- function(x) {
+  x %>%
+    str_split(", ") %>%
+    map(str_remove_all, "[:punct:]") %>%
+    map(str_squish) %>%
+    map(str_to_lower) %>%
+    map(str_replace_all, " ", "_")
+}
+
+game_rec <-
+  recipe(average ~ ., data = game_train) %>%
+  update_role(name, new_role = "id") %>%
+  step_tokenize(boardgamecategory, custom_token = split_category) %>%
+  step_tokenfilter(boardgamecategory, max_tokens = 30) %>%
+  step_tf(boardgamecategory)
+
+## just to make sure this works as expected
+game_prep <- prep(game_rec)
+bake(game_prep, new_data = NULL) %>% str()
+```
+
+
+Now let’s create a tunable xgboost model specification, with only some of the most important hyperparameters tunable, and combine it with our preprocessing recipe in a workflow().
+```{r}
+xgb_spec <-
+  boost_tree(
+    trees = tune(),
+    mtry = tune(),
+    min_n = tune(),
+    learn_rate = 0.01
+  ) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+
+xgb_wf <- workflow(game_rec, xgb_spec)
+xgb_wf
 ```
 
 
 
+use tune_race_anova() to eliminate parameter combinations that are not doing well.
 ```{r}
-boost_tree_xgboost_spec <-
-  boost_tree(tree_depth = tune(), trees = tune(), learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune()) %>%
-  set_engine('xgboost') %>%
-  set_mode('classification')
+doParallel::registerDoParallel()
+
+set.seed(234)
+xgb_game_rs <-
+  tune_race_anova(
+    xgb_wf,
+    game_folds,
+    grid = 20,
+    control = control_race(verbose_elim = TRUE)
+  )
+
+xgb_game_rs
+```
+
+
+*Evaluate models*
+
+Notice how we saved a TON of time by not evaluating the parameter combinations that were clearly doing poorly on all the resamples; we only kept going with the good parameter combinations.
+```{r}
+plot_race(xgb_game_rs)
+
+show_best(xgb_game_rs)
+
+
+xgb_last <-
+  xgb_wf %>%
+  finalize_workflow(select_best(xgb_game_rs, "rmse")) %>%
+  last_fit(game_split)
+
+xgb_last
+```
+
+
+Let’s start with model-based variable importance using the vip package.
+```{r}
+xgb_fit <- extract_fit_parsnip(xgb_last)
+vip::vip(xgb_fit, geom = "point", num_features = 12)
+```
+use Shapley Additive Explanations 特征重要性
+```{r}
+library(SHAPforxgboost)
+
+game_shap <-
+  shap.prep(
+    xgb_model = extract_fit_engine(xgb_fit),
+    X_train = bake(game_prep,
+      has_role("predictor"),
+      new_data = NULL,
+      composition = "matrix"
+    )
+  )
+
+
+shap.plot.summary(game_shap)
+# Or create partial dependence plots for specific variables:
+shap.plot.dependence(
+  game_shap,
+  x = "minage",
+  color_feature = "minplayers",
+  size0 = 1.2,
+  smooth = FALSE, add_hist = TRUE
+)
+```
+
+
+
+
+
+
+构建`xgboost`模型：不过此处用的还是隔壁SVM里的数据集。
+```{r}
+xgboost_recipe <- 
+  recipe(formula = class ~ ., data = prostat_train) %>% 
+  step_zv(all_predictors()) 
+
+xgboost_spec <- 
+  boost_tree(trees = tune(), min_n = tune(), tree_depth = tune(), learn_rate = tune(), 
+    loss_reduction = tune(), sample_size = tune()) %>% 
+  set_mode("classification") %>% 
+  set_engine("xgboost") 
+
+xgboost_workflow <- 
+  workflow() %>% 
+  add_recipe(xgboost_recipe) %>% 
+  add_model(xgboost_spec) 
+
+
+prostat_folds <- vfold_cv(prostat_train, strata = class)
+
+set.seed(42)
+xgboost_tune <-
+  tune_grid(xgboost_workflow, resamples = prostat_folds, 
+            grid = 20
+            )
 
 
 ```
