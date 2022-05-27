@@ -21,8 +21,8 @@ library(Boruta)
 
 read data
 ```{r}
-expr_file <- "datasets/prostat.expr.symbol.txt"
-metadata_file <- "datasets/prostat.metadata.txt"
+expr_file <- "./datasets/prostat.expr.symbol.txt"
+metadata_file <- "./datasets/prostat.metadata.txt"
 expr_mat <- read.table(expr_file, row.names = 1, header = T, sep="\t", 
                        stringsAsFactors =T)
 # 处理异常的基因名字
@@ -58,10 +58,12 @@ dim(test_data)
 ### 建模
 
 特征选择
+`Boruta`法在特征变量筛选是既可以用于分类问题，也可以用于回归问题，其是通过随机森林建模并计算每个变量的重要性得分，通过和影子变量进行对比，得到重要的变量。
 ```{r}
 
 boruta <- Boruta::Boruta(x = train_data, y = train_data_group, pValue=0.01, mcAdj=T, maxRuns=300)
 table(boruta$finalDecision)
+# boruta$finalDecision[boruta$finalDecision=="Confirmed"]
 
 Boruta::plotImpHistory(boruta)
 ```
@@ -139,7 +141,10 @@ rf_finalModel <- rf$finalModel
 #### 模型评价
 ```{r}
 library(pROC)
+predictions_train <- predict(rf_finalModel, newdata=boruta_train_data)
+confusionMatrix(predictions_train, train_data_group)
 
+# 在测试集上的数据表现
 prediction_prob <- predict(rf_finalModel, 
                            newdata = boruta_test_data, type = 'prob')
 
@@ -148,6 +153,7 @@ confusionMatrix(predictions, test_data_group)
 
 # ROC curve
 roc_curve <- roc(test_data_group, prediction_prob[,1])
+roc_curve
 roc <- roc(test_data_group, factor(predictions, ordered=T))
 plot(roc)
 
@@ -164,5 +170,33 @@ ROC_data <- ROC_data[with(ROC_data, order(FPR,TPR)),]
 
 
 ```
+
+
+```{r}
+p <- ggplot(data=ROC_data, mapping=aes(x=FPR, y=TPR)) +
+  geom_step(color="red", size=1, direction = "vh") +
+  geom_segment(aes(x=0, xend=1, y=0, yend=1))  + theme_classic() + 
+  xlab("False positive rate") + 
+  ylab("True positive rate") + coord_fixed(1) + xlim(0,1) + ylim(0,1) +
+  annotate('text', x=0.5, y=0.25, label=paste('AUC=', round(roc_curve$auc,2))) +
+  geom_point(data=best_thresh, mapping=aes(x=1-specificity, y=sensitivity), color='blue', size=2) + 
+  ggrepel::geom_text_repel(data=best_thresh, mapping=aes(x=1.05-specificity, y=sensitivity ,label=best))
+p
+```
+
+
+
+基于选定的最优阈值制作混淆矩阵并评估模型预测准确度显著性,结果显著P-Value [Acc > NIR]<0.05。
+```{r}
+predict_result <- data.frame(Predict_status=c(T,F), Predict_class=colnames(prediction_prob))
+
+head(predict_result)
+predictions2 <- plyr::join(data.frame(Predict_status=prediction_prob[,1] > best_thresh[1,1]), predict_result)
+
+predictions2 <- as.factor(predictions2$Predict_class)
+
+confusionMatrix(predictions2, test_data_group)
+```
+
 
 
