@@ -10,8 +10,27 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## SVM_tidymodels
+支持向量机
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(usemodels)
+
+```
 
 
+在建立模型之前，可以通过一些`tidymodels`所提供的辅助工具进行一些初步的工作，比如我们打算在前列腺癌表达数据集上进行重要变量（基因）的筛选和建立区分癌和癌旁的模型，并打算利用SVM算法，那么首先可以利用`usemodels`建立一个基本的模型框架，并基于具体的数据进行一些修改, 不过`usemodels`所支持的模型还有限，`parsnip::parsnip_addin()`也有一 段时间没有 更新了。
+`show_engines()`函数可以查看所支持的引擎。
+```{r}
+usemodels::use_kernlab_svm_rbf(formula = class ~ ., data = prostat_train,
+                               prefix = 'kernlab', verbose = F,
+                               tune = TRUE, colors = TRUE, clipboard = F
+                               )
+```
+
+
+准备数据
 ```{r}
 expr_file <- "datasets/prostat.expr.symbol.txt"
 metadata_file <- "datasets/prostat.metadata.txt"
@@ -40,21 +59,21 @@ prostat_test <- testing(df_split)
 
 
 
-
+svm主要由两个R包提供内在的引擎`show_engines('svm_linear')`: kernlab & LiblineaR
 ```{r}
-book_folds <- vfold_cv(prostat_train, strata = class)
+prostat_folds <- vfold_cv(prostat_train, strata = class)
 
 
-
-svm_spec <- svm_linear(mode = "classification")
+svm_spec <- svm_linear(mode = "classification") %>% 
+  set_engine('kernlab')
 
 prostat_rec <-
   recipe(class ~ ., data = prostat_train)
 
 ## just to see how it is working:
-prep(prostat_rec) %>% bake(new_data = NULL) %>% glimpse()
+# prep(prostat_rec) %>% bake(new_data = NULL) %>% glimpse()
 
-prostat_wf <- workflow(books_rec, svm_spec)
+prostat_wf <- workflow(prostat_rec, svm_spec)
 prostat_wf
 ```
 
@@ -64,23 +83,27 @@ prostat_wf
 doParallel::registerDoParallel()
 
 set.seed(123)
-books_metrics <- metric_set(accuracy, sens, spec)
-book_rs <- fit_resamples(book_wf, resamples = book_folds, metrics = books_metrics)
-collect_metrics(book_rs)
+prostat_metrics <- metric_set(accuracy, sens, spec)
+
+# `fit_resamples`不可以做tune的操作，即不可以做网格搜索；但提供一种类似交叉验证的操作
+prostat_rs <- fit_resamples(prostat_wf, resamples = prostat_folds, metrics = prostat_metrics)
+collect_metrics(prostat_rs)
 ```
 
 
-last_fit() to fit one final time to the training data and evaluate one final time on the testing data
+last_fit() to fit one final time to the training data and evaluate one final time on the testing data.
+以下结果显示在测试集数据上具有不错的表现。
 ```{r}
-final_rs <- last_fit(book_wf, books_split, metrics = books_metrics)
+final_rs <- last_fit(prostat_wf, df_split, metrics = prostat_metrics)
 collect_metrics(final_rs)
 ```
 
 
-confusion matrix
+confusion matrix:
+在测试集数据上的混淆矩阵
 ```{r}
-collect_predictions(final_rs) %>%
-  conf_mat(total_weeks, .pred_class) %>%
+(collect_predictions(final_rs) %>%
+  conf_mat(class, .pred_class)) %>%
   autoplot()
 ```
 
@@ -88,11 +111,13 @@ collect_predictions(final_rs) %>%
 If we decide this model is good to go and we want to use it in the future, we can extract out the fitted workflow. This object can be used for prediction:
 ```{r}
 final_fitted <- extract_workflow(final_rs)
-augment(final_fitted, new_data = slice_sample(books_test, n = 1))
+augment(final_fitted, new_data = slice_sample(prostat_test, n = 3)) %>% 
+  dplyr::select(last_col(5:1))
 ```
 
 
 We can also examine this model (which is just linear with coefficients) to understand what drives its predictions.
+在engine选择为LiblineaR时tidy函数支持，不过kernlab不支持。
 ```{r}
 tidy(final_fitted) %>%
   slice_max(abs(estimate), n = 20) %>%
