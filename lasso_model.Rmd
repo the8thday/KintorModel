@@ -1,0 +1,24 @@
+---
+title: "lasso"
+author: "liuc"
+date: '2022-05-31'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## lasso model
+
+复现一篇LASSO临床预测模型的文章：
+Screening the Influence of Biomarkers for Metabolic Syndrome in Occupational Population Based on the Lasso Algorithm
+
+
+
+```{r}
+library(glmnet)
+library(rms)
+library(foreign)
+```
+
