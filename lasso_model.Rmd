@@ -14,11 +14,287 @@ knitr::opts_chunk$set(echo = TRUE)
 复现一篇LASSO临床预测模型的文章：
 Screening the Influence of Biomarkers for Metabolic Syndrome in Occupational Population Based on the Lasso Algorithm
 
+复现的内容包括：LASSO路径图, 为LASSO交叉验证图, 瀑布图(展示了那些因子被压缩为零，那些被选入模型), 筛选独立因子， 筛选出的10个因子再次构建Logistic回归预测概率，Nomogram，森林图，校准曲线，DCA曲线。
+
+Ridge regression shrinks all coefficients towards zero, but lasso regression has the potential to remove predictors from the model by shrinking the coefficients completely to zero.
+
 
 
 ```{r}
+library(tidyverse)
+library(tidymodels)
 library(glmnet)
 library(rms)
 library(foreign)
+library(visreg) # displaying the results of a fitted model in terms of how a predictor variable x affects an outcome y.
+library(vip)
+```
+
+
+1. 数据清理和准备
+因为文章没有提供可供分析的数据，故选择IMDB ratings数据集(回归问题)。
+bdiag.csv数据集用于分类问题，The variable diagnosis classifies the biopsied tissue as M = malignant or B = benign.
+
+```{r}
+ratings_raw <- readr::read_csv("./datasets/office_ratings.csv")
+
+remove_regex <- "[:punct:]|[:digit:]|parts |part |the |and"
+
+office_ratings <- ratings_raw %>%
+  transmute(
+    episode_name = str_to_lower(title),
+    episode_name = str_remove_all(episode_name, remove_regex),
+    episode_name = str_trim(episode_name),
+    imdb_rating
+  )
+
+office_info <- schrute::theoffice %>%
+  mutate(
+    season = as.numeric(season),
+    episode = as.numeric(episode),
+    episode_name = str_to_lower(episode_name),
+    episode_name = str_remove_all(episode_name, remove_regex),
+    episode_name = str_trim(episode_name)
+  ) %>%
+  select(season, episode, episode_name, director, writer, character)
+
+characters <- office_info %>%
+  count(episode_name, character) %>%
+  add_count(character, wt = n, name = "character_count") %>%
+  filter(character_count > 800) %>%
+  select(-character_count) %>%
+  pivot_wider(
+    names_from = character,
+    values_from = n,
+    values_fill = list(n = 0)
+  )
+creators <- office_info %>%
+  distinct(episode_name, director, writer) %>%
+  pivot_longer(director:writer, names_to = "role", values_to = "person") %>%
+  separate_rows(person, sep = ";") %>%
+  add_count(person) %>%
+  filter(n > 10) %>%
+  distinct(episode_name, person) %>%
+  mutate(person_value = 1) %>%
+  pivot_wider(
+    names_from = person,
+    values_from = person_value,
+    values_fill = list(person_value = 0)
+  )
+office <- office_info %>%
+  distinct(season, episode, episode_name) %>%
+  inner_join(characters) %>%
+  inner_join(creators) %>%
+  inner_join(office_ratings %>%
+    select(episode_name, imdb_rating)) %>%
+  janitor::clean_names()
+
+office
+
+```
+
+
+特征工程，利用tidymodels会很简单。此处暂时不涉及特征工程的部分。
+```{r}
+dat <- office %>% select(-episode_name) %>% 
+  as.data.frame()
+
+index = sample(1:nrow(dat), 0.7*nrow(dat)) 
+train = dat[index,] # Create the training data 
+test = dat[-index,] # Create the test data
+
+dim(train)
+dim(test)
+
+# scale the data 
+cols = c('andy', 'angela', 'darryl', 'dwight')
+pre_proc_val <- preProcess(train[,cols], method = c("center", "scale"))
+
+train[,cols] = predict(pre_proc_val, train[,cols])
+test[,cols] = predict(pre_proc_val, test[,cols])
+
+summary(train)
+
+
+
+X <- model.matrix(imdb_rating ~ ., data=dat)[,-1]
+
+Y <- dat[,"imdb_rating"]
+
+```
+
+
+First we need to find the amount of penalty,  λ by cross-validation.
+```{r}
+#Penalty type (alpha=1 is lasso 
+#and alpha=0 is the ridge)
+cv.lambda.lasso <- cv.glmnet(x=X, 
+                             y=Y, 
+                             nfolds = 10,
+                             alpha = 1) 
+
+plot(cv.lambda.lasso)#MSE for several lambdas
+
+#Lasso path
+plot(cv.lambda.lasso$glmnet.fit, 
+     "lambda", label=FALSE)
+```
+
+
+
+```{r}
+#find coefficients of best model
+best_lambda <- cv.lambda.lasso$lambda.min
+
+best_model <- glmnet(X, Y,
+                     alpha = 1, # alpha=1 is the lasso penalty, and alpha=0 the ridge penalty
+                     lambda = best_lambda,
+                     family='gaussian',
+                     )
+coef(best_model)
+best_model$beta #Coefficients
+
+
+plot(best_model)
+plot(best_model, xvar='lambda', label = TRUE)
+```
+
+
+在得到*best_model*后，再进行变量重要性的展示：
+```{r}
+vi_model(best_model)
+vip::vip(best_model)
+```
+
+visreg似乎不适用于glmnet的结果
+```{r}
+visreg::visreg(best_model, 'andy')
+```
+
+DCA曲线：对于回归问题
+```{r}
+
+```
+
+
+
+### lasso model by tidymodels
+
+用`tidymodels`建立LASSO预测模型，并提取和上述类似的lasso模型。
+
+```{r}
+office_split <- initial_split(office, strata = season)
+office_train <- training(office_split)
+office_test <- testing(office_split)
+
+
+office_rec <- recipe(imdb_rating ~ ., data = office_train) %>%
+  update_role(episode_name, new_role = "ID") %>%
+  step_zv(all_numeric(), -all_outcomes()) %>%
+  step_normalize(all_numeric(), -all_outcomes())
+
+office_prep <- office_rec %>%
+  prep(strings_as_factors = FALSE)
+```
+
+
+```{r}
+lasso_spec <- linear_reg(penalty = 0.1, mixture = 1) %>%
+  set_engine("glmnet")
+
+wf <- workflow() %>%
+  add_recipe(office_rec)
+
+lasso_fit <- wf %>%
+  add_model(lasso_spec) %>%
+  fit(data = office_train)
+
+lasso_fit %>%
+  pull_workflow_fit() %>%
+  tidy()
+```
+
+
+Tune lasso parameters
+
+```{r}
+set.seed(1234)
+office_boot <- bootstraps(office_train, strata = season)
+
+tune_spec <- linear_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet")
+
+lambda_grid <- grid_regular(penalty(), levels = 50)
+
+
+doParallel::registerDoParallel()
+
+set.seed(2020)
+lasso_grid <- tune_grid(
+  wf %>% add_model(tune_spec),
+  resamples = office_boot,
+  grid = lambda_grid
+)
+```
+
+
+```{r}
+lasso_grid %>%
+  collect_metrics()
+```
+
+see a visualization of performance with the regularization parameter.
+```{r}
+lasso_grid %>%
+  collect_metrics() %>%
+  ggplot(aes(penalty, mean, color = .metric)) +
+  geom_errorbar(aes(
+    ymin = mean - std_err,
+    ymax = mean + std_err
+  ),
+  alpha = 0.5
+  ) +
+  geom_line(size = 1.5) +
+  facet_wrap(~.metric, scales = "free", nrow = 2) +
+  scale_x_log10() +
+  theme(legend.position = "none")
+```
+
+
+
+```{r}
+lowest_rmse <- lasso_grid %>%
+  select_best("rmse")
+
+final_lasso <- finalize_workflow(
+  wf %>% add_model(tune_spec),
+  lowest_rmse
+)
+```
+
+let’s see what the most important variables are using the vip package
+
+```{r}
+final_lasso %>%
+  fit(office_train) %>%
+  pull_workflow_fit() %>%
+  vi(lambda = lowest_rmse$penalty) %>%
+  mutate(
+    Importance = abs(Importance),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(y = NULL)
+```
+
+
+```{r}
+last_fit(
+  final_lasso,
+  office_split
+) %>%
+  collect_metrics()
 ```
 
