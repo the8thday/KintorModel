@@ -11,7 +11,152 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## lightGBM
 
+https://www.kaggle.com/code/athosdamiani/lightgbm-with-tidymodels/notebook
+
+以一个分类问题进行示例。
 
 
 
+```{r}
+library(doParallel)
+library(tidyverse)
+library(tidymodels)
+library(bonsai)
+# library(treesnip) # 被bonsai代替了
+
+
+show_engines('boost_tree')
+
+all_cores <- parallel::detectCores(logical = FALSE)
+registerDoParallel(cores = all_cores)
+```
+
+
+理解数据
+```{r}
+adult <- read_csv("./datasets/adult.csv")
+adult <- adult %>% 
+    janitor::clean_names() 
+glimpse(adult)
+```
+
+
+
+Step 1: train/test split ----------------------------------------
+
+```{r}
+set.seed(2)
+adult_initial_split <- initial_split(adult, strata = "income", prop = 0.75)
+
+adult_train <- training(adult_initial_split)
+adult_test  <- testing(adult_initial_split)
+
+adult_initial_split
+
+```
+
+
+Step 3: dataprep --------------------------------------------------------
+
+```{r}
+adult_recipe <- recipe(income ~ ., data = adult_train) %>%
+  step_modeimpute(workclass, occupation, native_country) %>%
+  step_zv(all_predictors()) %>%
+  step_novel(all_nominal(), -all_outcomes()) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+head(juice(prep(adult_recipe)))
+```
+
+
+
+
+Step 4: model definiton -----------------------------------
+
+```{r}
+adult_model <- 
+  boost_tree(
+  mtry = 5, 
+  trees = 1000, 
+  min_n = tune(), 
+  tree_depth = tune(),
+  loss_reduction = tune(), 
+  learn_rate = tune(), 
+  sample_size = 0.75
+) %>% 
+  set_mode("classification") %>%
+  set_engine("lightgbm")
+
+# workflow
+adult_wf <- workflow() %>% 
+    add_model(adult_model) %>% 
+    add_recipe(adult_recipe)
+
+adult_wf
+```
+
+
+Step 5: hiperparameter tunning ------------------------------------------
+
+```{r}
+# resamples
+adult_resamples <- vfold_cv(adult_train, v = 4)
+
+# grid
+adult_grid <- parameters(adult_model) %>% 
+    finalize(adult_train) %>% 
+    grid_random(size = 200)
+head(adult_grid)
+```
+```{r}
+# grid search
+# 相比xgboost之下lightgbm快不少
+adult_tune_grid <- adult_wf %>%
+    tune_grid(
+        resamples = adult_resamples,
+        grid = adult_grid,
+        control = control_grid(verbose = FALSE),
+        metrics = metric_set(roc_auc)
+    )
+
+autoplot(adult_tune_grid)
+```
+
+```{r}
+# top 5 hiperparams set
+show_best(adult_tune_grid, "roc_auc")
+```
+
+
+
+Step 6: last fit performance ------------------------------------------
+
+```{r}
+# select best hiperparameter found
+adult_best_params <- select_best(adult_tune_grid, "roc_auc")
+adult_wf <- adult_wf %>% finalize_workflow(adult_best_params)
+
+# last fit
+adult_last_fit <- last_fit(
+  adult_wf,
+  adult_initial_split
+)
+
+# metrics
+collect_metrics(adult_last_fit)
+```
+
+```{r}
+# roc curve
+adult_test_preds <- collect_predictions(adult_last_fit)
+adult_roc_curve <- adult_test_preds %>% roc_curve(income, `.pred_<=50K`)
+autoplot(adult_roc_curve)
+
+# confusion matrix
+adult_test_preds %>%
+  mutate(
+    income_class = factor(if_else(`.pred_<=50K` > 0.6, "<=50K", ">50K"))
+  ) %>%
+  conf_mat(income, income_class)
+```
 
