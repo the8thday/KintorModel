@@ -1,0 +1,134 @@
+---
+title: "complete_ttest"
+author: "liuc"
+date: '2022-05-31'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## t-test
+
+https://r4stats.com/articles/add-ons/
+
+详细的T-TEST流程，结果参考SPSS.
+应该包括: EDA（尤其对）outcome变量分组的柱状图QQ图、是否满足正态性、方差齐性、观测值之间是否独立、观测值是否存在异常值, 结果如何解读和呈现(mean difference  SE CI P-value  effect_size )，以表格的形式输出结果。
+对于样本量也需要一些先验知识进行确定。以下仅以最为常见的独立样本T检验进行演示，配对样本或独立样本等修改下参数。
+
+```{r}
+library(tidyverse)
+library(easystats)
+library(gtsummary)
+# library(expss)# table like SPSS
+```
+
+
+## Step1. EDA以及描述性统计结果
+
+```{r}
+df <- haven::read_sav('./datasets/two_sample_ttest.sav') %>% 
+  mutate(gender = as_factor(gender))
+
+# 描述性统计
+stderror <- function(x) sd(x)/sqrt(length(x))
+
+df %>% group_by(gender) %>% 
+  summarise(num = n(),
+            mean = mean(score),
+            sd = sd(score),
+            se_mean = stderror(score)
+            )
+
+# EDA
+ggplot(df, aes(x = factor(gender), y = score)) +
+  geom_boxplot(outlier.colour = 'red') +
+  theme_bw()
+
+```
+
+
+## Step2. 满足假设条件
+
+`base`包里的这几个函数都不支持`group_by`的数据, 改用`aggregate`函数进行。
+
+```{r}
+# outlier 检查
+check_outliers(df, method = 'iqr')
+
+# 正态性检验
+aggregate(formula = score ~ gender, 
+          data = df, 
+          FUN = function(x) {y <- shapiro.test(x); c(statistic = y$statistic, pvalue = y$p.value)}
+          )
+
+df %>%
+  group_by(gender) %>%
+  summarise(statistic = shapiro.test(score)$statistic,
+            p.value = shapiro.test(score)$p.value)
+
+# 方差齐性检验，在SPSS中center默认的是mean
+car::leveneTest(data = df,
+                y = score ~ gender,
+                center = 'median'
+                )
+
+```
+
+
+
+
+## Step3. ttest检验以及结果呈现
+
+`htest`对象的结果提取不如`lm`类更为简单呀。
+
+```{r}
+t_res <- t.test(
+  formula = score ~ gender,
+  data = df,
+  alternative = 'two.sided',
+  paired = FALSE,
+  var.equal = TRUE
+)
+
+t_res
+
+# effect size
+effectsize::effectsize(t_res)
+
+
+# 以tibble表格的形式呈现结果
+final_res <- tibble(
+  t = t_res$statistic,
+  pvalue = t_res$p.value,
+  group1_mean = t_res$estimate[[1]],
+  group2_mean = t_res$estimate[[2]],
+  ci_up = t_res$conf.int[1],
+  ci_down = t_res$conf.int[2]
+)
+
+final_res
+
+```
+
+绘制95%CI的示意图：
+```{r}
+
+```
+
+
+线性模型等价分析
+```{r}
+res <- lm(formula = score ~ gender, data = df)
+
+effectsize(res)
+```
+
+
+
+
+
+
+
+
