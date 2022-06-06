@@ -1,0 +1,184 @@
+---
+title: "PCA_UMAP_tidymodels"
+author: "liuc"
+date: '2022-05-27'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## PCA_UMAP_tidymodels
+
+https://juliasilge.com/blog/cocktail-recipes-umap/
+
+在`recipe`包中提供了多种特征工程的方便的函数，其也是包装了一些其他函数的功能，在使用时虽则简单了很多，但还是需要理解其所使用的后端的函数，以及对应参数的调整。
+`tidymodels`还有提供多个`recipe`的扩展包，如以下的`embed`包。
+
+
+
+```{r}
+library(tidymodels)
+library(usemodels)
+library(finetune)
+library(embed) # recipe external package
+```
+
+
+
+```{r}
+boston_cocktails <- readr::read_csv("./datasets/boston_cocktails.csv")
+
+boston_cocktails %>%
+  count(ingredient, sort = TRUE)
+
+
+cocktails_parsed <- boston_cocktails %>%
+  mutate(
+    ingredient = str_to_lower(ingredient),
+    ingredient = str_replace_all(ingredient, "-", " "),
+    ingredient = str_remove(ingredient, " liqueur$"),
+    ingredient = str_remove(ingredient, " (if desired)$"),
+    ingredient = case_when(
+      str_detect(ingredient, "bitters") ~ "bitters",
+      str_detect(ingredient, "lemon") ~ "lemon juice",
+      str_detect(ingredient, "lime") ~ "lime juice",
+      str_detect(ingredient, "grapefruit") ~ "grapefruit juice",
+      str_detect(ingredient, "orange") ~ "orange juice",
+      TRUE ~ ingredient
+    ),
+    measure = case_when(
+      str_detect(ingredient, "bitters") ~ str_replace(measure, "oz$", "dash"),
+      TRUE ~ measure
+    ),
+    measure = str_replace(measure, " ?1/2", ".5"),
+    measure = str_replace(measure, " ?3/4", ".75"),
+    measure = str_replace(measure, " ?1/4", ".25"),
+    measure_number = parse_number(measure),
+    measure_number = if_else(str_detect(measure, "dash$"),
+      measure_number / 50,
+      measure_number
+    )
+  ) %>%
+  add_count(ingredient) %>%
+  filter(n > 15) %>%
+  select(-n) %>%
+  distinct(row_id, ingredient, .keep_all = TRUE) %>%
+  na.omit()
+
+cocktails_parsed
+
+cocktails_df <- cocktails_parsed %>%
+  select(-ingredient_number, -row_id, -measure) %>%
+  pivot_wider(names_from = ingredient, values_from = measure_number, values_fill = 0) %>%
+  janitor::clean_names() %>%
+  na.omit()
+
+cocktails_df # 行为特征、列为sample的矩阵
+```
+
+
+#### PCA
+
+The step_pca() function uses stats::prcomp() under the hood.
+
+在`tidymodels`中，`recipe`包即可提供PCA等非监督的降维方法。不过所提供的参数和分析还是不如独立的分析。
+PCA作为一种降维方法，
+```{r}
+pca_rec <- recipe(~., data = cocktails_df) %>%
+  update_role(name, category, new_role = "id") %>%
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors())
+
+# Before using prep() these steps have been defined but not actually run or implemented. The prep() function is where everything gets evaluated.
+pca_prep <- prep(pca_rec)
+
+pca_prep
+```
+
+
+
+```{r}
+tidied_pca <- tidy(pca_prep, 2) # 2为recipe中的第二步的step
+tidied_pca
+
+tidied_pca %>%
+  filter(component %in% paste0("PC", 1:5)) %>%
+  mutate(component = fct_inorder(component)) %>%
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL)
+```
+
+
+This is the component that explains the most variation in drinks
+```{r}
+library(tidytext)
+
+tidied_pca %>%
+  filter(component %in% paste0("PC", 1:4)) %>%
+  group_by(component) %>%
+  top_n(8, abs(value)) %>%
+  ungroup() %>%
+  mutate(terms = reorder_within(terms, abs(value), component)) %>%
+  ggplot(aes(abs(value), terms, fill = value > 0)) +
+  geom_col() +
+  facet_wrap(~component, scales = "free_y") +
+  scale_y_reordered() +
+  labs(
+    x = "Absolute value of contribution",
+    y = NULL, fill = "Positive?"
+  )
+
+
+juice(pca_prep) %>%
+  ggplot(aes(PC1, PC2, label = name)) +
+  geom_point(aes(color = category), alpha = 0.7, size = 2) +
+  geom_text(check_overlap = TRUE, hjust = "inward") +
+  labs(color = NULL)
+```
+
+绘制PCA的散点图。
+```{r}
+bake(pca_prep, new_data = NULL) %>%
+  ggplot(aes(PC1, PC2)) +
+  geom_point(aes(color = category), alpha = 0.7, size = 2) +
+  # geom_text(check_overlap = TRUE, hjust = "inward") +
+  labs(color = NULL) +
+  theme_bw()
+
+```
+
+
+
+#### UMAP
+
+We included UMAP since it can be projected on new data. tSNE can't (at least, the last time that I looked).
+
+```{r}
+umap_rec <- recipe(~., data = cocktails_df) %>%
+  update_role(name, category, new_role = "id") %>%
+  step_normalize(all_predictors()) %>%
+  step_umap(all_predictors())
+
+umap_prep <- prep(umap_rec)
+
+umap_prep
+```
+
+
+
+how the cocktails are distributed in the plane of the first two UMAP components.
+```{r}
+juice(umap_prep) %>%
+  ggplot(aes(umap_1, umap_2, label = name)) +
+  geom_point(aes(color = category), alpha = 0.7, size = 2) +
+  geom_text(check_overlap = TRUE, hjust = "inward", family = "IBMPlexSans") +
+  labs(color = NULL)
+```
+
+
+
+
