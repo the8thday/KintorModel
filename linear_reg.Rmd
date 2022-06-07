@@ -1,0 +1,113 @@
+---
+title: "linear_reg"
+author: "liuc"
+date: '2022-06-01'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## linear regression
+
+线性回归作为应用很多，注意事项也很多的算法，在医学研究中有很多应用，此处做一个详细的示例。
+主要关注点在于 计算标准化回归系数。
+同时还会加上：Nomogram，森林图，校准曲线，DCA曲线等预测模型常见的内容。
+
+所用数据为`lasso_model.Rmd`中的office数据集。
+
+标准化回归系数，是指消除了因变量和自变量所取单位的影响之后的回归系数，其绝对值的大小直接反映了自变量对因变量的影响程度。标准化回归系数的比较结果只是适用于某一特定环境的，而不是绝对正确的，它可能因时因地而变化。
+通常我们在构建多因素回归模型时，方程中呈现的是未标准化回归系数，它是方程中不同自变量对应的原始的回归系数。它反映了在其他因素不变的情况下，该自变量每变化一个单位对因变量的作用大小。通过未标准化回归系数和常数项构建的方程，便可以对因变量进行预测，并得出结论。
+而对于标准化回归系数，它是在对自变量和因变量同时进行标准化处理后所得到的回归系数，数据经过标准化处理后消除了量纲、数量级等差异的影响，使得不同变量之间具有可比性，因此可以用标准化回归系数来比较不同自变量对因变量的作用大小。
+*通常我们主要关注的是标准化回归系数的绝对值大小，绝对值越大，可认为它对因变量的影响就越大。*
+
+
+
+```{r}
+library(glmnet)
+library(rms)
+library(sjPlot) # 绘制标准化回归系数
+# library(QuantPsyc) # 计算标准化回归系数
+library(visreg)
+library(regplot) # A function to plot a regression nomogram of regression objects
+library(finalfit) #
+```
+
+
+
+像在`glm.Rmd`中演示的那样，用glm或lm所得到的线性模型结果是一致的。
+使用的数据为lasso中的imdb数据集。
+数据输入格式数据探索的内容在此先不考虑。
+```{r}
+lreg <- glm(imdb_rating ~ ., data=dat, family = 'gaussian')
+```
+
+
+绘制某变量的 校正其它变量后，再作图观察某一个自变量与应变量之间的关系, 亦可同时绘制全部。既是矫正后的散点图。
+此处绘制`kelly`变量的散点图。
+```{r}
+visreg::visreg(lreg, 'kelly')
+```
+
+
+标准化回归系数, 也可以将数据scale后在进行建模，得到的结果是一致的。
+```{r}
+QuantPsyc::lm.beta(mymodel)
+```
+
+
+利用`sjPlot`包可以同时得到标准化回归系数和绘制图型
+```{r}
+sjPlot::plot_model(lreg,
+           type = "std",      # 计算标准化回归系数
+           sort.est = TRUE,    # 进行排序
+           show.values = TRUE,  # 显示数值
+           show.p = TRUE,     # 显示p值
+           value.offset = 0.2,  # 调整数值的位置
+           vline.color = "gray",    # 修改穿越0的线条颜色
+           title = "Summary of the regression model")    # 添加题目
+
+
+# 给出各个变量的标准化回归系数
+sjPlot::tab_model(lreg)
+
+```
+
+
+```{r}
+vip::vi(lreg)
+```
+
+
+regplot绘制列线图
+```{r}
+regplot::regplot(lreg)
+```
+
+
+
+利用`finalfit`一步法得到回归模型。finalfit支持的模型包括：linear lm(), logistic glm(), hierarchical logistic lme4::glmer() and Cox proportional hazards survival::coxph() regression models.
+```{r}
+library(finalfit)
+
+
+# 指定单因素的自变量
+explanatory = c("jim", "kelly", "kevin", "michael")
+# 指定多因素的自变量
+explanatory_multi = c("kevin", "michael")
+# 指定结局变量
+dependent = "imdb_rating"
+# 输出结果
+dat %>%
+  finalfit(dependent, explanatory, explanatory_multi)
+
+# 使用ff_plot()函数将结果数据绘制森林图
+dat %>%
+  ff_plot(dependent, explanatory)
+```
+
+
+
+
