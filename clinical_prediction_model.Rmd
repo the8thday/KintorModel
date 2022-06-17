@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 临床预测模型的一般流程
 
-临床预测模型和临床预后模型虽则常使用线性回归、逻辑回归，但其涉及到具体的临床需求以及发展出一套分析思路，现整理如下。在其他的几个笔记中也有涉及类似的R语言实现过程。
+临床预测模型和临床预后模型虽则常使用线性回归、逻辑回归，但其涉及到具体的临床需求以及发展出一套分析思路，现整理如下。在其他的几个笔记中也有涉及类似的R语言实现过程。参数模型和半参数模型的使用，一个很重要的考量在于模型的解释度。一些非参数化的机器学习模型往往不易于解释。 在临床预测模型中_数据_的采集是最为重要的部分，对于不同的目的采用不同的研究类型选择。而通过回顾性研究得到的数据也会涉及到对具体临床问题的理解，包括预测变量的筛选和潜在重要变量的筛选。数据的质量和多个批次数据用以验证是构建模型中重要的因素，在这个层面来说临床模型的构建是不容易的，需要医院机构具有良好的数据库管理。
 
 1.  建模，同时要关注变量的筛选
 2.  验证模型,包括区别度分析（discrimination）、校准曲线（calibration）、决策曲线（DCA）、NRI/IDI等
@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 模型的区分度指标是指对于一个模型本身区分或者说预测outcome的准确度，混淆矩阵/AUC/NRI/IDI等就是常用的指标，但是校准曲线是看待结局实际发生的概率和预测的概率的一致性，其calibration refers to the agreement between the estimated and the "true" risk of an outcome关注点在于每一个预测，在回归模型中容易理解，现举一个在分类问题中的例子：比如在逻辑回归中通过0.5来判断二分类的是与否，但每一个样本其实是有对应分类发生的概率的，而这些个体实际上发生的概率（比如10个人中有几个人是患病的）这样的的一个散点图就是校准曲线，看待的是二者的一致性，自然图的解读就是对角线为好。这的重点在于某种风险发生的具体的概率，可以通过Hosmer-Lemeshow检验得到统计检验。
 
-决策曲线关注的是净收益和阈概率（Threshold Probability）之间的关系，比如说我们在预测一个阳性患者后还需要考虑假如我们 预测的是假阳性可能对患者的损害，我们希望自己做出来的预测模型在临床使用中，在任何时候依照模型结果进行干预净受益都比默认的好（最常见的默认情况就是全干预和全不干预）。`In brief, decision curve analysis calculates a clinical “net benefit” for one or more prediction models or diagnostic tests in comparison to default strategies of treating all or no patients.`阈概率（Threshold Probability），表示的是只有病人的预测概率超过这个阈概率，干预才有受益， 才值得干预。
+决策曲线关注的是净收益和阈概率（ThresholdProbability）之间的关系，比如说我们在预测一个阳性患者后还需要考虑假如 我们预测的是假阳性可能对患者的损害，我们希望自己做出来的预测模型在临床使用中，在任何时候依照模型结果进行干预净受益都比默认的好（最常见的默认情况就是全干预和全不干预）。`In brief, decision curve analysis calculates a clinical “net benefit” for one or more prediction models or diagnostic tests in comparison to default strategies of treating all or no patients.`阈概率（Threshold Probability），表示的是只有病人的预测概率超过这个阈概率，干预才有受益， 才值得干预。
 
 下面以一个示例记录详细的建模过程。
 
@@ -34,8 +34,28 @@ library(rms)
 
 <span style='color: red;'>变量选择<span>
 
-特征工程在临床预测模型中有几点需要考虑： 
-1.
+特征工程在临床预测模型中有几点需要考虑：
+
+1.  混杂因素的矫正
+2.  临床中一些变量终然在单变量回归中没有达到统计p值，也应该纳入最终的多因素模型中，基于临床专业知识的变量纳入是最为基本的考量
+3.  常见的先单因素再多因素的方法（在统计效能不足时）
+4.  一个单变量至少有20个有效样本量
+5.  在临床模型的构建上，变量筛选时应考虑一些统计方法同时还需要考虑具体的数据大小等。
+6.  对于连续变量可以考虑各种分类变量变化；对于等级资料设定dummy变量，比上同一个level；对于无序多分类变量设置dummy
+7.  dummy 变量设置后在模型解释上，可以突出其所比对的reference。除了`ifelse`之外还可以用R包`fastDummies`以及base包里的`model.matrix`函数。建立模型时什么时候需要用到dummy变量呢，
+
+```{r}
+# 一个生成dummy变量的示例
+library(recipes)
+
+dummies <- df %>% 
+  recipes::recipe(outcome ~ .) %>% 
+  step_dummy(var,
+             one_hot = TRUE
+             ) %>% 
+  prep() %>% 
+  bake()
+```
 
 ```{r}
 # 读入带label的SPSS数据对于下游的一些分析会带来麻烦，此处待解决
@@ -54,7 +74,6 @@ df1
 
 ```
 
-
 ### rms
 
 利用**rms**包展开分析，此包提供了多种对于回归模型的包装函数。包括拟合、区分度分析、校准曲线、nomogram等。
@@ -62,7 +81,8 @@ df1
 ```{r}
 # 为防止影响下游分析将每一列进行类型转换
 df1 <- df1 %>% 
-  mutate(across(everything(), as.numeric))
+  mutate(across(everything(), as.numeric)) %>% 
+  as.data.frame()
 
 attach(df1)
 dd <- datadist(df1)
@@ -76,9 +96,10 @@ fit1 <- rms::lrm(formula = low ~ age+ftv+ht+lwt+ptl+smoke+ui+race1+race2,
 fit1
 ```
 
+*模型检验* 在建模时需要检验模型是否满足其对应的assumption，比如对于线性回归模型应满足LINE，对于Cox回归应该满足等风险比例，对于逻辑回归其outcome应该是分类变量、残差符合正态分布等。
 
-_模型检验_
-在建模时需要检验模型是否满足其对应的assumption，比如对于线性回归模型应满足LINE，对于Cox回归应该满足等风险比例，对于逻辑回归其outcome应该是分类变量、残差符合正态分布等。
+`easystats`似乎对`rms`包的支持一般。
+
 ```{r}
 # assumption
 performance::check_model(fit1)
@@ -88,15 +109,11 @@ performance::performance(fit1)
 
 ```
 
+*校准曲线*
 
+Calibration plot and Hosmer-Lemeshow goodness-of-fit test assess calibration.Calibration is the agreement between observed outcomes and model's prediction.
 
-_校准曲线_
-
-Calibration plot and Hosmer-Lemeshow goodness-of-fit test assess calibration.Calibration is the agreement between observed outcomes and model’s prediction. 
-
-对于下图的解读：三条线分别为，Ideal线为
-n=189   Mean absolute error=0.037   Mean squared error=0.00177
-0.9 Quantile of absolute error=0.057
+对于下图的解读：三条线分别为，Ideal线为 n=189 Mean absolute error=0.037 Mean squared error=0.00177 0.9 Quantile of absolute error=0.057
 
 ```{r}
 cal1 <- rms::calibrate(fit = fit1, method = 'boot',
@@ -116,8 +133,8 @@ plot(cal1,xlim = c(0,1.0),ylim = c(0,1.0))
 #      errbar.col="blue")
 ```
 
-
 ROC/AUC
+
 ```{r}
 # 混淆矩阵
 library(ROCR)
@@ -145,13 +162,12 @@ Hmisc::somers2(df1$predvalue, df1$low)
 ```
 
 对于ROC曲线的分析似乎`pROC`是一个不错的选择。下面以`pROC`作为示例：
+
 ```{r}
 
 ```
 
-
-
-_nomogram_
+*nomogram*
 
 下面展开列线图的绘制和解读
 
@@ -167,7 +183,9 @@ nom <- nomogram(fit = fit1,
 plot(nom)
 
 ```
+
 通过以上列线图的结果，可以看到ftv对模型的影响很小，可以不考虑。现重新构建模型fit2:
+
 ```{r}
 df2 <- df1 %>% 
   mutate(race = ifelse(race==1, 1, 0)) %>% 
@@ -182,13 +200,10 @@ fit2 <- rms::lrm(formula = low ~ age+ht+lwt+ptl+smoke+race,
 fit2
 ```
 
+*DCA*
 
+在R中做DCA曲线的有`ggDCA`, `rmda`等R包，但似乎都差些意思。需要一个更好更强大的R包。 DCA曲线的解读如上文所述，看我们得到的模型是不是比All干预时所有的净收益都要好，如图可以看到模型整体的净收益都比all曲线的净收益要好。 评估模型的临床效用。
 
-
-_DCA_
-
-在R中做DCA曲线的有`ggDCA`, `rmda`等R包，但似乎都差些意思。需要一个更好更强大的R包。
-DCA曲线的解读如上文所述，看我们得到的模型是不是比All干预时所有的净收益都要好，如图可以看到
 ```{r}
 library(ggDCA)
 
@@ -201,14 +216,12 @@ ggplot(d_res)
 ggDCA::AUDC(d_res)
 ```
 
+*NRI + IDI*
 
-_NRI + IDI_
-
-净重新分类指数(net reclassification improvement NRI)是指在新旧指标，或者在不同模型上的重新分类的变化。广泛应用 于比较两个预测模型的准确度。
-IDI(integrated discrimination improvement)综合判别改善指数。
-二者是measures of discrimination，一般用于两个模型间的对比。
+净重新分类指数(net reclassification improvement NRI)是指在新旧指标，或者在不同模型上的重新分类的变化。广泛应用 于比较两个预测模型的准确度。 IDI(integrated discrimination improvement)综合判别改善指数。 二者是measures of discrimination，一般用于两个模型间的对比。
 
 以下所使用的R包似乎只支持glm对象，rms对象似乎不支持。
+
 ```{r}
 library(PredictABEL) # 此包二者都可以做，但是有点麻烦
 library(nricens)
@@ -249,12 +262,3 @@ nricens::nribin(mdl.std = logistic.model.list[["fit1"]],
        niter = 1000
        )
 ```
-
-
-
-
-
-
-
-
-
