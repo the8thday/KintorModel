@@ -3,6 +3,9 @@ title: "cox regression"
 author: "liuc"
 date: "11/29/2021"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -10,15 +13,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # 生存分析的COX回归和KM分析
-https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html
 
-本笔记主要记录较为完整的Cox回归模型和KM分析，其中对于Lasso-Cox、mixed-Cox等，详见*lasso_cox.Rmd*, *mixed_cox.Rmd*这两个笔记。
+<https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html>
 
-生存分析所分析的数据特点为time-to-event数据，time总是from to end的，比如Time from response to recurrence
+本笔记主要记录较为完整的Cox回归模型和KM分析，其中对于Lasso-Cox、mixed-Cox等，详见*lasso_cox.Rmd*,
+*mixed_cox.Rmd*这两个笔记。
+
+生存分析所分析的数据特点为time-to-event数据，time总是from to
+end的，比如Time from response to recurrence
 这类最常见的数据，在面对此类数据时除了period需要考察外还需要考虑起始时间的特点，这一点在删失数据的各种分类更需注意。
-对于左删失和interval censor数据需要别的数据处理方法，此处主要讨论以右删失数据为主。
-
-
+对于左删失和interval
+censor数据需要别的数据处理方法，此处主要讨论以右删失数据为主。
 
 ## cox regression
 
@@ -32,9 +37,9 @@ library(rms)
 library(gtsummary) # for beautiful table
 ```
 
-建模.
-对于cox回归其实质同线性回归;
+建模. 对于cox回归其实质同线性回归;
 需要满足等比例假设，对于不满足的自变量采用分层分析的方法。
+_对于因子变量_应如何纳入到具体的模型中呢？对于设置成factor的因子R中模型常见的处理方式是将其自动设置为dummy变量。就像`model.matrix(~ 0 + factor(ph.ecog), lung)`
 
 ```{r}
 data('lung', package = 'survival')
@@ -42,6 +47,7 @@ lung <- na.omit(lung) %>%
   as_tibble() %>% 
   rstatix::convert_as_factor(sex, ph.ecog)
 
+# 多变量cox回归
 mod <- coxph(Surv(time, status==2)~age + sex + ph.ecog + ph.karno + meal.cal + wt.loss, 
              data = lung, 
              # y=TRUE, 
@@ -70,10 +76,9 @@ summary(mod_strata)
 broom::tidy(mod, exp = TRUE)
 
 # 输出漂亮表格
-gtsummary::tbl_regression(mod)
+gtsummary::tbl_regression(mod, exp = T)
 
 ```
-
 
 c-index以及校准曲线:
 c-index用于评估模型的区分度，可以理解为模型拟合后自身的区分能力。
@@ -129,7 +134,10 @@ plotROC(roc_res,
 ```
 
 ### 呈现cox回归的结果
+
 interpret the results is so import!
+
+在上述的`summary(mod)`的结果中，三个整体的检验(likelihood,Wald,Score)P值小于0.05，说明模型整体上是有意义的。
 
 ```{r}
 # The HR is interpreted as the instantaneous rate of occurrence of the event of interest in those who are still at risk for the event. It is not a risk, though it is commonly interpreted as such
@@ -140,8 +148,8 @@ interpret the results is so import!
 
 ```
 
-
 ### 基于rms包的分析:
+
 列线图的绘制、c-index、校准曲线等
 
 ```{r}
@@ -242,8 +250,7 @@ lines(cal[,c("mean.predicted","KM")],type="b",lwd=2,
 abline(0,1,lty=3,lwd=2,col=c(rgb(0,118,192,maxColorValue=255)))
 ```
 
-ggDCA包的决策曲线分析：
-决策曲线（Decision curve analysis，DCA）
+ggDCA包的决策曲线分析： 决策曲线（Decision curve analysis，DCA）
 
 ```{r}
 library(ggDCA)
@@ -259,6 +266,45 @@ ggplot(dca1,
        model.names="model1",
        linetype =F,
        lwd = 1.2) 
+```
+
+
+*多因素cox回归分析后的单因素的KM曲线*
+confounder-adjusted expected survival probabilities, 不知此时是否还合适称之为KMplot.
+
+在混杂因素纳入模型后，聚焦的单一变量在一些文献中，也会绘制Adjusted Survival Curves. The `survfit` function estimates $S(t)$, by default at the mean values of the covariates:
+
+> <http://www.sthda.com/english/wiki/cox-proportional-hazards-model>
+> <https://bookdown.org/sestelo/sa_financial/adjusting-survival-curves.html>
+> https://stackoverflow.com/questions/70783093/how-to-generate-covariate-adjusted-cox-survival-hazard-functions
+
+经过多方尝试，似乎`https://github.com/RobinDenz1/adjustedCurves` 是个不错的选择。
+
+```{r}
+new_df <- with(lung,
+               data.frame(sex = c(1, 2), 
+                          age = rep(mean(age, na.rm = TRUE), 2),
+                          ph.ecog = c(1, 1),
+                          ph.karno = rep(mean(ph.karno, na.rm = TRUE), 2)
+                          )
+               ) %>% rstatix::convert_as_factor(sex, ph.ecog)
+
+fit <- survfit(mod2, newdata = new_df)
+
+ggsurvplot(fit, conf.int = TRUE, 
+           pval = TRUE,data = new_df,
+           legend.labs=c("Sex=1", "Sex=2"),
+           ggtheme = theme_minimal())
+
+# 利用survminer
+# 似乎对因子变量不怎么支持
+curve <- surv_adjustedcurves(mod2, variable = 'sex', data = lung, method = "average")
+ggadjustedcurves(mod2, variable = 'sex', data = lung, method = "average")
+```
+
+**两个模型的比较**
+```{r}
+anova(mod2, mod) #fist the reduced, second the full
 ```
 
 
@@ -283,6 +329,9 @@ summary(survfit(Surv(time, status) ~ 1, data = lung), times = 365.25)
 # 从survdiff中提取pvalue
 sd <- survdiff(Surv(time, status) ~ sex, data = lung)
 1 - pchisq(sd$chisq, length(sd$n) - 1)
+# directly calculate the log-rank test p-value using survdiff()
+survdiff(Surv(time, status) ~ sex, data = lung)
+
 
 # KM plot
 pp <- ggsurvplot(fit, 
@@ -373,12 +422,11 @@ p3 <- jskm(fit,
 
 ```
 
-
 ### Random Forests Model for survival
 
 ```{r}
 # ranger model
-r_fit <- ranger(Surv(time, status) ~ trt + celltype + 
+r_fit <- ranger::ranger(Surv(time, status) ~ trt + celltype + 
                      karno + diagtime + age + prior,
                      data = vet,
                      mtry = 4,
@@ -401,6 +449,3 @@ plot(r_fit$unique.death.times,r_fit$survival[1,],
      main = "Patient Survival Curves")
 
 ```
-
-
-

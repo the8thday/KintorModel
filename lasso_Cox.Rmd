@@ -20,6 +20,7 @@ The glmnet package provides procedures for fitting the entire lasso or elastic-n
 
 ```{r}
 library(glmnet)
+library(survival)
 
 data(lung, package = 'survival')
 
@@ -96,7 +97,7 @@ ggplot(tidy_covariates, aes(x=lambda, y=estimate, color=as.factor(term)))+
 ```
 
 
-以下best_lambda似乎有问题
+以下best_lambda似乎有问题, 并非有问题，解释见下文。
 ```{r}
 #find coefficients of best model
 best_model <- glmnet(X, y, family="cox", 
@@ -132,12 +133,12 @@ nomograph based on lasso-cox regression
 
 具体的见*survival.Rmd*
 
-
+文献中所用到的R包
 ```{r}
 library(nricens)
 library(stdca)
-library(rmda)
-library(timeROC)
+library(rmda) # for DCA
+library(timeROC) # for ROC
 ```
 
 
