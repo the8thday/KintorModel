@@ -94,6 +94,18 @@ fit1 <- rms::lrm(formula = low ~ age+ftv+ht+lwt+ptl+smoke+ui+race1+race2,
                  )
 
 fit1
+
+# 以下为rms包所提供的一些方便的功能
+plot(anova(fit1), what='proportion chisq') # relative importance
+plot(Predict(fit1, fun=plogis)) # predicted values
+rms::validate(fit1, method="boot", B=500) # bootstrapped validation
+vif(fit1) # test for multicolinearity
+Predict(fit1)
+
+# penalty <- pentrace(mod1, penalty=c(0.5,1,2,3,4,6,8,12,16,24), maxit=25)
+# mod1_pen <- update(mod1, penalty=penalty$penalty)
+# effective.df(mod1_pen)
+# mod1_pen
 ```
 
 *模型检验* 在建模时需要检验模型是否满足其对应的assumption，比如对于线性回归模型应满足LINE，对于Cox回归应该满足等风险比例，对于逻辑回归其outcome应该是分类变量、残差符合正态分布等。
@@ -117,7 +129,7 @@ Calibration plot and Hosmer-Lemeshow goodness-of-fit test assess calibration.Cal
 
 ```{r}
 cal1 <- rms::calibrate(fit = fit1, method = 'boot',
-                       B = 100
+                       B = 500
                        )
 
 plot(cal1,xlim = c(0,1.0),ylim = c(0,1.0))
