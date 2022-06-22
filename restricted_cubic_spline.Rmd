@@ -1,0 +1,89 @@
+---
+title: "restricted cubic spline in R"
+author: "liuc"
+date: '2022-06-21'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## restricted cubic spline in R
+
+非线性关系分析:
+
+在观察性研究中遇到定量或者等级资料的时候，一般会绘制 限制性立方样条图，并采用似然比检验分析非线性关系。
+该方法可以探讨暴露因素与结局的非线性关系。
+在医学研究中，我们经常构建回归模型来分析自变量和因变量之间的关系。事实上，大多数的回归模型有一个重要的假设就是自变量和因变量呈线性关联，这个条件实际很难满足。常见的解决方法是将连续变量分类，但类别数目和节点位置的选择往往带有主观性，并且分类往往会损失信息。因此，一个更好的解决方法是拟合自变量与因变量之间的非线性关系，限制性立方（Restricted cubic spline，RCS）就是分析非线性关系的最常见的方法之一。
+
+事实上，限制性立方样条的应用范围非常广，凡是想描述自变量和因变量的关系都可以在回归模型中加入限制性立方样条，除了以上的例子中的COX回归外，还可以应用到线性回归、Logistic回归、以及Meta分析中剂量反应关系的Meta回归等。
+
+ In statistics, splines are a broad class of methods for transforming variables.
+ 
+ - Dummy variable
+ - Unrestricted linear splines
+ - Restricted linear splines
+ - Restricted cubic splines
+ 
+ Various proposals have been made, but Frank Harrell recommends using 4 knots if N < 100 and 5 for larger data sets and placing them at the 5th, 35th, 65th and 95th percentiles for k = 4 and the 5th, 27.5th, 50th, 72.5th and 95th for k = 5 (where k is the number of knots).
+
+下面在R语言中实现其应用:
+```{r}
+library(splines)
+library(splines2)
+# library(gss)
+library(Hmisc)
+library(rms)
+```
+
+
+> https://towardsdatascience.com/restricted-cubic-splines-c0617b07b9a5
+> https://www.mediecogroup.com/zhuanlan/lessons/600/
+
+
+```{r}
+# We would like to explore the relationship between age (in years) and a crude measure of body fat, which is triceps skinfold thickness.
+
+df <- lung
+dd <- datadist(df)
+options(datadist = 'dd')
+
+# 拟合, 对于logistic和线性回归，只需改成对应的拟合函数即可lrm/ols
+fit<- cph(Surv(time, status) ~ rms::rcs(age,4) + sex, data=df, x = TRUE, y = TRUE)
+dd$limits$age[2] <- 60 ###这里是设置参考点，也就是HR为1的点，常见的为中位数或者临床有意义的点
+
+fit <- update(fit)
+summary(fit) # effect estimates, 其中low/high分别表示25th to the 75th percentile of each variable, CI为在其他变量不变的情况下计算的,summary(newmod, conf.type=c('simultaneous'))可以得到同时考量多个变量的
+# 对于下图的理解为从25%到75% age变量对y的贡献增长0.019，图中三种颜色分别表示99% 95% 90%的CI
+plot(summary(fit))
+
+HR <- Predict(fit, age,fun=exp,ref.zero = TRUE) ####预测HR值
+
+# 查看是否存在非线性关系, p值小于0.05为存在非线性关联
+(an <- anova(fit))
+
+# plot
+ggplot(HR)
+# ggplot(fit) # 每个变量的单独效应
+plot(HR, anova=an, pval = TRUE)
+
+
+# 哪一行的观测对这个变量是有影响的
+which.influence(fit)
+
+# for a logistic or Cox model
+Hmisc::rcspline.plot()
+```
+
+interpretation: `g statistic` it’s based on Gini’s mean difference and is purported to be a robust and highly efficient measure of variation.
+对于anova的结果其describe the marginal impact of removing each covariate from `fit`.
+
+
+文献示例：
+In figure 1, we used restricted cubic splines to flexibly model and visualize the relation of predicted fat mass and lean body mass with all cause mortality in men. The risk of all cause mortality was relatively flat until around 21 kg of predicted fat mass and then started to increase rapidly afterwards (P for non-linearity <0.001). The average BMI for men with 21 kg of predicted fat mass was 25. Above 21 kg, the hazard ratio per standard deviation higher predicted fat mass was 1.22 (1.18 to 1.26). Regarding the strong U shaped relation between predicted lean body mass and all cause mortality, the plot showed a substantial reduction of the risk within the lower range of predicted lean body mass, which reached the lowest risk around 56 kg and then increased thereafter (P for non-linearity <0.001). Below 56 kg, the hazard ratio per standard deviation higher predicted lean body mass was 0.87 (0.82 to 0.92). 
+
+> Predicted lean body mass, fat mass, and all cause and cause specific mortality in men: prospective US cohort study
+
+
+
