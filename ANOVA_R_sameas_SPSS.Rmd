@@ -84,6 +84,45 @@ car::Anova(aov.res.two, type = 'III')
 ```
 
 
+## MANOVA 多元方差分析
+多元方差分析是指有多个结局变量outcome的ANOVA模型。
+多个结局变量的情况如，ABC三组小鼠分别经受DEF两种药物不同的处理，研究者想要同时观察小鼠身高和体重的变化，NULL假设为药物处理对身高体重皆有影响，此种情况下适合用MANOVA。
+MANOVA需要满足几个assumption: multivariate normality. `mvnormtest::mshapiro.test( )`, *No multicollinearity*, *No outliers*.
+在结果有意义后，可通过one-way ANOVA对每一个dependent variable分别检验。
+
+> https://www.r-bloggers.com/2022/01/manova-in-r-how-to-implement-and-interpret-one-way-manova/
+
+MANOVA in R uses Pillai’s Trace test for the calculations, which is then converted to an F-statistic when we want to check the significance of the group mean differences. You can use other tests, such as Wilk’s Lambda, Roy’s Largest Root, or Hotelling-Lawley’s test, but Pillai’s Trace test is the most powerful one.
+```{r}
+dependent_vars <- cbind(iris$Sepal.Length, iris$Sepal.Width, iris$Petal.Length, iris$Petal.Width)
+independent_var <- iris$Species
+# MANOVA test
+manova_model <- manova(dependent_vars ~ independent_var, data = iris)
+
+summary(manova_model)
+
+# If the value is 0.14 or greater, we can say the effect size is large.
+effectsize::eta_squared(manova_model)
+
+# Look to see which differ
+summary.aov(manova_model)
+
+# post-hoc by LDA
+iris_lda <- MASS::lda(independent_var ~ dependent_vars, CV = F)
+iris_lda
+lda_df <- data.frame(
+  species = iris[, "Species"],
+  lda = predict(iris_lda)$x
+)
+lda_df
+
+ggplot(lda_df) +
+  geom_point(aes(x = lda.LD1, y = lda.LD2, color = species), size = 4) +
+  theme_classic()
+```
+
+
+
 
 ## 重复测量方差分析
 #### 单因素重复测量方差分析一般指单一的Time因素
