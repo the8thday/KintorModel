@@ -1,0 +1,22 @@
+---
+title: "SAS in R"
+author: "liuc"
+date: '2022-06-30'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## SAS in R
+
+在R中实现SAS中，详细的分析内容，包括log、详细分析结果
+
+
+
+```{r}
+library(tidyverse)
+library(sassy)
+```
+
