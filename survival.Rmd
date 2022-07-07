@@ -270,7 +270,8 @@ ggplot(dca1,
 
 
 *多因素cox回归分析后的单因素的KM曲线*
-confounder-adjusted expected survival probabilities, 不知此时是否还合适称之为KMplot.
+或者应该说是
+cofounder-adjusted expected survival probabilities, 不知此时是否还合适称之为KMplot.
 
 在混杂因素纳入模型后，聚焦的单一变量在一些文献中，也会绘制Adjusted Survival Curves. The `survfit` function estimates $S(t)$, by default at the mean values of the covariates:
 
@@ -300,11 +301,24 @@ ggsurvplot(fit, conf.int = TRUE,
 # 似乎对因子变量不怎么支持
 curve <- surv_adjustedcurves(mod2, variable = 'sex', data = lung, method = "average")
 ggadjustedcurves(mod2, variable = 'sex', data = lung, method = "average")
+
+
+# 尝试adjustedCurves的用法
+adjsurv <- adjustedCurves::adjustedsurv(data=lung,
+                        variable="sex",
+                        ev_time="time",
+                        event="status",
+                        method="direct",
+                        outcome_model=cox_mod,
+                        conf_int=TRUE)
+
+# plot with confidence intervals
+plot(adjsurv, conf_int=TRUE)
 ```
 
 **两个模型的比较**
 ```{r}
-anova(mod2, mod) #fist the reduced, second the full
+anova(mod2, mod) #fist the reduced model, second the full model
 ```
 
 
