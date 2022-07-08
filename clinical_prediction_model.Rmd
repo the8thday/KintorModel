@@ -30,6 +30,10 @@ library(tidyverse)
 library(easystats)
 library(rms)
 
+get_logistic_pred = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) {
+  probs = predict(mod, newdata = data, type = "response")
+  ifelse(probs > cut, pos, neg)
+}
 ```
 
 <span style='color: red;'>变量选择<span>
@@ -56,6 +60,8 @@ dummies <- df %>%
   prep() %>% 
   bake()
 ```
+
+
 
 ```{r}
 # 读入带label的SPSS数据对于下游的一些分析会带来麻烦，此处待解决
@@ -274,3 +280,59 @@ nricens::nribin(mdl.std = logistic.model.list[["fit1"]],
        niter = 1000
        )
 ```
+
+
+
+## use glm
+
+```{r}
+model_glm <- glm(low ~ age + ftv + ht + lwt + ptl + smoke + 
+     ui + race1 + race2, data = df1, family = "binomial")
+
+predict(model_glm)
+predict(model_glm, type = 'response')
+
+```
+
+
+```{r}
+# assumption
+performance::check_model(model_glm)
+
+# 模型整体的表现
+performance::performance(model_glm)
+```
+
+
+```{r}
+model_glm_pred <- ifelse(predict(model_glm, type = "link") > 0, "Yes", "No")
+
+train_tab = table(predicted = model_glm_pred, actual = default_trn$default)
+
+train_con_mat = caret::confusionMatrix(train_tab, positive = "Yes")
+c(train_con_mat$overall["Accuracy"], 
+  train_con_mat$byClass["Sensitivity"], 
+  train_con_mat$byClass["Specificity"])
+
+get_logistic_error(model_glm, data = default_trn, 
+                   res = "default", pos = "Yes", neg = "No", cut = 0.5)
+```
+
+
+```{r}
+library(pROC)
+test_prob = predict(model_glm, newdata = default_tst, type = "response")
+test_roc = roc(default_tst$default ~ test_prob, plot = TRUE, print.auc = TRUE)
+```
+
+
+To perform multinomial logistic regression, we use the multinom function from the nnet package. Training using multinom() is done using similar syntax to lm() and glm(). We add the trace = FALSE argument to suppress information about updates to the optimization routine as the model is trained.
+
+```{r}
+library(nnet)
+model_multi = multinom(Species ~ ., data = iris_trn, trace = FALSE)
+summary(model_multi)$coefficients
+
+head(predict(model_multi, newdata = iris_trn, type = "prob"))
+```
+
