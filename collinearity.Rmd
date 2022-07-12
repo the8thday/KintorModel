@@ -20,12 +20,55 @@ knitr::opts_chunk$set(echo = TRUE)
 岭回归是一种专门用于共线性数据分析的有偏估计方法，实质上是经修正过的最小二乘法。
 
 ```{r}
+library(glmnet)
 
+ridge <- glmnet::glmnet(Fertility ~., data = swiss, alpha = 0)
+
+summary(ridge)
 ```
 
-#### 多重共线性的变量选择
+#### 多重共线性的变量选择之 逐步回归法
 逐步回归的应用。
+虽然很多时候并不是推荐的方法。
 
 ```{r}
+# Note that,
+# 
+# forward selection and stepwise selection can be applied in the high-dimensional configuration, where the number of samples n is inferior to the number of predictors p, such as in genomic fields.
+# Backward selection requires that the number of samples n is larger than the number of variables p, so that the full model can be fit.
 
+
+
+library(MASS)
+# Fit the full model 
+full.model <- lm(Fertility ~., data = swiss)
+# Stepwise regression model
+step.model <- stepAIC(full.model, direction = "both", 
+                      trace = FALSE)
+summary(step.model)
+
+
+# use stats package
+#define intercept-only model
+intercept_only <- lm(Fertility ~ 1, data=swiss)
+#define model with all predictors
+all <- lm(Fertility ~ ., data=swiss)
+#perform forward stepwise regression, 注意direction不同时，step第一个参数的改变
+forward <- step(intercept_only, direction='forward', scope=formula(all), trace=0)
+#view results of forward stepwise regression
+forward$anova
+#view final model
+forward$coefficients
+
+
+# use leaps package
+models <- regsubsets(Fertility~., data = swiss, nvmax = 5,
+                     method = "seqrep")
+summary(models)
 ```
+
+
+
+
+
+
