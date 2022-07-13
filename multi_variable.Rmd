@@ -1,0 +1,51 @@
+---
+title: "multi variable"
+author: "liuc"
+date: '2022-07-12'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 多因素统计分析
+
+对于类似统计工具的使用，一篇优秀的示例教程才是重中之重。不论是SPSS、SAS、还是R，对于用户而言，总是只需要明白对应数据类型和欲得到的结果，选择合适的统计方法，并阐释清楚即可。
+
+> https://thomaselove.github.io/432-notes/index.html
+> https://epirhandbook.com/en/index.html
+
+相较于单因素统计分析，多因素往往指的是类似`y ~ x1 + x2 + x...`
+
+
+配对设计的条件logistic回归：
+配对设计指的是：比如同一个患者进行了两次检测，1:1的配对设计。配对样本共享同一个ID
+> https://www.metafor-project.org/doku.php/tips:clogit_paired_binary_data
+
+```{r}
+library(survival)
+library(Epi)
+data(bdendo)
+ 
+clg_res <- survival::clogit(d ~ cest + dur + strata(set), bdendo)
+summary(clg_res)
+
+
+res.clogistic <- Epi::clogistic(d ~ cest + dur, strata = set, data = bdendo)
+res.clogistic
+
+# 用lme4 package
+summary(lme4::glmer(d ~ cest + dur + (1 | set), family=binomial, data = bdendo, nAGQ=17))
+```
+
+
+
+```{r}
+
+```
+
+
+
+
+
