@@ -17,6 +17,8 @@ Random forest model by tidymodels
 library(tidyverse)
 library(tidymodels)
 library(vip)
+library(usemodels)
+
 
 tidymodels_prefer()
 doParallel::registerDoParallel()
@@ -57,7 +59,7 @@ df_test <- testing(df_split)
 
 
 #### rpart 分类问题
-树模型的种类繁多，此处选择`rpart`包。
+决策树模型的种类繁多，此处选择`rpart`包。
 
 ```{r}
 class_tree_spec <- decision_tree() %>%
@@ -150,6 +152,17 @@ trees_folds <- vfold_cv(df_train,
                         v = 10
                         )
 
+grid = expand.grid(
+      mtry = c(1, 3, 5), 
+      trees = c(500, 1000, 2000)
+    )
+# use dials to create grid
+dials_grid <- grid_random(
+  mtry(c(1, ncol(df_train) - 1)),
+  trees(),
+  size = 6
+)
+
 tune_res <- tune_grid(
   class_rf_wf,
   resamples = trees_folds,
@@ -165,6 +178,12 @@ AUC for `tune_res`:
 以下探索在各个参数的情况下，以roc_auc matrics为标准的一些参数变化，为了演示grid设置较少。
 ```{r}
 # load('./datasets/tune_res_rf.rda')
+
+
+tune_res %>%
+  collect_metrics()
+
+show_best(tune_res)
 
 tune_res %>%
   collect_metrics() %>%
