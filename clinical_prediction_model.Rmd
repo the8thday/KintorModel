@@ -289,9 +289,34 @@ nricens::nribin(mdl.std = logistic.model.list[["fit1"]],
 model_glm <- glm(low ~ age + ftv + ht + lwt + ptl + smoke + 
      ui + race1 + race2, data = df1, family = "binomial")
 
-predict(model_glm)
+predict(model_glm)  # 默认predict为predict.glm, type为on the scale of the linear predictors
 predict(model_glm, type = 'response')
 
+```
+
+
+```{r}
+### 马修斯相关系数, matthews correlation coefficient
+Logistic_Predictions = predict(model_glm, type = 'response')
+Logistic_Predictions_binomial=ifelse(Logistic_Predictions>0.5,1,0)
+con_Logistic <- caret::confusionMatrix(factor(Logistic_Predictions_binomial), factor(df1$low))
+
+
+MCC_Logistic <- list(
+  TP <- con_Logistic$table[[1]],
+  FP <- con_Logistic$table[[2]],
+  FN <- con_Logistic$table[[3]],
+  TN <- con_Logistic$table[[4]]
+) %>%  # # MCC <- ((TP * TN) - (FP * FN)) / sqrt((TP + FP) * (TP+FN) * (TN+FP) * (TN+FN))
+  pmap_dbl(., ~ ((..1 * ..4) - (..2 * ..3))/sqrt((..1 + ..2) * (..1 + ..3) * (..4 + ..2) * (..4 + ..3)))
+
+
+# use yardisk
+yardstick::mcc(con_Logistic$table)
+
+
+
+# PRROC::pr.curve
 ```
 
 
