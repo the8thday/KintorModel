@@ -153,6 +153,14 @@ vip::vip(xgb_fit, geom = "point", num_features = 12)
 ```
 
 use Shapley Additive Explanations 确定特征重要性
+Why SHAP values
+SHAP’s main advantages are local explanation and consistency in global model structure.
+
+Tree-based machine learning models (random forest, gradient boosted trees, XGBoost) are the most popular non-linear models today. SHAP (SHapley Additive exPlanations) values is claimed to be the most advanced method to interpret results from tree-based models. It is based on Shaply values from game theory, and presents the feature importance using by marginal contribution to the model outcome.
+
+This Github page explains the Python package developed by Scott Lundberg. Here we show all the visualizations in R. The xgboost::xgb.shap.plot function can also make simple dependence plot.
+> https://liuyanguu.github.io/post/2019/07/18/visualization-of-shap-for-xgboost/
+
 ```{r}
 library(SHAPforxgboost)
 
@@ -176,6 +184,8 @@ shap.plot.dependence(
   size0 = 1.2,
   smooth = FALSE, add_hist = TRUE
 )
+
+# SHAP force plot
 ```
 
 
