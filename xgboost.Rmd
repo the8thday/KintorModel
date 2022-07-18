@@ -14,10 +14,12 @@ knitr::opts_chunk$set(echo = TRUE)
 https://juliasilge.com/blog/board-games/
 
 xgboost对于样本量多，变量没那么多的数据挺合适？This is a pretty sizeable rectangular dataset so let’s use an xgboost model; xgboost is a good fit for that type of dataset.
+应该是对于长方形数据比较合适。
 
 ```{r}
 library(tidymodels)
 library(xgboost)
+library(SHAPforxgboost)
 library(textrecipes)
 library(finetune)
 library(vip)
@@ -149,7 +151,8 @@ Let’s start with model-based variable importance using the vip package.
 xgb_fit <- extract_fit_parsnip(xgb_last)
 vip::vip(xgb_fit, geom = "point", num_features = 12)
 ```
-use Shapley Additive Explanations 特征重要性
+
+use Shapley Additive Explanations 确定特征重要性
 ```{r}
 library(SHAPforxgboost)
 
