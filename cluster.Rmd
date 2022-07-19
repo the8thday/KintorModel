@@ -1,0 +1,39 @@
+---
+title: "cluster notebook"
+author: "liuc"
+date: '2022-07-19'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## cluster nootebook
+
+聚类算法是将数据partition and segment, 
+
+1. k-means
+2. gaussian mixed
+3. hierarchical clustering
+4. DBSCAN stands for Density-Based Spatial Clustering and Application with Noise
+5. Partitioning Around Medoids (PAM)
+6. Level Set Tree clustering algorithm. Use the denpro R package. 
+
+
+
+```{r}
+library(cluster)
+library(flexclust)
+library(fpc)
+library(fastcluster)
+# library(pvclust) #The pvclust( ) function in the pvclust package provides p-values for hierarchical clustering
+```
+
+
+
+
+
+
+
+
