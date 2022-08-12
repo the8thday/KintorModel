@@ -35,10 +35,12 @@ https://ase.tufts.edu/bugs/guide/assets/mixed_model_guide.html
 首先是检验数据因变量的概率分布，在这一点上似乎和广义线性模型相似，线性混合模型需要因变量满足正态性.
 如果不符合正态性检验，需选择正确的建模方法，比如penalized quasilikelihood (PQL) 、Laplace approximation and Markov chain Monte Carlo algorithms (MCMC).
 
-不过通过performance::check_models似乎更安全 ，不确定此处的正态性检验是对因变量还是残差。    
+不过通过performance::check_models似乎更安全 ，不确定此处的正态性检验是对因变量还是残差。   
+
+除此之外，对于outlier等数据的处理，
 
 ```{r}
-df2 <- readRDS('./df2.rds')
+df2 <- readRDS('./datasets/df2.rds')
 
 car::qqPlot(df2$score)
 ```
@@ -91,12 +93,14 @@ lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距�
 ```{r}
 # type III
 car::Anova(lme_model, type = 'III')
+
+
 # Satterthwaite's method
 anova(lme_model)
 
 
 # to see all 134 models
-coef(lme_model)
+# coef(lme_model)
 
 plot(ggemmeans(lme_model, terms = c("time", "class"), 
                condition = c(diagnose = "severe"))) + 
@@ -117,11 +121,58 @@ pc <- emmeans::emmeans(lme_model,
                        adjust = 'fdr', infer = c(TRUE, TRUE))
 pc
 
-# 当然还可以 通过如下方式，求得两两比对的结果，同pairs(emm_res)
+# 当然还可以 通过如下方式，求得两两比对的结果，结果同pairs(emm_res)
 # contrast(emm_res, method='pairwise', by = 'class')
 grafify::posthoc_Levelwise(lme_model,
                            c("time", 'class'))
 ```
+
+
+```{r}
+## Pairwise comparisons, 对于lme模型中emmeans值进行两两比较，自然是针对分类变量
+(emm_res <- emmeans(lme_model, specs = 'Time'))
+pairs(emm_res)
+contrast(emm_res)
+plot(emm_res, comparisons = TRUE) + theme_bw() +
+  labs(y = "", x = "Estimated marginal mean")
+```
+
+
+```{r}
+library(gtsummary)
+
+tbl_data <- df_p_long %>% 
+  select(Subject, Folder, !!x_input, ACTARM) %>% 
+  distinct() %>% 
+  pivot_wider(names_from = Folder, values_from = !!x_input)
+  # janitor::clean_names()
+  # labelled::remove_labels()
+
+
+gtsummary::tbl_summary(tbl_data %>% select(-Subject),
+                       by = ACTARM,
+                       missing = 'no',
+                       type = all_continuous() ~ 'continuous2',
+                       statistic = list(all_continuous() ~ c("{N_nonmiss}",
+                                                             "{mean} ({sd})",
+                                                             "{median} ({p25}, {p75})", 
+                                                             "{min}, {max}"),
+                                        all_categorical() ~ "{n} / {N} ({p}%)")
+                       ) %>% 
+   modify_header(all_stat_cols() ~ "**{level}**<br>N = {n} ({style_percent(p)}%)") %>%
+  add_n() %>% 
+  add_p() %>% 
+  bold_labels() %>% 
+  modify_spanning_header(all_stat_cols() ~ glue::glue("**{x_string}**"))
+```
+
+
+```{r}
+gtsummary::tbl_regression(lme_model,
+                          intercept = TRUE
+                          )
+```
+
 
 *use easystats to get model parameter or effectsize or performance*
 下面针对模型的参数和performance进行展示
