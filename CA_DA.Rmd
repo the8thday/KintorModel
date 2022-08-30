@@ -9,15 +9,16 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Correspondence analysis
+## Correspondence analysis(CA)
 
 对应分析,以及去势对应分析等常用于分类数据，当研究多个分类变量的关系时，用卡方检验或对数优势线性模型难以直观简单的
 给出各变量间的关系。而对应分析可以给出直观的结果解释。它把R型因子分析和Q型因子分析结合起来，以少数几个公共因子的综合指标去描述研究对象在空间上的联系。
+CA作为PCA的一个扩展，其结果展示也和PCA类似。
 CA有时会产生弓形效应，DCA可用以消除这个问题。
 
-FactoMineR 包可以进行CA，MCA，DCA的等计算.
+FactoMineR 包可以进行CA，MCA，DCA等计算.
 
-```{r}
+```{r, include=FALSE}
 library(medicaldata)
 library(FactoMineR)
 library(tidymodels)
@@ -31,28 +32,61 @@ library(discrim)
 # 以列联表数据为例子
 # http://www.sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/113-ca-correspondence-analysis-in-r-essentials/
 data(housetasks, package = 'factoextra')
-gplots::balloonplot(t(as.table(as.matrix(housetasks))))
+housetasks
 # 本数据集可以看作x多个变量和y多个变量组成的列联表
 
-res.ca <- FactoMineR::CA(housetasks)
-res.ca # has alot of slots
+gplots::balloonplot(t(as.table(as.matrix(housetasks))),
+                    xlab ="", ylab="",
+                    label = FALSE, show.margins = FALSE)
+
+
+res.ca <- FactoMineR::CA(housetasks, graph = TRUE)
+# 会有chi square的统计结果
+res.ca # has a lot of slots
 
 # Eigenvalue
-eig.val = get_eigenvalue(res.ca)
+eig.val = factoextra::get_eigenvalue(res.ca)
 eig.val
 ```
-_结果解读_: 对应分析用于多个变量间关系的分析，类似于卡方检验。
+```{r}
+chisq <- chisq.test(housetasks)
+chisq
+```
+
+_结果解读_: 对应分析用于多个变量间关系的分析，类似于卡方检验。散点图中处于同一个象限的为关系较为紧密的变量。
 
 
 
-### Discriminant Analysis is more stable than logistic regression for multi-class 
+*MCA* multiple correspondence analysis
 
-http://www.sthda.com/english/articles/36-classification-methods-essentials/146-discriminant-analysis-essentials-in-r/
+对于多个多变量之间的关系。
+
+```{r}
+data(poison)
+
+poison.active <- poison[1:55, 5:15]
+res.ca2 <- FactoMineR::MCA(poison.active, graph = TRUE)
+
+factoextra::fviz_screeplot(res.ca2, addlabels = TRUE, ylim = c(0, 40))
+
+
+# extract the results for variable categories. 
+var <- get_mca_var(res.mca)
+
+# Correlation between variables and principal dimensions
+```
+
+
+
+
+### Discriminant Analysis(DA) is more stable than logistic regression for multi-class 
+
+> http://www.sthda.com/english/articles/36-classification-methods-essentials/146-discriminant-analysis-essentials-in-r/
 
 判别分析包括有多个变种，包括线性判别分析、mixture DA, Flexible DA....
 常用于多分类
 
-下面为lda线性判别分析的一般过程
+下面为*lda*线性判别分析的一般过程
 
 ```{r}
 # preprocess the data
