@@ -25,7 +25,7 @@ Example 2. A researcher is interested in exploring associations among factors fr
 require(ggplot2)
 require(GGally)
 require(CCA)
-# require(CCP)
+require(CCP)
 ```
 
 ```{r}
@@ -52,9 +52,46 @@ cc2 <- comput(psych, acad, cc1)
 cc2[3:6]
 
 
-
+CCA::matcor(psych, acad)
 ```
 
 
-interpret results: 
+interpret results: cc1的结果和回归系数的情况是很像的，i.e., for the variable read, a one unit increase in reading leads to a .0446 decrease in the first canonical variate of set 2 when all of the other variables are held constant.
+The above correlations are between observed variables and canonical variables which are known as the canonical loadings. 
+
+
+
+Canonical dimensions, also known as canonical variates, are latent variables that are analogous to factors obtained in factor analysis. For this particular model there are three canonical dimensions of which only the first two are statistically significant. For statistical test we use R package "CCP".
+```{r}
+# tests of canonical dimensions
+rho <- cc1$cor
+## Define number of observations, number of variables in first set, and number of variables in the second set.
+n <- dim(psych)[1]
+p <- length(psych)
+q <- length(acad)
+
+## Calculate p-values using the F-approximations of different test statistics:
+p.asym(rho, n, p, q, tstat = "Wilks")
+
+p.asym(rho, n, p, q, tstat = "Hotelling")
+```
+
+
+
+When the variables in the model have very different standard deviations, the standardized coefficients allow for easier comparisons among the variables. Next, we’ll compute the standardized canonical coefficients.
+```{r}
+# standardized psych canonical coefficients diagonal matrix of psych sd's
+s1 <- diag(sqrt(diag(cov(psych))))
+s1 %*% cc1$xcoef
+
+# standardized acad canonical coefficients diagonal matrix of acad sd's
+s2 <- diag(sqrt(diag(cov(acad))))
+s2 %*% cc1$ycoef
+```
+
+
+
+
+
+
 
