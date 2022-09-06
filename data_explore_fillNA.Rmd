@@ -11,7 +11,154 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Data Explore
 
+探索性数据的分布和缺失值的分布是较为常规的操作，一个优秀的R包会加快这个过程。现就几个R包进行一些探索性操作的笔记。
+
+```{r}
+library(dlookr) # 数据探索的包
+# library(SmartEDA)
+library(DataExplorer) # long time no 更新
+# library(explore)
+library(visdat)
+library(naniar) # NA值的统计、绘图等
+
+
+```
+
+
+`dlookr`是一个帮助进行数据探索的包。
+
+```{r}
+library(nycflights13)
+
+
+dlookr::diagnose(flights)
+
+# 除了多种diagnose命令外，对outlier的还是好用的
+dlookr::diagnose_outlier(flights)
+
+
+dlookr::describe(flights)
+
+```
+
+```{r}
+dlookr::normality(flights, dep_time, arr_time)
+
+dlookr::plot_normality(flights, dep_time, arr_time)
+```
+
+
+利用dlookr进行NA值的分析:
+
+- impute:
+- predictor is numerical variable
+- “mean” : arithmetic mean
+- “median” : median
+- “mode” : mode
+- “knn” : K-nearest neighbors
+- target variable must be specified
+- “rpart” : Recursive Partitioning and Regression Trees
+- target variable must be specified
+- “mice” : Multivariate Imputation by Chained Equations
+- target variable must be specified
+- random seed must be set
+- predictor is categorical variable
+- “mode” : mode
+- “rpart” : Recursive Partitioning and Regression Trees
+- target variable must be specified
+- “mice” : Multivariate Imputation by Chained Equations
+- target variable must be specified
+- random seed must be set
+
+```{r}
+dep_time <- dlookr::imputate_na(flights,
+                                xvar = dep_time,
+                                method = 'mean'
+                                )
+
+# 对outlier进行impute
+
+
+find_skewness(flights)
+
+
+```
+
+
+
+`naniar`可以可视化NA值，不过也只是一种可视化的手段，其提供的按照NA值存在与否看待其他变量分布的手段是很实用的。
+
+```{r}
+# 二者的结果一致, 同一个作者
+naniar::vis_miss(airquality)
+
+visdat::vis_miss(airquality)
+```
+
+```{r}
+gg_miss_var(airquality)
+
+
+#
+airquality %>%
+  bind_shadow() %>%
+  group_by(Ozone_NA) %>%
+  summarise_at(
+    .vars = "Solar.R",
+    .funs = c("mean", "sd", "var", "min", "max"),
+    na.rm = TRUE
+  )
+
+airquality %>%
+  naniar::nabular() %>%
+  ggplot(
+    .,
+    aes(
+      x = Temp,
+      colour = Ozone_NA
+    )
+  ) +
+  geom_density()
+```
+
+
+在探索数据的NA值时，主要的是理解NA值产生的原因和
+
+```{r}
+
+```
 
 
 
 ## fill NA
+
+impute NA value.
+选择合适的impute NA的方法。
+
+
+```{r}
+library(mde)
+library(mice)
+library(VIM) # visualization of missing and imputed values
+# library(simputation)
+
+```
+
+```{r}
+mice::md.pattern(airquality)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
