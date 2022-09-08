@@ -1,0 +1,67 @@
+---
+title: "R Notebook"
+output: html_document
+---
+
+## data masking 再整理
+
+再将实现了data-mask的函数包装到另一个函数的时候，如何传递参数给内部的data-mask的函数已经有了一定的了解和应用经历，再次还需要结合
+`rlang`和`advanced R`的一些内容理清一些概念。
+
+1. 什么是data masking
+2. 什么是defusing R expression
+3. 什么是
+
+Unlike data masking, tidy selection is an interpreted dialect. There is in fact no masking at all.
+
+R中的data-masking的实现是通过，This is needed because under the hood data-masking works by defusing R code to prevent its immediate evaluation. The defused code is resumed later on in a context where data frame columns are defined.
+> https://rlang.r-lib.org/reference/topic-data-mask.html
+
+主要关注的两个过程为`defusing`, `injecting`, 这是应用data-mask的主要方法。
+
+*需要注意的是base R 和 tidy eval在关于data-mask 编程时的不同*
+
+
+#### Bridge pattern
+
+> https://rlang.r-lib.org/reference/topic-data-mask-programming.html
+
+除了data-mask和tidy-select所具有的各自传递names参数的方法外，e.g. `.data[[x]]`, `all_of`,
+
+1. 向data-mask传递 tidy-select的select
+2. 向data-mask传递 tidy-select的字符串
+3. 向tidy-select 传递 data-mask
+
+```{r}
+# 向data-mask传递 tidy-select， 以group_by 为例
+
+```
+
+```{r}
+# 向data-mask传递 tidy-select的字符串
+
+```
+
+```{r}
+# 向tidy-select 传递 data-mask
+
+
+```
+
+!!在base R中的应用：
+是需要用到`inject`函数的。
+
+```{r}
+cyl <- c(100, 110)
+with(mtcars, mean(cyl))
+
+inject(
+  with(mtcars, mean(!!cyl))
+)
+```
+
+
+
+
+
+
