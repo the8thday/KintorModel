@@ -11,21 +11,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 协方差分析
 
-此文通过一个小示例记录协方差分析在计算 emmeans 中的应用。 比如在具有主要结局指标的重复测量数据分析中， 以baseline作为协变量，以某一时期的结果作为主要结局变量，则通常会采用协变量的方法进行分析。
+此文通过一个小示例记录协方差分析以及计算 emmeans时的应用。 比如在具有主要结局指标的重复测量数据分析中， 以baseline作为协变量，以某一时期的结果作为主要结局变量，则通常会采用协变量的方法进行分析。
 协变量分析的效应值就是矫正过的在各个分组中的均值，协方差分析的自变量至少包括一个分类变量和一个数值型变量。
+
 emmenas为在各个分组中outcome的均值；contrasts为不同分组间的差异，汇报的结果一般还需要包括Pvalue和95%CI。
 
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
+library(easystats)
 library(rstatix)
-```
-
-
-```{r}
 library(grafify)
 library(emmeans)
+library(marginaleffects)
 ```
+
 
 ```{r}
 df <- readr::read_rds('./datasets/foo3.rds')
@@ -40,9 +40,15 @@ skimr::skim(df)
 首先是否满足的分析条件，和一般线性回归一样，需要满足LINE，同时还需要协变量和因变量之间不存在交互效应。
 以下分步骤所做的检测，亦可在模型建立后performance::check_model进行（推荐）。
 
-*对于不满足条件的，可以用sm包的非参数检验方法的sm.ancova()函数进行。*
+*对于不满足条件的，可以用sm包的非参数检验方法的sm.ancova()函数进行分析。*
 
 ```{r}
+# raw means
+# 可以初步看待下不同分组中的raw means
+df %>% select(W1D1, `研究项目分组`, diffW24) %>% distinct() %>% 
+  group_by(`研究项目分组`) %>% summarise(mm = mean(diffW24))
+
+
 # 正态性
 df %>% group_by(`研究项目分组`) %>% identify_outliers(diffW24)
 df %>% group_by(`研究项目分组`) %>% shapiro_test(diffW24)
@@ -99,17 +105,24 @@ emmeans 计算以及分析.
 95%CI经过了bonferroni矫正。
 
 ```{r}
-(emm_res <- emmeans(aov_res, specs = '研究项目分组'))
+# 每一个变量及其因子的emmeans
+(emm_res <- emmeans::emmeans(aov_res, specs = '研究项目分组'))
 
+# 两两比对的contrast
 pairs(emm_res, adjust = 'bonferroni', infer = c(TRUE, TRUE))
+
+contrast(emm_res, method = 'pairwise', adjust = 'none', infer = c(T, T))
 
 plot(emm_res, comparisons = TRUE) + theme_bw() +
   labs(x = "Estimated Marginal Mean")
+
 ```
 
 ### 和线性模型的对比
 
 将下面的模型和aov_res对比，可以见到二者是一致的。
+
+可以推测到对于简单线性模型`lm(diffW24 ~ `研究项目分组`, data = df)`和直接计算`mean`值得到的结果应该是一致的。
 
 ```{r}
 # ?aov 本就是利用线性模型得到的分析
@@ -135,6 +148,7 @@ aov.res2 <- aov(formula = diffW24 ~ W1D1 + `研究项目分组` * dislevel,
                 )
 
 performance(aov.res2)
+
 car::Anova(aov.res2, type = 'III')
 ```
 
@@ -153,6 +167,96 @@ pc
 contrast(emm_res, method = 'trt.vs.ctrl',
          type = 'response', adjust = 'fdr',by = 'dislevel', infer = c(TRUE, TRUE))
 ```
+
+
+#### 基于`modelbased`包的分析
+
+`modelbased`包提供包括，也都是对emmeans的包装:
+
+- `estimate_means()`, Estimates the average values at each factor levels
+- `estimate_contrasts()`, Estimates and tests contrasts between different factor levels
+- `estimate_expectation()`等方便的函数。
+
+```{r}
+# model的emmeans
+# 每一个变量的factor level的emmeans
+# at 参数自动选择
+# This is typically used when some of the predictors of interest are factors.
+emm = modelbased::estimate_means(model = aov_res, 
+                           at = '研究项目分组',
+                           transform = 'response',
+                           ci = 0.95
+                           )
+modelbased::estimate_means(model = aov_res, 
+                           at = '研究项目分组=c("安慰剂BID", "5mgBID")',
+                           transform = 'response',
+                           ci = 0.95
+                           )
+plot(emm)
+# standardize(emm)
+
+# contrast
+# 可以指定reference contrast(ref)
+con <- modelbased::estimate_contrasts(model = aov_res,
+                               contrast = "研究项目分组",
+                               ci = 0.95,
+                               adjust = 'holm', # 怎么此参数没用？一直都是tukey的结果
+                               method = 'revpairwise'
+                               )
+# 二者的结果不一样，是因为上面好像有bug
+contrast(emm_res, method = 'revpairwise', adjust = 'holm', infer = c(T, T))
+
+plot(con, emm)
+
+
+# is not values on the response variable, but the model's parameters
+# marginal effects return averages of coefficients
+# 在对"研究项目分组"这一分类变量矫正后，W1D1的effect is negative and significant
+modelbased::estimate_slopes(model = aov_res)
+slopes <- estimate_slopes(aov_res, trend = "W1D1", at = "研究项目分组")
+
+slopes
+
+```
+
+
+预测值和真实值:
+
+从图中的结果可以看到预测的效果似乎一般。
+
+```{r}
+pred_data <- estimate_expectation(aov_res)
+head(pred_data)
+
+pred_data$diffW24 <- df$diffW24
+pred_data$Predicted_2 <- estimate_expectation(aov.res2)$Predicted
+
+pred_data %>%
+  ggplot() +
+  geom_line(aes(x = diffW24, y = diffW24), linetype = "dashed") +
+  geom_point(aes(x = diffW24, y = Predicted), color = "grey") +
+  geom_point(aes(x = diffW24, y = Predicted_2), color = "red") +
+  ylab("diffW24 (predicted)") +
+  theme_modern()
+```
+
+estimate the relationship between the response and the two predictors.
+
+三组用药组的diffW24都随着W1D1的增加有下降的趋势，可以考虑在入组时患者
+
+```{r}
+predicted <- estimate_expectation(aov_res, data = "grid")
+
+df %>%
+  ggplot(aes(x = W1D1)) +
+  geom_point(aes(y = diffW24, color = `研究项目分组`)) +
+  geom_ribbon(data = predicted, aes(ymin = CI_low, ymax = CI_high, 
+                                    fill = `研究项目分组`), alpha = 0.3) +
+  geom_line(data = predicted, aes(y = Predicted, color = `研究项目分组`), size = 1) +
+  theme_modern()
+```
+
+
 
 ####  将结果输出成所需要的表格并绘制森林图
 *森林图*
