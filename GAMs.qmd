@@ -1,0 +1,77 @@
+---
+title: "General Additive Models"
+format: html
+---
+
+## General Additive Models
+
+General Additive Models (GAMs) are a powerful class of models that extend the capabilities of traditional GLMs. In particular, they are able to parsimoniously model possibly non-linear relationship.
+
+一般加性模型和广义加性模型一般用于model 非线性的关系。其自然也是可以model线性关系的，比如对变量间关系不确定时支持使用
+广义加性模型也是可以的。
+
+
+
+```{r}
+library(easystats) #
+library(mgcv)
+library(gam)
+```
+
+
+
+### model一个线性关系
+
+```{r}
+# Generate data
+data <- bayestestR::simulate_correlation(r = 0.85, n = 1000, names = c("y", "x"), 
+                                         mean = c(100, 0), sd = c(15, 1))
+
+# we need to specify a smooth term (s()) for the variable for which we want to estimate the (non-necessarily linear) relationship.
+model_gam <- mgcv::gam(y ~ s(x), data = data)
+
+plot(modelbased::estimate_relation(model_gam), line = list(color = "blue"))
+```
+
+
+```{r}
+parameters::parameters(model_gam)
+```
+
+
+model 线性模型
+
+```{r}
+model_lm <- lm(y ~ x, data = data)
+
+plot(modelbased::estimate_relation(model_lm))
+
+parameters::parameters(model_lm)
+```
+
+
+#### effect derivative
+
+在前面的两个模型示例中，lm model给出了x变量的slope，也即x每改变一个单位y所改变的值。然而gam model确无法给出这样的一个
+coefficient。其实有一个更为通用的方法，即效应求导可以帮组得到对应的系数值。
+
+而且其可以用于任何模型。方便于interpret GAM模型的结果。
+
+```{r}
+deriv <- modelbased::estimate_slopes(model_gam, trend = "x", at = "x")
+
+plot(deriv, line = list(color = "blue")) +
+  geom_hline(yintercept = 0, linetype = "dashed")
+
+# 可以看到coefficient的结果和lm model的结果很是类似
+summary(deriv)
+```
+
+
+
+
+
+
+
+
+
