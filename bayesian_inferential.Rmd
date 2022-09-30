@@ -1,0 +1,208 @@
+---
+title: "bayesian inferential analysis"
+author: "liuc"
+date: '2022-06-06'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## bayesian inferential analysis
+
+一个好用的R包是很重要的。
+以工具使用的角度而言，统计学和统计工具作为工具，其自然不能离开具体的问题。此为生物信息分析或者数据分析的核心。此外对于较为抽象的分析对象，也不过是对象的改变而已。
+
+
+贝叶斯统计和经验学派统计的主要的差别在于未知参数是否随机变量。这种分歧衍生出两种截然不同的统计思想。
+
+不同于频率学派，贝叶斯学派不假设有一个确切的参数值可以通过样本数据得到，而是通过样本数据计算不同效应的的概率，得到参数可能值的分布，既是后验概率。
+贝叶斯分析并不包含一个确切的indices来描述效应的statistical significant，像频率学派的p-value，其主要是对效应后验概率的
+描述，比如credible interval.
+
+
+```{r, include=FALSE}
+# 以下罗列常用的一些贝叶斯分析的R包
+library(easystats) # bayestestR
+library(tidybayes)
+library(broom.mixed)
+library(rstanarm)
+library(vetiver)
+library(brms)
+library(BayesFactor)
+```
+
+
+对比频率学派的一般线性回归和贝叶斯线性回归。
+
+对于`lm`拟合的简单线性回归，此处不再赘述，其拟合和interpret都较为熟悉。
+
+```{r}
+m <- lm(Sepal.Length ~ Petal.Length, data = iris)
+
+parameters::parameters(m)
+```
+
+
+```{r, message=FALSE}
+# 拟合贝叶斯的一般线性回归
+
+model <- rstanarm::stan_glm(Sepal.Length ~ Petal.Length,
+                            data = iris,
+                            chains = 4,
+                            iter = 2000,
+                            warmup = 1000,
+                            family = gaussian()
+                            )
+
+# posteriors distribution is all we want, this return Summary of Posterior Distribution 
+posteriors <- describe_posterior(model)
+# 得到后验分布
+posteriors_dist <- insight::get_parameters(model)
+# for a nicer table
+print_md(posteriors, digits = 2)
+```
+*对上述结果的阐释：*posteriors, 后验概率,既是参数的后验分布，可以看到其中位值和lm得到的结果较为一致。在汇报时对上述 表格里的内容即可，详细的可以参考`report::report(model)`.
+对于后验分布选择哪个值以point-estimate的形式展示，mean?median?mode? 还需要credible interval。
+如果没有p-value之类的值的话，直接通过credible interval进行阐释，怎么展示effect的重要性呢？
+
+对于stan_glm的参数：If we look at the documentation (?sampling) for the rstanarm’s "sampling" algorithm used by default in the model above, we can see several parameters that influence the number of posterior draws. By default, there are 4 chains (you can see it as distinct sampling runs), that each create 2000 iter (draws). However, only half of these iterations are kept, as half are used for warm-up (the convergence of the algorithm). Thus, the total for posterior draws equals 4 chains * (2000 iterations - 1000 warm-up) = 4000.
+
+- Median	95% CI
+- pd
+- ROPE
+- % in ROPE
+- Rhat
+- ESS
+
+
+### Visualizing the posterior distribution
+
+后验分布的范围和概率，中位值0.41是最有可能的值。
+
+```{r}
+ggplot(posteriors_dist, aes(x = Petal.Length)) +
+  geom_density(fill = "orange")
+```
+
+
+
+
+```{r}
+parameters::parameters(model = model)
+
+model_performance(model)
+```
+
+
+
+#### 类似ttest的过程
+
+
+```{r}
+
+# We keep only rows for which feed is meatmeal or sunflower
+data <- data_filter(chickwts, feed %in% c("meatmeal", "sunflower"))
+
+model <- stan_glm(weight ~ feed, data = data)
+
+# posteriors中只有feedsunflower这一列，可以理解为sunflower和meatmeal的差？
+posteriors <- get_parameters(model)
+
+ggplot(posteriors, aes(x = feedsunflower)) +
+  geom_density(fill = "red")
+
+
+bayestestR::hdi(posteriors$feedsunflower, 
+                ci = 0.89)
+
+```
+
+如何对上述的贝叶斯分析进行significant的分析呢？
+
+*首先是利用describe_posterior 函数得到一系列的indicies*
+```{r}
+describe_posterior(model, test = c("p_direction", "rope", "bayesfactor"))
+```
+
+
+
+*ROPE( Region of Practical Equivalence) Percentage*可以用来阐释这种需求。
+
+```{r}
+# 假设依据专业知识, [-20, 20]的范围可以看作null/0
+
+rope(posteriors$feedsunflower, range = c(-20, 20), ci = 0.89)
+
+# 结果为对于89%的CI，其有3.7%的概率落在ROPE区域
+
+
+## 除了上述这种主观判断外还有较为客观的准则
+rope_value <- 0.1 * sd(data$weight)
+rope_range <- c(-rope_value, rope_value)
+rope_range
+rope_value <- rope_range(model)
+rope_value
+
+rope(posteriors$feedsunflower, range = rope_range, ci = 0.89)
+
+# 上述结果展示the 89% of the posterior distribution of the effect does not overlap with the ROPE.可以得到effect是有意义的
+```
+
+
+Probability of Direction (pd) 和 频率学派的p-value
+
+```{r}
+p_direction(posteriors$feedsunflower)
+
+pd <- 97.82
+onesided_p <- 1 - pd / 100
+twosided_p <- onesided_p * 2
+twosided_p
+```
+
+
+
+#### correlation & t-test
+
+利用`BayesFactor`包做此分析。
+
+```{r}
+result <- BayesFactor::correlationBF(iris$Sepal.Width, iris$Sepal.Length)
+
+bayestestR::describe_posterior(result)
+```
+
+
+```{r}
+bayesfactor_models(result)
+
+plot(bayesfactor_models(result)) +
+  scale_fill_pizza()
+```
+
+
+Bayes Factor 可以理解为: 小于1接受null假设，大于1接受备择假设。
+
+
+#### t-test
+
+
+```{r}
+# Select only two relevant species
+data <- droplevels(data_filter(iris, Species != "setosa"))
+
+
+result <- BayesFactor::ttestBF(formula = Sepal.Width ~ Species, data = data)
+describe_posterior(result)
+```
+
+From the indices, we can say that the difference of Sepal.Width between virginica and versicolor has a probability of 100% of being negative [from the pd and the sign of the median] (median = -0.19, 89% CI [-0.29, -0.092]). The data provides a strong evidence against the null hypothesis (BF = 18).
+
+
+
+
+
+
+
