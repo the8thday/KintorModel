@@ -11,13 +11,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## bayesian inferential analysis
 
-一个好用的R包是很重要的。
+一个好用的R包是很重要的。stan项目在R中提供的多个包是很好用的。
 以工具使用的角度而言，统计学和统计工具作为工具，其自然不能离开具体的问题。此为生物信息分析或者数据分析的核心。此外对于较为抽象的分析对象，也不过是对象的改变而已。
 
 
 贝叶斯统计和经验学派统计的主要的差别在于未知参数是否随机变量。这种分歧衍生出两种截然不同的统计思想。
 
-不同于频率学派，贝叶斯学派不假设有一个确切的参数值可以通过样本数据得到，而是通过样本数据计算不同效应的的概率，得到参数可能值的分布，既是后验概率。
+不同于频率学派，贝叶斯学派不假设有一个确切的参数值可以通过样本数据得到，而是通过样本数据计算不同效应值的的概率，得到参数可能值的分布，既是后验概率。
 贝叶斯分析并不包含一个确切的indices来描述效应的statistical significant，像频率学派的p-value，其主要是对效应后验概率的
 描述，比如credible interval.
 
@@ -28,13 +28,14 @@ library(easystats) # bayestestR
 library(tidybayes)
 library(broom.mixed)
 library(rstanarm)
+library(bayesplot)
 library(vetiver)
 library(brms)
 library(BayesFactor)
 ```
 
 
-对比频率学派的一般线性回归和贝叶斯线性回归。
+#### 对比频率学派的一般线性回归和贝叶斯线性回归。
 
 对于`lm`拟合的简单线性回归，此处不再赘述，其拟合和interpret都较为熟悉。
 
@@ -48,18 +49,19 @@ parameters::parameters(m)
 ```{r, message=FALSE}
 # 拟合贝叶斯的一般线性回归
 
-model <- rstanarm::stan_glm(Sepal.Length ~ Petal.Length,
+model_lm <- rstanarm::stan_glm(Sepal.Length ~ Petal.Length,
                             data = iris,
-                            chains = 4,
-                            iter = 2000,
+                            chains = 4, # 不同的采样runs
+                            iter = 2000, # iterations
                             warmup = 1000,
                             family = gaussian()
                             )
 
 # posteriors distribution is all we want, this return Summary of Posterior Distribution 
-posteriors <- describe_posterior(model)
+posteriors <- describe_posterior(model_lm)
 # 得到后验分布
-posteriors_dist <- insight::get_parameters(model)
+posteriors_dist <- insight::get_parameters(model_lm)
+
 # for a nicer table
 print_md(posteriors, digits = 2)
 ```
@@ -79,7 +81,7 @@ print_md(posteriors, digits = 2)
 
 ### Visualizing the posterior distribution
 
-后验分布的范围和概率，中位值0.41是最有可能的值。
+后验分布的范围和概率，通过绘图结果可以看到中位值0.41是最有可能的值。
 
 ```{r}
 ggplot(posteriors_dist, aes(x = Petal.Length)) +
@@ -87,18 +89,29 @@ ggplot(posteriors_dist, aes(x = Petal.Length)) +
 ```
 
 
+`bayesplot`提供了一系列的绘图函数，帮助visual MCMC diagnostics, and graphical posterior (or prior) predictive checking. 
+
+```{r}
+bayesplot::mcmc_areas(posteriors_dist,
+           pars = c("Petal.Length"),
+           prob = 0.8) + ggtitle("Posterior distributions",
+                      "with medians and 80% intervals")
+```
+
+
 
 
 ```{r}
-parameters::parameters(model = model)
+parameters::parameters(model = model_lm)
 
-model_performance(model)
+model_performance(model_lm)
 ```
 
 
 
 #### 类似ttest的过程
 
+线性回归实现ttest的过程。
 
 ```{r}
 
@@ -119,16 +132,18 @@ bayestestR::hdi(posteriors$feedsunflower,
 
 ```
 
-如何对上述的贝叶斯分析进行significant的分析呢？
+如何对上述的贝叶斯分析进行significant的分析呢？可以通过CI是否包含0值来进行判断，bayes结果的credible interval 是参数有诸如89%的可能落在此区间。
 
 *首先是利用describe_posterior 函数得到一系列的indicies*
+
 ```{r}
 describe_posterior(model, test = c("p_direction", "rope", "bayesfactor"))
 ```
 
 
+下面对此表格中涉及到的几个参数进行一番阐释：
 
-*ROPE( Region of Practical Equivalence) Percentage*可以用来阐释这种需求。
+*ROPE( Region of Practical Equivalence) Percentage*可以用来阐释这种需求, 作为参数是否有significant的指标。
 
 ```{r}
 # 假设依据专业知识, [-20, 20]的范围可以看作null/0
@@ -164,11 +179,12 @@ twosided_p
 
 
 
-#### correlation & t-test
+#### correlation 
 
 利用`BayesFactor`包做此分析。
 
 ```{r}
+# 举例两连续变量，既Pearson 
 result <- BayesFactor::correlationBF(iris$Sepal.Width, iris$Sepal.Length)
 
 bayestestR::describe_posterior(result)
@@ -183,7 +199,10 @@ plot(bayesfactor_models(result)) +
 ```
 
 
-Bayes Factor 可以理解为: 小于1接受null假设，大于1接受备择假设。
+Bayes Factor 可以理解为: 小于1接受null假设，大于1接受备择假设(既是h1为分子)。上述结果中BF的值为0.509，bayes factor 可以理解为观察数据更支持null假设还是更为支持alter假设.在频率学派p-value的逻辑中，人们只能选择拒绝null假设，
+但不能选择是否接受null假设.
+
+B^^01^^是指分子为null假设，分母为h1假设。取log后大于0的接受h0假设，小于0的接受h1假设。see包所提供的pie图结果可以直观的看到，观察数据支持rho=0，即null假设。
 
 
 #### t-test
@@ -191,14 +210,65 @@ Bayes Factor 可以理解为: 小于1接受null假设，大于1接受备择假�
 
 ```{r}
 # Select only two relevant species
+# 类似非配对ttest
 data <- droplevels(data_filter(iris, Species != "setosa"))
 
 
-result <- BayesFactor::ttestBF(formula = Sepal.Width ~ Species, data = data)
-describe_posterior(result)
+result_ttest <- BayesFactor::ttestBF(formula = Sepal.Width ~ Species, 
+                                     data = data)
+describe_posterior(result_ttest)
 ```
 
-From the indices, we can say that the difference of Sepal.Width between virginica and versicolor has a probability of 100% of being negative [from the pd and the sign of the median] (median = -0.19, 89% CI [-0.29, -0.092]). The data provides a strong evidence against the null hypothesis (BF = 18).
+*interpret the Results: *From the indices, we can say that the difference of Sepal.Width between virginica and versicolor has a probability of 100% of being negative [from the pd and the sign of the median] (median = -0.19, 89% CI [-0.29, -0.092]). The data provides a strong evidence against the null hypothesis (BF = 18).
+
+结果解释为ttest检验中，参数后验分布的中为值为-0.19，即是virginica和versicolor之间的**差**为负值，pd为99.88%，后验概率绝大部分在负的一侧. BF10=17.72, 即是h1/h0提供更强的证据观察数据支持h1.
+
+```{r}
+bayesfactor_models(result_ttest)
+
+plot(bayesfactor_models(result_ttest)) +
+  scale_fill_pizza()
+```
+
+*以罗辑回归的形式重新分析两样本独立T检验：*
+两样本间的差异和Y结局变量可以区分两个分组具有同样的意思。
+
+```{r}
+model_glm <- rstanarm::stan_glm(Species ~ Sepal.Width,
+  data = data,
+  family = "binomial",
+  chains = 10, iter = 5000, warmup = 1000,
+  refresh = 0
+)
+```
+
+
+```{r}
+describe_posterior(model_glm, test = c("pd", "ROPE", "BF"))
+```
+
+
+```{r}
+model_performance(model_glm)
+
+plot(rope(result))
+```
+
+
+### Testing contrasts from Bayesian model with 'emmeans' and 'bayestestR'
+
+`emmeans` package 对于常见的bayesian model也是支持的，主流的几个R包都可以获得很好的结果。
+
+
+```{r}
+# model_lmer <- rstanarm::stan_lmer()
+
+modelbased::estimate_means(model = model, at = 'feed')
+```
+
+
+
+
 
 
 
