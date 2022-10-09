@@ -1,0 +1,142 @@
+---
+title: "Common statistical tests are linear models"
+format: html
+---
+
+## Common statistical tests are linear models
+
+> https://lindeloev.github.io/tests-as-linear/
+
+
+线性模型等价common statistic的一些笔记。
+线性模型往往需要较多的样本数量才和common statistic的结果趋近。
+
+### 对于correlation中常用的参数和非参数的Pearson和Spearman，其等价于如下的lm模型，
+
+
+```{r}
+a = cor.test(y, x, method = "pearson") # Built-in
+b = lm(y ~ 1 + x) # Equivalent linear model: y = Beta0*1 + Beta1*x
+c = lm(scale(y) ~ 1 + scale(x)) # On scaled vars to recover r
+
+# Spearman correlation
+a = cor.test(y, x, method = "spearman") # Built-in
+b = lm(rank(y) ~ 1 + rank(x)) # Equivalent linear model
+```
+
+
+### t-test的线性等价：
+
+#### one sample t-test
+
+```{r}
+# Built-in t-test
+a = t.test(y)
+
+# Equivalent linear model: intercept-only
+b = lm(y ~ 1)
+```
+
+```{r}
+## 以下三者是一致的
+# Built-in
+signed_rank = function(x) sign(x) * rank(abs(x))
+
+a = wilcox.test(y)
+
+# Equivalent linear model
+b = lm(signed_rank(y) ~ 1)  # See? Same model as above, just on signed ranks
+
+# Bonus: of course also works for one-sample t-test
+c = t.test(signed_rank(y))
+
+a
+summary(b)
+c
+```
+
+
+#### two sample t-test
+
+对于两样本ttest，其公式为：\[y_{i}=\beta_{0} + \beta_{1}xi \text{ } H_{0}:\beta_{1}=0 \]
+
+```{r}
+# Built-in independent t-test on wide data
+a = t.test(y, y2, var.equal = TRUE)
+
+# Be explicit about the underlying linear model by hand-dummy-coding:
+group_y2 = ifelse(group == 'y2', 1, 0)  # 1 if group == y2, 0 otherwise
+b = lm(value ~ 1 + group_y2)  # Using our hand-made dummy regressor
+
+# Note: We could also do the dummy-coding in the model
+# specification itself. Same result.
+c = lm(value ~ 1 + I(group == 'y2'))
+```
+
+_Mann-Whitney U Test_
+
+```{r}
+# Wilcoxon / Mann-Whitney U
+a = wilcox.test(y, y2)
+
+# As linear model with our dummy-coded group_y2:
+b = lm(rank(value) ~ 1 + group_y2)  # compare to linear model above
+```
+
+
+在上述的示例中，t.test中假设方差相等，方差不相等的情况下we model one variance per group.
+
+
+```{r}
+# Built-in
+a = t.test(y, y2, var.equal=FALSE)
+
+# As linear model with per-group variances
+b = nlme::gls(value ~ 1 + group_y2, weights = nlme::varIdent(form=~1|group), 
+              method="ML")
+```
+
+
+### ANOVAs
+
+对于分组变量，在模型中纳入的是dummy变量，R中模型如何处理factor真是令人头痛呀。
+好在很多函数中直接输入factor变量即可，虽然存在指定reference的问题。
+
+```{r}
+# Compare built-in and linear model
+a = car::Anova(aov(value ~ group, D))  # Dedicated ANOVA function
+
+b = lm(value ~ 1 + group_b + group_c, data = D)  # As in-your-face linear model
+#identical(lm(value ~ 1 + group, data = D), b)
+```
+
+
+```{r}
+# Dedicated ANCOVA functions. The order of factors matter in pure-aov (type-I variance).
+# Use type-II (default for car::Anova) or type-III (set type=3),
+a = car::Anova(aov(value ~ group + age, D))
+#a = aov(value ~ group + age, D)  # Predictor order matters. Not nice!
+
+# As dummy-coded linear model.
+full = lm(value ~ 1 + group_b + group_c + age, D)
+
+# Testing main effect of age using Likelihood-ratio test
+null_age = lm(value ~ 1 + group_b + group_c, D)  # Full without age. One-way ANOVA!
+result_age = anova(null_age, full)
+
+# Testing main effect of groupusing Likelihood-ratio test
+null_group = lm(value ~ 1 + age, D)  # Full without group. Pearson correlation!
+result_group = anova(null_group, full)
+```
+
+
+
+### Proportion
+
+```{r}
+
+```
+
+
+
+
