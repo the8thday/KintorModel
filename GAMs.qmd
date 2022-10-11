@@ -5,22 +5,46 @@ format: html
 
 ## General Additive Models
 
-General Additive Models (GAMs) are a powerful class of models that extend the capabilities of traditional GLMs. In particular, they are able to parsimoniously model possibly non-linear relationship.
+主要参考以下资料：
+
+> https://m-clark.github.io/generalized-additive-models/preface.html
+
+<\br>
+
+General/Generalized Additive Models (GAMs) are a powerful class of models that extend the capabilities of traditional GLMs. In particular, they are able to parsimoniously model possibly non-linear relationship.
 
 一般加性模型和广义加性模型一般用于model 非线性的关系。其自然也是可以model线性关系的，比如对变量间关系不确定时支持使用
 广义加性模型也是可以的。
 
+从对不符合线性关系的Y和x的描述中，有些数据拟合对predictor进行transform也不易做到，诸如splines，cubic等。Transformation often exacerbate data issues or fail to help. 
+
+GAMs对其的predictors应用一些smooth function(like splines):
+
+$g(ui)=A_{i} + f_{1}(x_{1}) + f_{2}(x_{2i}) + ...$
+
+
+`mgcv`的`s()`, `lo()` 等smoother:
+- `s()` 平滑器指定为样条平滑
+- `lo()` 指定为LOESS平滑
+- `te()` tensor product smooth
+
+
+在广义线性模型的计算中，g() 和 link()都是对于respose变量而言的。link function maps a nonlinear relationship to a linear one so that a linear model can be fit (and then mapped to the original form).
 
 
 ```{r}
-library(easystats) #
-library(mgcv)
-library(gam)
+library(easystats) # every model need it !
+library(mgcv) # 首选R包
+# library(gam)
+library(gratia)
+# library(GAMLSS)
 ```
 
 
 
-### model一个线性关系
+### 用mgcv model一个线性关系
+
+GAM 模型亦可用于一般线性模型之中
 
 ```{r}
 # Generate data
@@ -38,8 +62,18 @@ plot(modelbased::estimate_relation(model_gam), line = list(color = "blue"))
 parameters::parameters(model_gam)
 ```
 
+Check your model:
 
-model 线性模型
+```{r}
+mgcv::gam.check(model_gam)
+```
+
+
+#### 用lm model 线性模型
+
+可以看到lm和gam的结果极为类似。
+
+`estimate_relation`的结果几乎一致。
 
 ```{r}
 model_lm <- lm(y ~ x, data = data)
@@ -57,6 +91,8 @@ coefficient。其实有一个更为通用的方法，即效应求导可以帮组
 
 而且其可以用于任何模型。方便于interpret GAM模型的结果。
 
+*求导是个好东西*
+
 ```{r}
 deriv <- modelbased::estimate_slopes(model_gam, trend = "x", at = "x")
 
@@ -66,12 +102,67 @@ plot(deriv, line = list(color = "blue")) +
 # 可以看到coefficient的结果和lm model的结果很是类似
 summary(deriv)
 ```
+上述结果可以看到coefficient的结果和lm model的结果很是类似.
+
+
+#### GAM 用于多项式线性模型的对比
+
+
+```{r}
+dd = readr::read_csv('datasets/pisasci2006.csv')
+
+p <- GGally::ggpairs(dd %>% select(-Country))
+
+plotly::ggplotly(p)
+```
+
+
+
+```{r}
+summary(mgcv::gam(Overall ~ Income, data = dd))
+
+summary(stats::lm(Overall ~ Income, data = dd))
+```
+
+
+```{r}
+# ?s
+# ?summary.gam
+
+mod_gam1 = mgcv::gam(Overall ~ s(Income, bs = "cr"), data = dd)
+summary(mod_gam1)
+```
+
+结果阐释：`edf( effective degrees of freedom)` : due to the smoothing process and the penalized regression estimation procedure, GAM's degree of freedom 不在是直接的特征数量。 The edf with value 1 suggests that it has essentially been reduced to a simple linear effect. 
+
+`GCV(generalized cross validation)`score  can be taken as an estimate of the mean square prediction error based on a leave-one-out cross validation estimation process.  lower being better.
+
+GAM的一些特征和一些机器学习的建模方法倒是挺像的。
+
+*可以看到mod_gam1 比lm的结果好*
 
 
 
 
+### 一个完备切实可行的GAM建模分析过程
+
+在拿到数据和对应的实验设计之后，首要的是确定数据适合用什么样子的模型。
+
+```{r}
+mod_gam2 = gam(Overall ~ s(Income) + s(Edu) + s(Health), data = dd)
+summary(mod_gam2)
+
+mod_gam2B = update(mod_gam2, . ~ . - s(Health) + Health)
+```
 
 
+
+```{r}
+concurvity(mod_gam2)
+
+
+gam.check(mod_gam2, k.rep = 1000)
+```
 
 
 
