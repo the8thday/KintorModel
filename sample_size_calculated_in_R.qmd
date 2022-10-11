@@ -1,0 +1,50 @@
+---
+title: "sample size calculated in R"
+format: html
+---
+
+
+##  sample size calculated in R
+
+临床研究中样本量计算的几个示例。
+
+在计算所需样本量时，effect size是最需要考量的指标，毕竟power和significant level易于指定。
+
+$$Effect Size=(Mean_{A}-Mean_{0})/std.var$$
+effect size (cohen's D)本质上是h1假设下和h0假设下的差值除以数据标准差。
+
+
+### Proportion结局的样本量计算
+
+以文献`Aggressive or Moderate Fluid Resuscitation in Acute Pancreatitis` 为例。
+
+```{r}
+library(pwr)
+# library(Mediana)
+# library(TrialSize)
+```
+
+
+中度重症或重症急性胰腺炎的预期发生率为35%。我们计算得出，在预期10%患者退出的情况下，744例患者的样本量（每组372例患者）将为本试验提供80%的统计学功效，在0.05的双侧显著性水平（α），检测到10个百分点的组间差异（35%与25%之间）。
+
+```{r}
+pwr::pwr.2p.test(
+  n = NULL,
+  h = ES.h(p1 = 0.35, p2 = 0.25),
+  sig.level = 0.05,
+  alternative = "two.sided",
+  power = 0.8)
+```
+```{r}
+# 在有10%失访的情况下
+
+328/0.9
+```
+
+
+
+
+
+
+
+
