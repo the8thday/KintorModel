@@ -3,11 +3,12 @@ title: "General Additive Models"
 format: html
 ---
 
-## General Additive Models
+### General Additive Models
 
 主要参考以下资料：
 
 > https://m-clark.github.io/generalized-additive-models/preface.html
+> https://noamross.github.io/gams-in-r-course/chapter1
 
 <\br>
 
@@ -148,21 +149,85 @@ GAM的一些特征和一些机器学习的建模方法倒是挺像的。
 
 在拿到数据和对应的实验设计之后，首要的是确定数据适合用什么样子的模型。
 
+对于`mgcv`包，记得分类变量变成factor。一般的，分类变量在gam模型中以linear处理。
+`model4b <- gam(hw.mpg ~ s(weight, by = fuel) + fuel, data = mpg,method = "REML")`
+
 ```{r}
-mod_gam2 = gam(Overall ~ s(Income) + s(Edu) + s(Health), data = dd)
+library(gamair)
+data("mpg", package="gamair")
+
+dd <- readr::read_csv('./datasets/pisasci2006.csv')
+```
+
+散点图查看数据的分布:
+
+一些变量的分布呈现曲线分布的情况。
+
+如何在设定一个target(outcome)的情况下查看数据的探索呢，dlookr似乎是可以的。
+
+```{r}
+GGally::ggpairs(dd %>% select(-Country))
+```
+
+```{r}
+require(dlookr)
+
+categ <- target_by(dd, Overall)
+
+dlookr::eda_report(categ)
+```
+
+
+
+```{r}
+# sp(smoothing parameter) 即可以放在s()中，也可以放在gam()中
+# k 参数, number of basis functions
+# In practice, we rarely make continuous variables linear in GAMs. This is because, if the relationship is really linear, or there is not enough data to show otherwise, automatic smoothing will force a linear shape.
+
+mod_gam2 <- gam(Overall ~ s(Income) + s(Edu) + s(Health), data = dd, method = "REML")
 summary(mod_gam2)
+mod_gam2$sp
+
+# extracts the coefficients of these basis functions the GAM model object.
+# The coef() function extracts all the model coefficients, which are coefficients for each basis function that makes up the smooth.
+# coef(mod_gam2)
 
 mod_gam2B = update(mod_gam2, . ~ . - s(Health) + Health)
 ```
+*interpret results: *The "Family" component tells us the model assumes a Gaussian or normal distribution of our errors, and the "Link" of "identity" shows that the model doesn't transform the predictions.
+Parametric means models that have a pre-determined form. In this context, it refers to the linear terms in the model.
+For smooths coefficients are not printed. This is because each smooth has several coefficients - one for each basis function. Instead, the first column reads edf, which stands for effective degrees of freedom. This value represents the complexity of the smooth. An edf of 1 is equivalent to a straight line. An edf of 2 is equivalent to a quadratic curve, and so on, with higher edfs describing more wiggly curves.
+
+A good way to interpret significance for smooth terms in GAMs is this: a significant smooth term is one where you can not draw a horizontal line through the 95% confidence interval.
 
 
 
 ```{r}
-concurvity(mod_gam2)
+# partial effect plots
+# they show the component effect of each of the smooth or linear terms in the model, which add up to the overall prediction.
+# by default we only see the smooth plots, but by setting all.terms = TRUE, we can display partial effects of linear or categorical terms, as well.
+plot(mod_gam2, page = 1, all.terms = TRUE, residuals = TRUE, shade = TRUE,
+     shade.col = "lightblue"
+     )
 
-
+# p-value 小于0.05indicate that residuals are not randomly distributed. This often means there are not enough basis functions.
+# 四幅图都是对残差的绘图,第三幅最好在0附近
 gam.check(mod_gam2, k.rep = 1000)
+
+
+concurvity(mod_gam2)
 ```
+
+
+#### Logistic GAMs for Classification
+
+
+
+
+
+
+
+
 
 
 
