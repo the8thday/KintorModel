@@ -61,6 +61,13 @@ nullmodel3 <- lmer( score ~ 1 + (1 + class * time |PatientID), data = df2, REML=
 anova (nullmodel1, nullmodel2) #  基于LRT比的模型间的对比，同时还考虑模型的AIC/BIC/
 ```
 
+```{r}
+test_performance(nullmodel1, nullmodel3)
+
+compare_performance(nullmodel1, nullmodel3)
+```
+
+
 上面的结果可以看到，nullmodel1有较好的指标，所以只选择随机intersect即可，不用考虑其他变量的随机slope。
 
 假如固定效应
@@ -89,6 +96,24 @@ lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距�
 *Random effects: * The “Residual” standard deviation refers to σ. 如果Variance太小的话，则随机效应可能不太重要。
 *Fixed Effects: * 随机效应的解释可以为timeDay1对比于(Intercept)中的timeDay0，score值减少了-147.260。AGE变量的话是可以不用考虑的。
 
+
+```{r}
+test_performance(lme_model, lme_model2)
+
+compare_performance(lme_model, lme_model2)
+```
+
+Group-level Effects
+
+此处的group为患者，注意患者数目对绘图的影响。
+
+```{r}
+random <- estimate_grouplevel(lme_model)
+random
+
+plot(random) +
+  theme_lucid()
+```
 
 ```{r}
 # type III
