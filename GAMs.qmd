@@ -193,10 +193,10 @@ dlookr::eda_report(categ)
 # k 参数, number of basis functions
 # In practice, we rarely make continuous variables linear in GAMs. This is because, if the relationship is really linear, or there is not enough data to show otherwise, automatic smoothing will force a linear shape.
 
-# mod_gam <- gam(Overall ~ s(Income) + s(Edu) + s(Health), data = dd, 
-#                 method = "REML")
+mod_gam <- gam(Overall ~ s(Income) + s(Edu) + s(Health), data = dd,
+                method = "REML")
 
-mod_gam <- gam()
+# mod_gam <- gam()
 
 summary(mod_gam)
 mod_gam$sp
@@ -239,10 +239,12 @@ concurvity(mod_gam, full = FALSE)
 
 `gratia`包提供的一些功能很方便进行美化：
 
+`smooth_estimates`等函数可以帮助提取绘图数据，其是提取图一的结果。文档中的示例展示了如何绘制个性化的基于ggplot2的图。
+
 ```{r}
 gratia::draw(mod_gam, residuals = TRUE)
 
-gratia::appraise(mod_gam)
+gratia::appraise(mod_gam) # Model diagnostics
 ```
 
 
@@ -252,6 +254,17 @@ gratia::appraise(mod_gam)
 # check_model(mod_gam) # not supported yet!
 
 parameters(mod_gam) # 同summary
+```
+
+```{r}
+data(meuse, package="sp")
+
+mod_gam2 <- gam(cadmium ~ s(x, y) + s(dist) + s(elev),
+              data = meuse, method = "REML")
+```
+
+```{r}
+gratia::draw(mod_gam2, )
 ```
 
 
@@ -330,10 +343,17 @@ low_pred <- predictions$fit - 2*predictions$se.fit
 
 
 
+###  GAMMs
+
+
 
 ### bayesian interpret in GAMs
 
 ```{r}
 
 ```
+
+
+
+
 
