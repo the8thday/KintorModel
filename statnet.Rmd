@@ -1,0 +1,28 @@
+---
+title: "statnet for epi"
+author: "liuc"
+date: '2022-07-07'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## statnet
+
+
+
+```{r}
+library(statnet)
+```
+
+
+
+```{r}
+
+```
+
+
+
+
