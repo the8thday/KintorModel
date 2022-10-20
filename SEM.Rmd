@@ -1,26 +1,55 @@
 ---
-title: "sme"
+title: "Structural Equation Modeling"
 author: "liuc"
 date: "11/3/2021"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 ## Structural Equation Modeling
 
-结构方程模型是一类将两个或多个结构模型联合起来，以实现对多元关系进行建模的的统计框架。
+*参考资料*
 
-```{r}
+> https://m-clark.github.io/sem/
+> https://mp.weixin.qq.com/s/zgXTYZ3SfyEDQCMWMouw6Q
+> https://jslefche.github.io/sem_book/
+> http://agroninfotech.blogspot.com/2021/06/path-analysis-in-r.html
+
+
+
+结构方程模型是一类将两个或多个结构模型联合起来，以实现对多元关系进行建模的的统计框架。
+其既包含有可观测的显在变量，也可能包含无法直接观测的潜在变量。结构方程模型可以替代多重回归、通径分析、因子分析、协方差分析等方法，
+清晰分析单项指标对总体的作用和单项指标间的相互关系。
+
+一般的，可以这样理解结构方程模型：
+首先依据先验知识自行构建一个因子（隐式变量）之间的关系模型，然后每一个隐式变量通过可以观察到的3-5个显式变量对隐式变量进行解释(通常情况下是隐式变量影响显示变量)，SEM包含两个部分，测量模型(又称验证性因子分析，负责描述观测变量与潜变量之间的关系)和结构模型(又称因果模型，负责描述潜变量之间的因果关系)，测量模型主要查看显式变量是否可以代表隐式变量，结构模型即是探讨隐式变量间的关系，因果性。其目的是要估计并检验假设模型中的潜在变量间的因果关系。
+
+在其计算过程中，本质上是分析两个变量间的协方差，协方差是两个变量协同情况下的偏离情况，两个变量的变化规律越协同一致，则其协方差的数值也越大。
+$$COV_{xy}=\frac{\sum(x_{i}-\overline{x})(y_{i}-\overline{y})}{n-1}$$
+SEM可以分为协方差SEM和分段SEM，协方差SEM假定所有变量均具有正态分布，即数据服从多元正态分布，同时该分析还假定所有的变量均为独立的。
+
+SEM一般分为 模型假定-模型识别-模型估计-模型评价-模型修正。
+
+
+
+```{r , echo = FALSE}
 library(easystats)
 library(lavaan)
+# library(lavaanPlot)
+# library(piecewiseSEM)
 library(tidySEM)
+library(semPlot)
 library(semTools)
 ```
 
 ## model syntax in lavaan
+
+在`lavaan`包中，不同的公式有不同的写法。具体详见官方文档，里面有详细的内容。需要注意的是最好文本公式是用单引号包起来，因为在R里单引号里面的string可以包含双引号，反之未必。
+
+`=~` is measured by.
 
 ```{r}
 myModel <- ' # regressions
@@ -34,9 +63,9 @@ myModel <- ' # regressions
                f3 =~ y7 + y8 + y9 + y10
 
              # variances and covariances 
-               y1 ~~ y1 
-               y1 ~~ y2 
-               f1 ~~ f2
+               y1 ~~ y1 # variance
+               y1 ~~ y2 # covariance
+               f1 ~~ f2 # covariance
 
              # intercepts 
                y1 ~ 1 
@@ -45,30 +74,82 @@ myModel <- ' # regressions
 ```
 
 
+测试数据
+```{r}
+dat <- readr::read_csv('./datasets/worland5.csv')
+```
+
+
 ## path analysis
+
+路径分析，
+可以理解为一个变量即是一个变量的outcome，也是另一个变量的predictor。方便起见以外源变量和内源变量进行描述。是mediation model的一种，我们知道mediation model/covariance modelling the primary focus here is the relationships between variables. e.g., estimate and test direct and indirect effects in a system of regression equations and estimate and test theories about the absence of relationships.
+
+Exogenous variables: those which are not predicted by any other
+Endogenous variables: variables which do have predictors, and may or may not predict other variales
 
 ```{r}
 # 没有潜在变量的SEM模型
- # https://benwhalley.github.io/just-enough-r/path-models.html
+# https://benwhalley.github.io/just-enough-r/path-models.html
+# https://advstats.psychstat.org/book/path/index.php
 
-mm <- ''
+# The data set consists of 2 factor variables and 9 response or observed variables and one variable that represents the repetitions of each experimental unit. The first 3 observed variables (aba, apx and pod) reflects the activity of phytohormones. The variable ph represents the height of the plants. The third category of variables (til, pl, grp, tgw) are considered as the yield contributing variables.
+
+
+# 用来检验
+mm <- '
+mpg ~ hp + gear + cyl + disp + carb + am + wt
+hp ~ cyl + disp + carb'
+
+# 用来检验中介效应
+# a*b that defines the mediation effect and a*b + cp that defines the total effect
+mediation <- '
+mpg ~ b*gear + cp*hp
+gear ~ a*hp
+ab := a*b
+total := a*b + cp
+'
 
 path <- sem(
-  model = mm,
-  data = data,
-  
+  model = mediation,
+  data = mtcars,
+  meanstructure=T
 )
+
+summary(path, standardize = T, rsq = T)
+inspect(path)
+
+parameterEstimates(path)
 
 ```
 *interpret results: * summary有几个参数可供选择，fit.measure = TRUE,standardized = TRUE.
-参数估计（Parameter Estimates），观测变量到潜在因子的标准化权重；
-潜在变量（Latent Variables），估计的潜在因子的因子得分；
-因子协方差（Covariances），潜在因子之间的协方差；
-误差方差（Variances），每个观测变量的误差方差的估计值
+The key section of the output to check is the table listed ‘Regressions’, which lists the regression parameters for the predictors for each of the endogenous variables.
+上述结果中，Model Test User Model中卡放检验的Pvalue
+
+中介作用由定义的参数（Defined Parameters）estimated，比如ab即是中介效应其值为-0.004，z检验显示并无统计学意义，毕竟是随意选择的两个模型变量。。
+
+
+
+```{r}
+semPlot::semPaths(path, "par",
+             #sizeMan = 15, sizeInt = 15, sizeLat = 15,
+             edge.label.cex=1.5,
+             fade=FALSE)
+```
+In a path diagram, different shapes and paths have different meanings:
+
+- Squares or rectangular boxes: observed or manifest variables
+- Circles or ovals: errors, factors, latent variables
+- Single-headed arrows: linear relationship between two variables. Starts from an independent variable and ends on a dependent variable.
+- Double-headed arrows: variance of a variable or covariance between two variables
+- Triangle: a constant variable, usually a vector of ones
 
 
 
 ## confirmatory factor analysis
+
+验证性因子分析,
+多数情况SEM可以考虑成一个CFA模型，比如以下数据集想要探讨的是学生的visual能力、textual能力之间的关系，可这种隐式变量是没有办法测量的，通过对其他可测量的指标，比如x1x2x3来验证visual能力、textual能力间的关系。
 
 ```{r}
 # measurement model
@@ -92,10 +173,22 @@ fitmeasures(fit,
             )
 performance::performance(fit)
 
-graph_sem(fit)
+tidySEM::graph_sem(fit)
 ```
+*interpret results: *首先是Estimator用的方法为ML(最大似然), Model Test User Model 和 Model Test Baseline Model分别指的是:
+
+参数估计（Parameter Estimates），观测变量到潜在因子的标准化权重；
+潜在变量（Latent Variables），估计的潜在因子的因子得分；
+因子协方差（Covariances），潜在因子之间的协方差；
+误差方差（Variances），每个观测变量的误差方差的估计值
+
+Chi-square的p-value大于0.05是倾向于发生的。Chisquare tests the hypothesis that there is a mismatch between model implied covariance matrix and the original covariance matrix. Therefore, the non-significant discrepancy is preferred. For optimal fitting of the chosen SEM, the  χ2  test would be ideal with  p>0.05.
+
+
 
 ## Latent Variable Structural Model
+
+潜变量结构模型
 
 ```{r}
 model <- '
@@ -114,10 +207,22 @@ model <- '
     y6 ~~ y8
 '
 
-fit <- sem(model, data = PoliticalDemocracy)
-summary(fit, standardized = TRUE)
+fit2 <- sem(model, data = PoliticalDemocracy)
+summary(fit2, standardized = TRUE,
+        fit.measures = TRUE
+        )
 
 ```
+
+
+In the next section of latent variables, you can see the first observed variable has loading fixed at 1. So, there is no test associated with those but we have significant tests associated with the remaining variables.
+
+In the next section we have regressions. We can see here the regression coefficients for latent variables and their significance.
+
+You can also see that we have a covariance between enzyme activity and yield contribution. The probability value shows a significance directional relationship between the enzyme activity and yield contribution.
+
+If you want fit of the measures in summary function then type fit.measures equal TRUE.
+
 
 
 ## growth curve models
