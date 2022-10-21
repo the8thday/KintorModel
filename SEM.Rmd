@@ -38,18 +38,21 @@ SEM一般分为 模型假定-模型识别-模型估计-模型评价-模型修正
 ```{r , echo = FALSE}
 library(easystats)
 library(lavaan)
-# library(lavaanPlot)
+# library(lavaanExtra) #虽然还很新，但似乎是一个不错的包
+# library(lavaanPlot) # 可个性化的地方比较多
 # library(piecewiseSEM)
 library(tidySEM)
 library(semPlot)
 library(semTools)
+# library(manymome) # 对mediation分析似乎挺有用
 ```
 
 ## model syntax in lavaan
 
 在`lavaan`包中，不同的公式有不同的写法。具体详见官方文档，里面有详细的内容。需要注意的是最好文本公式是用单引号包起来，因为在R里单引号里面的string可以包含双引号，反之未必。
 
-`=~` is measured by.
+`=~` means *is measured by*.
+`~~`的意义是检验
 
 ```{r}
 myModel <- ' # regressions
@@ -83,25 +86,27 @@ dat <- readr::read_csv('./datasets/worland5.csv')
 ## path analysis
 
 路径分析，
-可以理解为一个变量即是一个变量的outcome，也是另一个变量的predictor。方便起见以外源变量和内源变量进行描述。是mediation model的一种，我们知道mediation model/covariance modelling the primary focus here is the relationships between variables. e.g., estimate and test direct and indirect effects in a system of regression equations and estimate and test theories about the absence of relationships.
+可以理解为一个变量即是一个变量的outcome，也是另一个变量的predictor。方便起见SEM中变量以外源变量和内源变量进行描述。
+以mediation model为例，我们知道mediation model/covariance modelling the primary focus here is the relationships between variables. e.g., estimate and test direct and indirect effects in a system of regression equations and estimate and test theories about the absence of relationships.
 
 Exogenous variables: those which are not predicted by any other
 Endogenous variables: variables which do have predictors, and may or may not predict other variales
+
+*其可以应用在*
 
 ```{r}
 # 没有潜在变量的SEM模型
 # https://benwhalley.github.io/just-enough-r/path-models.html
 # https://advstats.psychstat.org/book/path/index.php
 
-# The data set consists of 2 factor variables and 9 response or observed variables and one variable that represents the repetitions of each experimental unit. The first 3 observed variables (aba, apx and pod) reflects the activity of phytohormones. The variable ph represents the height of the plants. The third category of variables (til, pl, grp, tgw) are considered as the yield contributing variables.
 
 
-# 用来检验
+# path1用来检验有无hp直接效应的情况下模型是否fit well
 mm <- '
 mpg ~ hp + gear + cyl + disp + carb + am + wt
 hp ~ cyl + disp + carb'
 
-# 用来检验中介效应
+# 用来检验中介效应，Test the direct and indirect effects
 # a*b that defines the mediation effect and a*b + cp that defines the total effect
 mediation <- '
 mpg ~ b*gear + cp*hp
@@ -110,23 +115,29 @@ ab := a*b
 total := a*b + cp
 '
 
-path <- sem(
+path1 <- sem(
+  model = mm,
+  data = mtcars,
+  meanstructure=T
+)
+
+path2 <- sem(
   model = mediation,
   data = mtcars,
   meanstructure=T
 )
 
-summary(path, standardize = T, rsq = T)
-inspect(path)
+summary(path1, standardize = T, rsq = T)
+inspect(path1)
 
-parameterEstimates(path)
+parameterEstimates(path2)
 
 ```
 *interpret results: * summary有几个参数可供选择，fit.measure = TRUE,standardized = TRUE.
-The key section of the output to check is the table listed ‘Regressions’, which lists the regression parameters for the predictors for each of the endogenous variables.
-上述结果中，Model Test User Model中卡放检验的Pvalue
+对于path1，The key section of the output to check is the table listed ‘Regressions’, which lists the regression parameters for the predictors for each of the endogenous variables.
+上述结果中，Model Test User Model中卡放检验的Pvalue<0.05, 拒绝null假设，备择假设为The model does not fit the data or the model is rejected，既模型在没有hp的直接effect下不是一个好模型。
 
-中介作用由定义的参数（Defined Parameters）estimated，比如ab即是中介效应其值为-0.004，z检验显示并无统计学意义，毕竟是随意选择的两个模型变量。。
+对于path2，中介作用由定义的参数（Defined Parameters）estimated， 比如ab即是中介效应其值为-0.004， z检验显示并无统计学意义，毕竟是随意选择的两个模型变量。。同时可以看到path2的summary没有卡方检验的p值，Regressions下的每一个公式都可以独立检验，比如gear~hp没有啥意义。
 
 
 
@@ -143,6 +154,9 @@ In a path diagram, different shapes and paths have different meanings:
 - Single-headed arrows: linear relationship between two variables. Starts from an independent variable and ends on a dependent variable.
 - Double-headed arrows: variance of a variable or covariance between two variables
 - Triangle: a constant variable, usually a vector of ones
+
+
+在路径图中，direct effect + indirect effect既是total effect，而indirect effect的计算为p2*p7这种乘积。在为`lavaan`写 公式时，可以参考这种写法。
 
 
 
@@ -190,7 +204,31 @@ Chi-square的p-value大于0.05是倾向于发生的。Chisquare tests the hypoth
 
 潜变量结构模型
 
+结构方程模型可以简单的看作是a combination of CFA and Path。
+
+`~~`是怎么用呢？
+
 ```{r}
+# The data set consists of 2 factor variables and 9 response or observed variables and one variable that represents the repetitions of each experimental unit. The first 3 observed variables (aba, apx and pod) reflects the activity of phytohormones. The variable ph represents the height of the plants. The third category of variables (til, pl, grp, tgw) are considered as the yield contributing variables.
+ddd <- readxl::read_excel('./datasets/data_corr.xlsx') %>% 
+  mutate(rep = as_factor(rep),
+         water = as_factor(water),
+         priming = as_factor(priming)
+         )
+# 一个较为简单的模型
+mod.id = '
+EA =~ aba + apx + pod
+YC =~ til + pl + grp + tgw
+gy ~ EA + YC
+'
+
+fit3 <- lavaan::sem(model = mod.id,
+                    data = ddd
+                    )
+summary(fit3,
+        fit.measures = TRUE)
+  
+  
 model <- '
   # measurement model
     ind60 =~ x1 + x2 + x3
@@ -208,20 +246,46 @@ model <- '
 '
 
 fit2 <- sem(model, data = PoliticalDemocracy)
+
 summary(fit2, standardized = TRUE,
         fit.measures = TRUE
         )
 
 ```
 
+*interpret: *
+首先是模型的一些基本情况；
+然后卡方检验的P值>0.05，说明模型还不错。不过同时应该注意，除了卡方，还会考虑CFI and TFI are both close to 1. The RMSEA is about 0.063 and SRMR is about 0.011，overall得到模型是否是一个好模型。(Chisquare tests the hypothesis that there is a mismatch between model implied covariance matrix and the original covariance matrix. )
 
-In the next section of latent variables, you can see the first observed variable has loading fixed at 1. So, there is no test associated with those but we have significant tests associated with the remaining variables.
+In the next section of latent variables, you can see the first observed variable has loading fixed at 1. So, there is no test associated with those but we have significant tests associated with the remaining variables. 潜变量第一个被设置成了1，其他的变量是和它做的对比吗？
 
-In the next section we have regressions. We can see here the regression coefficients for latent variables and their significance.
+In the next section we have regressions. We can see here the regression coefficients for latent variables and their significance. 比如此例中隐变量EA是对gy有贡献的。
 
-You can also see that we have a covariance between enzyme activity and yield contribution. The probability value shows a significance directional relationship between the enzyme activity and yield contribution.
+You can also see that we have a covariance between enzyme activity and yield contribution. The probability value shows a significance directional relationship between the enzyme activity and yield contribution. 协方差可以简单的理解为二者的相关性。
 
 If you want fit of the measures in summary function then type fit.measures equal TRUE.
+
+- RMSEA(root mean square error of approximation): 越小模型越好,0为完美fit。
+- Comparative Fit Index (CFI): In practice, the CFI should be close to  0.95  or higher.
+- Tucker-Lewis Index (TLI): A TLI of  >0.90  is considered acceptable.
+- standardized root mean square residual (SRMR): should be less than  0.09  for a good model fit.
+
+```{r}
+semPaths(
+          object = fit3,
+          what = "path",
+          whatLabels = "par",
+          style = "ram",
+          layout = "tree",
+          rotation = 2,
+          sizeMan = 7,
+          sizeLat = 7,
+          color = "lightgray",
+          edge.label.cex = 1.2,
+          label.cex = 1.3
+)
+```
+
 
 
 
@@ -250,6 +314,7 @@ model2 <- '
 fit2 <- growth(model2, data = Demo.growth)
 summary(fit2)
 ```
+
 
 # piecewise structural equation modeling
 
