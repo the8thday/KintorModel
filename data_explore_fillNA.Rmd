@@ -1,5 +1,5 @@
 ---
-title: "data_explore"
+title: "data_explore and fill NA value"
 author: "liuc"
 date: '2022-05-05'
 output: pdf_document
@@ -26,6 +26,8 @@ library(naniar) # NA值的统计、绘图等
 
 
 `dlookr`是一个帮助进行数据探索的包。
+
+对于数据诊断和数据探索都提供了方便的函数。
 
 ```{r}
 library(nycflights13)
@@ -135,6 +137,9 @@ airquality %>%
 impute NA value.
 选择合适的impute NA的方法。
 
+`Hmisc`有提供多个简单插补的方法；
+下面记录一下`mice`包用于多重插补。当你认为数据是MCAR或MAR，并且缺失数据问题非常复杂时，多重插补将是一个非常实用方法。
+
 
 ```{r}
 library(mde)
@@ -145,14 +150,55 @@ library(VIM) # visualization of missing and imputed values
 ```
 
 ```{r}
-mice::md.pattern(airquality)
+data(sleep, package="VIM")
+
+
+mice::md.pattern(sleep)
+```
+解读：0表示变量的列中有缺失值，1则表示没有缺失值。第一行表述了“无缺失值”的模式（所有元素都为1）。第二行表述了“除了 Span 之外无缺失值”的模式。第一列表示各缺失值模式的实例个数，最后一列表示各模式中有缺失值的变量的个数。此处可以看到，有42个实例没有缺失值，仅2个实例缺失了 Span 。9个实例同时缺失了 NonD 和 Dream的值。数据集包含了总共(42×0)+(2×1)+…+(1×3)=38个缺失值。最后一行给出了每个变量中缺失值的数目。
+
+
+```{r}
+VIM::aggr(sleep, prop=TRUE, numbers=TRUE)
+```
+```{r}
+VIM::barMiss(sleep)
+```
+```{r}
+VIM::matrixplot(sleep)
+```
+```{r}
+marginplot(sleep[c("Gest","Dream")], pch=c(20),
+col=c("darkgray", "red", "blue"))
 ```
 
 
+`mice`包
+
+mice 包的插补分析过程：
+library(mice)
+imp <- mice(data, m)
+fit <- with(imp, analysis)
+pooled <- pool(fit)
+summary(pooled) 
+其中， 
+- data 是一个包含缺失值的矩阵或数据框。 
+- imp 是一个包含m个插补数据集的列表对象，同时还含有完成插补过程的信息。默认m为5。
+- analysis 是一个表达式对象，用来设定应用于m个插补数据集的统计分析方法。方法包括做线性回归模型的 lm() 函数、做广义线性模型的 glm() 函数、做广义可加模型的gam() ，以及做负二项模型的 nbrm() 函数。表达式在函数的括号中， ~ 的左边是响应变量，右边是预测变量（用 + 符号分隔开）。 
+- fit 是一个包含m个单独统计分析结果的列表对象。 
+- pooled 是一个包含这m个统计分析平均结果的列表对象。
 
 
 
+将多重插补法应用到 sleep 数据集，如下所示
 
+```{r}
+imp <- mice(sleep, seed=1234)
+fit <- with(imp, lm(Dream ~ Span + Gest))
+pooled <- pool(fit)
+
+summary(pooled)
+```
 
 
 
