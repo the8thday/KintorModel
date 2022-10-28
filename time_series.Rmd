@@ -11,42 +11,131 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## time series analysis in R
 
-时间序列数据首先应该符合时间单位。不是所有等step的数据都叫做时序数据。不过等step的数据应该可以采用同样的分析方法吧。。。
-Arma及其衍生模型，Garch簇模型，滤波技术，傅里叶和小波分析.
+参考资料：
+
+> https://otexts.com/fpp3/
+> https://fable.tidyverts.org/
+
+
+
+*首先理清何为时序数据，常见的时序数据格式是怎样的，常见的应用是怎样的。*
+
+
+时序数据即时间序列序列，某一变量在不同时间点的记录，一般目的在于找出已有数据的统计特性(比如描述)和发展规律，构建时间序列模型，并进行样本外的预测。
+如果有多个研究对象，这种数据类型不就是outcome为重复测量的数据，只是对于其他变量也应在同一时间段内进行采集，其结构化的数据格式index为时间，column为各种变量。
+
+时间序列数据首先应该符合时间单位。不是所有等step的数据都叫做时序数据。不过等step的数据应该可以采用同样的分析方法吧.
+
+时序数据
+
+
+常见的时序数据模型包括，Arma及其衍生模型，Garch簇模型，滤波技术，傅里叶和小波分析等，下面会择机对每一个算法的应用进行一些粗略的讲解。
+
+- `fable::ETS()` & `forecast::ets()` 用来拟合指数预测模型，短期预测能力较好。
+- `fable::ARIMA()` & `forecast::auto.arima()`用来拟合Box-Jenkins法，也称作ARIMA模型，在ARIMA预测模型中，预测值表示为由最近的真实值和最近的预测误差组成的线性函数。主要用于拟合具有平稳性(stationarity)(或可以被转换为平稳序列)的时间序列。
+
+
 
 ```{r}
-library(tidymodels)
+library(tidyverse)
+library(easystats)
+library(fpp3)
 library(lubridate)
-library(forecast)
+library(clock)
+library(forecast) # This package is now retired in favour of the fable package
+library(fable)
 ```
 
 
-### stats:: package
-base R 中的ts函数, forcast函数
+### stats:: package 的一些基本操作
+
+`stats`包中有一些列处理时序数据的函数，诸如`ts`, `frequency`等。
+
+以下主要通过一个简单的示例介绍`ts()`数据类型的生成和一些`forecast`中的应用，不过后续会转到`fable`等包。
 
 ```{r}
+# 一个简单的示例
+
 x <- c(580, 7813, 28266, 59287, 75700,
        87820, 95314, 126214, 218843, 
        471497, 936851, 1508725, 2072113)
   
 # creating time series object
 # from date 22 January, 2020
-mts <- ts(x, start = decimal_date(ymd("2020-01-22")),
-                            frequency = 12)
+# frequency为每个单位时间所包含的观测值数量，如frequency=1对应年度数据，frequency=12对应月度数据，frequency=4对应季度数据
+mts <- ts(x, 
+          # start = decimal_date(ymd("2020-01-22")),
+          start = c(2020, 1),
+          frequency = 12)
+
+start(mts)
+end(mts)
+frequency(mts)
+# 提取子集
+mts_sub <- stats::window(mts, start = c(2020, 3), end = c(2020, 6))
    
 # forecasting model using arima model
-m_fit <- auto.arima(mts)
+m_fit <- forecast::auto.arima(mts)
    
 # Next 5 forecasted values
 forecast(m_fit, 5)
    
 # plotting the graph with next5 weekly forecasted values
-plot(forecast(m_fit, 5), xlab ="Weekly Data",
-ylab ="Total Positive Cases",
-main ="COVID-19 Pandemic", col.main ="darkgreen")
+plot(forecast(m_fit, 5), xlab ="Monthly Data",
+     ylab ="Total Positive Cases",
+     main ="COVID-19 Pandemic", 
+     col.main ="darkgreen")
+```
+图中2020.0小数点后面的东西为类似decimal_date计算后的时间点。
+
+
+EST模型的一些基本概念:
+```{r}
+# ts是要分析的时序，限定模型的字母有三个。
+# 第一个字母代表误差项，第二个字母代表趋势项，第三个字母则代表季节项。
+# 可选的字母包括:相加模型(A)、相乘模型(M)、无(N)、自动选择(Z)。
+# ses()、holt()、和hw()函数都是ets()函数的便捷包装(convenience wrapper)
+
+forecast::ets(mts, model="ZZZ")
+
 ```
 
-### use modeltime
+
+ARIMA 模型的一些基本概念:
+```{r}
+# forecast包中的auto.arima()函数也可以实现最优ARIMA模型的自动选取
+# lag 滞后阶数
+# ACF图可用于为ARIMA模型选择合适的参数，并评估最终模型的拟合效果。
+
+forecast::Acf(mts)
+
+
+# 平稳性也可以通过ADF(Augmented Dickey-Fuller)统计检验来验证平稳性假定
+# 也可以可以通过时序图直观判断
+tseries::adf.test(mts)
+# Nile是一个内置的数据集
+plot(Nile)
+forecast::ndiffs(Nile) #找到最优的d值
+dNile <- diff(Nile) #原始序列差分一次(函数默认一阶滞后项，即lag=1)并存储在dNile中    
+plot(dNile) #画出差分后的序列的折线图，显然比原始序列更平稳
+tseries::adf.test(dNile) #对差分后的序列做ADF检验
+
+fit <- arima(Nile, order=c(0,1,1))
+
+```
+第一幅图中的Lag为滞后阶数.
+一般来说，一个模型如果合适，那模型的残差应该满足均值为0的正态分布，并且对于任意的滞后阶数，残差自相关系数都应该为零。
+换句话说，模型的残差应该满足独立正态分布(即残差间没有关联)。
+
+
+
+### 时序数据的*平滑化*和*季节性*分解
+
+
+
+### use modeltime进行forecast
+
+`modeltime`包是一个
 
 ```{r}
 library(timetk)
@@ -93,12 +182,22 @@ models_tbl %>%
 
 tidyverts是一个类似tidyverse整合一系列时间序列分析的R包集合.
 
+系列包基本可以处理时序数据的一切。
+首先看待一下，其对时序数据所定义的`tsibble`数据格式，此格式
+
 ```{r}
+
+library(tsibble)
 library(fable)
+library(feasts)
 library(TSstudio)
+
 ```
 
 
+```{r}
+
+```
 
 
 
