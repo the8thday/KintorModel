@@ -1,0 +1,187 @@
+---
+title: "IC50 数据分析"
+format: html
+---
+
+## IC50 数据分析
+
+> https://rstudio-pubs-static.s3.amazonaws.com/378543_5b5bda32bf0541a485ccc49efbea680a.html
+> https://towardsdatascience.com/drug-dose-response-data-analysis-5d7d336ad8e9
+
+复现常见的药物IC50计算和绘图.
+
+IC50 is the “half-maximal inhibitory concentration” for an entity (typically a drug) against a biological process or function (eg, enzyme activity, cell number, metabolic activity). 
+
+EC50 is, comparably, the “half-maximal effective concentration”. The effective is in there because not all entities will completely wipe out the biological process that you are assaying.
+
+
+- E0: Response observed in absence of drug
+- Einf: Maximum response caused by a drug
+- EC50: Concentration of a drug at which 50% of its maximal response is induced. EC50 is normally measured in molar concentrations and is used as a measure of agonist drug potency — the lower the EC50 value, the lower the concentration of drug required to elicit a 50% maximal response and the greater the potency of the drug.
+- IC50: Concentration of a drug required for 50% inhibition of cell growth. It is normally measured in molar concentrations and is used as a measure of antagonist drug potency — the lower the IC50 value, the more potent the drug is.
+
+
+*four-parameter log-logistic model: *
+
+
+
+```{r}
+library(tidyverse)
+library(ggprism)
+library(pzfx) # read GraphPad data
+library(drc) # Dose response curve
+```
+
+
+
+```{r}
+pzfx_tables('~/OneDrive/kintor/Daily_Work/IC50_xiaodan/data.pzfx')
+
+```
+
+
+
+```{r}
+
+dd <- pzfx::read_pzfx('~/OneDrive/kintor/Daily_Work/IC50_xiaodan/data.pzfx', 
+                      "22RV1-GT19686")
+
+dd
+```
+
+
+```{r}
+d_p <- dd %>% rename('drug_con' = 'Var.1','rep1' = '_1',
+              'rep2' = '_2', 'rep3' = '_3'
+              ) %>% 
+  mutate(id = row_number()) %>% 
+  rowwise() %>% 
+  mutate(inhib_mean = mean(c_across(c(rep1, rep2, rep3)))) %>% 
+  ungroup()
+
+d_p
+```
+
+```{r}
+dose_resp <- y ~ min + ((max - min) / (1 + exp(hill_coefficient * (ec50 - x))))
+
+d_p %>%
+  mutate(drug_con_log = log10(drug_con)) %>%
+  pivot_longer(
+    cols = -c(drug_con, drug_con_log, id, inhib_mean),
+    names_pattern = "(.{3})([0-9])",
+    names_to = c("treatment", "rep"),
+    values_to = "response"
+  ) %>%
+  ggplot(
+    aes(x = drug_con_log, y = response)
+  ) +
+  geom_smooth(
+    aes(colour = treatment),
+    method = "nls", formula = dose_resp, se = FALSE,
+    method.args = list(start = list(
+      min = 13.28957, max = 117.2733,
+      ec50 = 0.6455712, hill_coefficient = -2.319812
+    ))
+  ) +
+  scale_colour_manual(
+    labels = c("No inhibitor", "Inhibitor"),
+    values = c("#00167B", "#9FA3FE")
+  ) +
+  ggnewscale::new_scale_colour() +
+  geom_point(aes(colour = treatment, shape = treatment), size = 3) +
+  scale_colour_prism(
+    palette = "winter_bright",
+    labels = c(
+      "No inhibitor",
+      "Inhibitor"
+    )
+  ) +
+  scale_shape_prism(
+    labels = c(
+      "No inhibitor",
+      "Inhibitor"
+    )
+  ) +
+  theme_prism(palette = "winter_bright", base_size = 16) +
+  theme(
+    axis.title.y = element_blank(),
+    legend.title = element_blank(),
+    legend.position = c(0.05, 0.95),
+    legend.justification = c(0.05, 0.95)
+  ) +
+  labs(x = "[Agonist], M")
+```
+
+```{r}
+fit <- lm(inhib_mean ~ drug_con, data = d_p)
+
+summary(fit)
+```
+
+
+```{r}
+fitted_curve <- drc::drm(
+  formula = inhib_mean ~ drug_con,
+  data = d_p,
+  fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
+  # fct = LL.4()
+  )
+
+
+summary(fitted_curve)
+```
+
+计算IC50值:
+```{r}
+coefs <- setNames(
+  fitted_curve$coefficients,
+  c("hill", "min_value", "max_value", "ec_50")
+  )
+
+ic_50 <- with(
+  as.list(coefs),
+  exp(
+    log(ec_50) + (1 / hill) * log(max_value / (max_value - 2 * min_value))
+  )
+)
+
+ic_50
+```
+
+
+```{r}
+ggplot(d_p %>% mutate(drug_con_log = log10(drug_con)), 
+       aes(x = drug_con, y = inhib_mean)) +
+  geom_point() +
+  stat_smooth(
+    method = "drm",
+    method.args = list(
+      fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
+      ),se = FALSE) +
+  ylim(0, NA)
+```
+
+
+
+```{r}
+# Note the logged x-axis
+plot(fitted_curve, 
+     log='x', 
+     xlab = 'Drug concentration (microM)', 
+     ylab= 'Inhibition')
+```
+
+```{r}
+E0 <- fitted_curve$coefficients[2]
+Einf <- fitted_curve$coefficients[3]
+EC50 <- fitted_curve$coefficients[4]
+H <-  -fitted_curve$coefficients[1]
+IC50 <- exp(log((((Einf - E0) / (50 - E0) ) - 1) * EC50**(-H))/ (-H))
+
+efficacy_metrics <- data.frame(c(E0, Einf, EC50, H, IC50))
+rownames(efficacy_metrics) <- c('E0', 'Einf', 'EC50', 'H', 'IC50')
+colnames(efficacy_metrics) <- 'Value'
+efficacy_metrics
+```
+
