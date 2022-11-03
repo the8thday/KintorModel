@@ -7,21 +7,33 @@ format: html
 
 > https://rstudio-pubs-static.s3.amazonaws.com/378543_5b5bda32bf0541a485ccc49efbea680a.html
 > https://towardsdatascience.com/drug-dose-response-data-analysis-5d7d336ad8e9
+> https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_models_built-in_to_prism.htm
+> https://www.aatbio.com/tools/ic50-calculator
+
+
 
 复现常见的药物IC50计算和绘图.
+针对不同的实验设计，比如激动剂药物和拮抗剂药物，体外还是体内实验，严格来说体内实验是`dose-response curve`, 对于体外实验`concentration-response curve`是一个更为合适的称谓，不过一般宽泛的称为`dose-response`。
+
 
 IC50 is the “half-maximal inhibitory concentration” for an entity (typically a drug) against a biological process or function (eg, enzyme activity, cell number, metabolic activity). 
 
-EC50 is, comparably, the “half-maximal effective concentration”. The effective is in there because not all entities will completely wipe out the biological process that you are assaying.
+EC50 is, comparably, the “half-maximal effective concentration”. The effective is in there because not all entities will completely wipe out the biological process that you are assaying. 如果没有一个最大和最小值是不可能计算EC50的。
+就只是response最下和最大值的中位值所对应的浓度。在拮抗剂可以让100%的细胞死亡的情况下，EC50=IC50。再比如说一个拮抗剂最多能杀死45%的细胞，那么IC50是不存在的，但是可以有EC50.
+
+Kd
 
 
 - E0: Response observed in absence of drug
 - Einf: Maximum response caused by a drug
 - EC50: Concentration of a drug at which 50% of its maximal response is induced. EC50 is normally measured in molar concentrations and is used as a measure of agonist drug potency — the lower the EC50 value, the lower the concentration of drug required to elicit a 50% maximal response and the greater the potency of the drug.
 - IC50: Concentration of a drug required for 50% inhibition of cell growth. It is normally measured in molar concentrations and is used as a measure of antagonist drug potency — the lower the IC50 value, the more potent the drug is.
+- Hill slope: 从定义可以看出拮抗剂的slope值一般是小于0的。而和1的对比可以大概看出曲线的坡度。
 
 
-*four-parameter log-logistic model: *
+*four-parameter log-logistic model: * 四参数模型是较为常用的，除此之外还有三参数、五参数模型等。
+
+  在对数据进行绘图时，一般会对X轴的浓度数据取log，而Y轴的response一般进行简单的线性转换，主要是保证that all scatter around the curve is Gaussian。
 
 
 
@@ -30,6 +42,12 @@ library(tidyverse)
 library(ggprism)
 library(pzfx) # read GraphPad data
 library(drc) # Dose response curve
+library(sandwich)
+library(lmtest)
+
+# 解决drc的一个bug
+registerS3method("estfun", "drc", drc::estfun.drc)
+registerS3method("bread", "drc", drc::bread.drc)
 ```
 
 
@@ -57,10 +75,22 @@ d_p <- dd %>% rename('drug_con' = 'Var.1','rep1' = '_1',
   mutate(id = row_number()) %>% 
   rowwise() %>% 
   mutate(inhib_mean = mean(c_across(c(rep1, rep2, rep3)))) %>% 
-  ungroup()
+  ungroup() %>% 
+  relocate(id, everything())
 
 d_p
 ```
+
+```{r}
+d_long <- d_p %>% pivot_longer(cols = -c(id, drug_con, inhib_mean),
+                               names_to = 'rep',
+                               values_to = 'response'
+                               )
+
+d_long
+```
+
+
 
 ```{r}
 dose_resp <- y ~ min + ((max - min) / (1 + exp(hill_coefficient * (ec50 - x))))
@@ -113,24 +143,45 @@ d_p %>%
   labs(x = "[Agonist], M")
 ```
 
-```{r}
-fit <- lm(inhib_mean ~ drug_con, data = d_p)
-
-summary(fit)
-```
-
+`drc` package 用来拟合`dose-response curve`，`drm` (which fits the regression model) and `LL.4` (which defines the structure of the regression model).
 
 ```{r}
 fitted_curve <- drc::drm(
   formula = inhib_mean ~ drug_con,
   data = d_p,
   fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
-  # fct = LL.4()
+  # fct = LL.5()
   )
 
 
 summary(fitted_curve)
 ```
+
+
+```{r}
+fitted_curve2 <- drc::drm(
+  formula = response ~ drug_con,
+  data = d_long,
+  fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
+  # fct = LL.3()
+  )
+
+
+summary(fitted_curve2)
+
+lmtest::coeftest(fitted_curve2, vcov = sandwich)
+# summary(multcomp::glht(ryegrass.LL.4)) # same result as above
+```
+
+
+计算ED值：
+
+```{r}
+ED(fitted_curve2, c(5, 10, 50, 80), interval = "delta")
+
+```
+
+
 
 计算IC50值:
 ```{r}
@@ -150,16 +201,30 @@ ic_50
 ```
 
 
+利用ggplot2绘制漂亮的图片：
+
 ```{r}
-ggplot(d_p %>% mutate(drug_con_log = log10(drug_con)), 
-       aes(x = drug_con, y = inhib_mean)) +
+# new dose levels as support for the line
+newdata <- expand.grid(conc = exp(seq(log(0.5), log(100), length = 100)))
+# predictions and confidence intervals
+pm <- predict(fitted_curve2, newdata = newdata, interval = "confidence")
+# new data with predictions
+newdata$p <- pm[, 1]
+newdata$pmin <- pm[, 2]
+newdata$pmax <- pm[, 3]
+# plot curve
+library(ggplot2)
+# need to shift conc == 0 a bit up, otherwise there are problems with coord_trans
+ryegrass$conc0 <- ryegrass$conc
+ryegrass$conc0[ryegrass$conc0 == 0] <- 0.5
+# plotting the curve
+ggplot(ryegrass, aes(x = conc0, y = rootl)) +
   geom_point() +
-  stat_smooth(
-    method = "drm",
-    method.args = list(
-      fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
-      ),se = FALSE) +
-  ylim(0, NA)
+  geom_ribbon(data = newdata, aes(x = conc, y = p, ymin = pmin, ymax = pmax), alpha = 0.2) +
+  geom_line(data = newdata, aes(x = conc, y = p)) +
+  coord_trans(x = "log") +
+  xlab("Ferulic acid (mM)") +
+  ylab("Root length (cm)")
 ```
 
 
@@ -171,6 +236,8 @@ plot(fitted_curve,
      xlab = 'Drug concentration (microM)', 
      ylab= 'Inhibition')
 ```
+
+此为另一篇推文计算的IC50和上述有所不同。
 
 ```{r}
 E0 <- fitted_curve$coefficients[2]
