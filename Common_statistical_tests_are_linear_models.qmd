@@ -15,6 +15,17 @@ format: html
 
 
 ```{r}
+rnorm_fixed = function(N, mu = 0, sd = 1)
+  scale(rnorm(N)) * sd + mu
+
+y = c(rnorm(15), exp(rnorm(15)), runif(20, min = -3, max = 0))  # Almost zero mean, not normal
+x = rnorm_fixed(50, mu = 0, sd = 1)  # Used in correlation where this is on x-axis
+y2 = rnorm_fixed(50, mu = 0.5, sd = 1.5) 
+```
+
+
+
+```{r}
 a = cor.test(y, x, method = "pearson") # Built-in
 b = lm(y ~ 1 + x) # Equivalent linear model: y = Beta0*1 + Beta1*x
 c = lm(scale(y) ~ 1 + scale(x)) # On scaled vars to recover r
