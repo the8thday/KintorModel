@@ -46,6 +46,7 @@ library(sandwich)
 library(lmtest)
 
 # 解决drc的一个bug
+# 在用sandwich包时的一个小错误
 registerS3method("estfun", "drc", drc::estfun.drc)
 registerS3method("bread", "drc", drc::bread.drc)
 ```
@@ -91,58 +92,6 @@ d_long
 ```
 
 
-
-```{r}
-dose_resp <- y ~ min + ((max - min) / (1 + exp(hill_coefficient * (ec50 - x))))
-
-d_p %>%
-  mutate(drug_con_log = log10(drug_con)) %>%
-  pivot_longer(
-    cols = -c(drug_con, drug_con_log, id, inhib_mean),
-    names_pattern = "(.{3})([0-9])",
-    names_to = c("treatment", "rep"),
-    values_to = "response"
-  ) %>%
-  ggplot(
-    aes(x = drug_con_log, y = response)
-  ) +
-  geom_smooth(
-    aes(colour = treatment),
-    method = "nls", formula = dose_resp, se = FALSE,
-    method.args = list(start = list(
-      min = 13.28957, max = 117.2733,
-      ec50 = 0.6455712, hill_coefficient = -2.319812
-    ))
-  ) +
-  scale_colour_manual(
-    labels = c("No inhibitor", "Inhibitor"),
-    values = c("#00167B", "#9FA3FE")
-  ) +
-  ggnewscale::new_scale_colour() +
-  geom_point(aes(colour = treatment, shape = treatment), size = 3) +
-  scale_colour_prism(
-    palette = "winter_bright",
-    labels = c(
-      "No inhibitor",
-      "Inhibitor"
-    )
-  ) +
-  scale_shape_prism(
-    labels = c(
-      "No inhibitor",
-      "Inhibitor"
-    )
-  ) +
-  theme_prism(palette = "winter_bright", base_size = 16) +
-  theme(
-    axis.title.y = element_blank(),
-    legend.title = element_blank(),
-    legend.position = c(0.05, 0.95),
-    legend.justification = c(0.05, 0.95)
-  ) +
-  labs(x = "[Agonist], M")
-```
-
 `drc` package 用来拟合`dose-response curve`，`drm` (which fits the regression model) and `LL.4` (which defines the structure of the regression model).
 
 ```{r}
@@ -150,7 +99,7 @@ fitted_curve <- drc::drm(
   formula = inhib_mean ~ drug_con,
   data = d_p,
   fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
-  # fct = LL.5()
+  # fct = LL.3()
   )
 
 
@@ -162,8 +111,8 @@ summary(fitted_curve)
 fitted_curve2 <- drc::drm(
   formula = response ~ drug_con,
   data = d_long,
-  fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
-  # fct = LL.3()
+  # fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
+  fct = drc::MM.3()
   )
 
 
@@ -205,9 +154,10 @@ ic_50
 
 ```{r}
 # new dose levels as support for the line
-newdata <- expand.grid(conc = exp(seq(log(0.5), log(100), length = 100)))
+newdata <- expand.grid(conc = exp(seq(log(0.01), log(100), length = 100)))
+# newdata <- expand(conc = )
 # predictions and confidence intervals
-pm <- predict(fitted_curve2, newdata = newdata, interval = "confidence")
+pm <- predict(fitted_curve, newdata = newdata, interval = "confidence")
 # new data with predictions
 newdata$p <- pm[, 1]
 newdata$pmin <- pm[, 2]
@@ -215,16 +165,32 @@ newdata$pmax <- pm[, 3]
 # plot curve
 library(ggplot2)
 # need to shift conc == 0 a bit up, otherwise there are problems with coord_trans
-ryegrass$conc0 <- ryegrass$conc
-ryegrass$conc0[ryegrass$conc0 == 0] <- 0.5
+d_long$conc0 <- d_long$drug_con
+# d_p$conc0 <- log(d_p$drug_con)
+d_long$conc0[d_long$conc0 == 0] <- 0.001
 # plotting the curve
-ggplot(ryegrass, aes(x = conc0, y = rootl)) +
-  geom_point() +
+ggplot(d_long, aes(x = conc0, y = response)) +
+  geom_point(size =3) +
   geom_ribbon(data = newdata, aes(x = conc, y = p, ymin = pmin, ymax = pmax), alpha = 0.2) +
   geom_line(data = newdata, aes(x = conc, y = p)) +
-  coord_trans(x = "log") +
-  xlab("Ferulic acid (mM)") +
-  ylab("Root length (cm)")
+  scale_x_log10() +
+  xlab("[Agonist], M") +
+  ylab("Response") +
+  scale_colour_manual(
+    values = c("#9FA3FE", "#00167B", "#9FA3FE")
+  ) +
+  ggnewscale::new_scale_colour() +
+  scale_colour_prism(
+    palette = "winter_bright",
+  ) +
+  scale_shape_prism() +
+  theme_prism(palette = "winter_bright", base_size = 16) +
+  theme(
+    axis.title.y = element_blank(),
+    legend.title = element_blank(),
+    legend.position = c(0.05, 0.95),
+    legend.justification = c(0.05, 0.95)
+  )
 ```
 
 
@@ -250,5 +216,55 @@ efficacy_metrics <- data.frame(c(E0, Einf, EC50, H, IC50))
 rownames(efficacy_metrics) <- c('E0', 'Einf', 'EC50', 'H', 'IC50')
 colnames(efficacy_metrics) <- 'Value'
 efficacy_metrics
+```
+
+
+```{r}
+dose_resp <- y ~ min + ((max - min) / (1 + exp(hill_coefficient * (ec50 - x))))
+
+d_p %>%
+  mutate(drug_con_log = log10(drug_con)) %>%
+  pivot_longer(
+    cols = -c(drug_con, drug_con_log, id, inhib_mean),
+    names_pattern = "(.{3})([0-9])",
+    names_to = c("treatment", "rep"),
+    values_to = "response"
+  ) %>%
+  ggplot(
+    aes(x = drug_con_log, y = response)
+  ) +
+  geom_smooth(
+    #aes(colour = treatment),
+    method = "nls", formula = dose_resp, se = FALSE,
+    method.args = list(start = list(
+      min = E0, max = Einf,
+      ec50 = EC50, hill_coefficient = H
+    ))
+  ) +
+  scale_colour_manual(
+    labels = c("Inhibitor"),
+    values = c("#00167B", "#9FA3FE")
+  ) +
+  ggnewscale::new_scale_colour() +
+  geom_point(size = 3) +
+  scale_colour_prism(
+    palette = "winter_bright",
+    labels = c(
+      "Inhibitor"
+    )
+  ) +
+  scale_shape_prism(
+    labels = c(
+      "Inhibitor"
+    )
+  ) +
+  theme_prism(palette = "winter_bright", base_size = 16) +
+  theme(
+    axis.title.y = element_blank(),
+    legend.title = element_blank(),
+    legend.position = c(0.05, 0.95),
+    legend.justification = c(0.05, 0.95)
+  ) +
+  labs(x = "[Agonist], M")
 ```
 
