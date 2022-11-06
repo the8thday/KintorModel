@@ -15,6 +15,8 @@ format: html
 复现常见的药物IC50计算和绘图.
 针对不同的实验设计，比如激动剂药物和拮抗剂药物，体外还是体内实验，严格来说体内实验是`dose-response curve`, 对于体外实验`concentration-response curve`是一个更为合适的称谓，不过一般宽泛的称为`dose-response`。
 
+CDC官网对四参数最低的data points数目要求为a minimum of five data points is required for parameter estimation。不过 查到的为ELISA数据，此处也是仅供参考。
+
 
 IC50 is the “half-maximal inhibitory concentration” for an entity (typically a drug) against a biological process or function (eg, enzyme activity, cell number, metabolic activity). 
 
