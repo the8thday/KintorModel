@@ -9,6 +9,8 @@ format: html
 > https://towardsdatascience.com/drug-dose-response-data-analysis-5d7d336ad8e9
 > https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_models_built-in_to_prism.htm
 > https://www.aatbio.com/tools/ic50-calculator
+> https://rstats4ag.org/dose-response-curves.html
+> http://www.darrenkoppel.com/2020/09/04/dose-response-modelling-and-model-selection-in-r/
 
 
 
@@ -36,6 +38,11 @@ Kd
 *four-parameter log-logistic model: * 四参数模型是较为常用的，除此之外还有三参数、五参数模型等。
 
   在对数据进行绘图时，一般会对X轴的浓度数据取log，而Y轴的response一般进行简单的线性转换，主要是保证that all scatter around the curve is Gaussian。
+  
+  
+*模型判断：*如何判断一个curve模型呢？`drc`包似乎没有提供类似Prism R2的结果。而且在非线性模型中，R2不再是线性模型中x对
+y的解释程度的那个数值，For nonlinear regression, the choice of a ‘null’ model is not as simple, and therefore the  
+R2 type measure will be different depending on the chosen reduced model.
 
 
 
@@ -114,7 +121,7 @@ fitted_curve2 <- drc::drm(
   formula = response ~ drug_con,
   data = d_long,
   # fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
-  fct = drc::MM.3()
+  fct = drc::LL.4(fixed = c(1,NA,NA,NA))
   )
 
 
@@ -123,6 +130,17 @@ summary(fitted_curve2)
 lmtest::coeftest(fitted_curve2, vcov = sandwich)
 # summary(multcomp::glht(ryegrass.LL.4)) # same result as above
 ```
+
+
+*模型验证*
+```{r}
+modelFit(fitted_curve2)
+
+# the correlation of the adjuste of the curve plotted and the data
+cor(d_long$response, fitted(fitted_curve2))
+```
+
+对于连续变量结局模型的评价，lack-of-fit的P值大于0.05表明模型还不错，不过Prism有提供R2值，目前`drc`包还没有找到计算R2的方法。
 
 
 计算ED值：
@@ -150,6 +168,21 @@ ic_50 <- with(
 
 ic_50
 ```
+
+
+*选择合适的model*
+
+```{r}
+
+mselect(fitted_curve, fctList = list(W1.3(fixed=c(NA, 100, NA)),
+                                     W1.4(), 
+                                     W2.3(fixed=c(NA, 100, NA)), 
+                                     W2.4(),
+                                     LL.4()),
+        linreg=TRUE) 
+```
+
+
 
 
 利用ggplot2绘制漂亮的图片：
@@ -270,25 +303,28 @@ d_p %>%
   labs(x = "[Agonist], M")
 ```
 
-
+绘制基于`ggplot2`的漂亮图片：
 
 ```{r}
 #plot_2
-p1 <- ggplot(data = ryegrass,
-       aes(x = conc, y = rootl)) + 
-  geom_point(col = "yellowgreen") + 
+p1 <- ggplot(data = d_long,
+       aes(x = drug_con, y = response)) + 
+  geom_point(col = "yellowgreen", size = 4) + 
   geom_smooth(method = drm,col = "skyblue", method.args = list(fct = L.4()), se = F) +
   scale_x_log10() +
-  labs(title= "", x = "Dose (mM)",  y = "Root length (cm)") + 
+  labs(title= "GT19637", 
+       x = "Dose (mM)",  y = "Inhibition") + 
+  # ggprism::theme_prism() +
   theme(legend.position = "",
         panel.background = element_blank(),
-        panel.border = element_rect(colour = "black", fill=NA, size=0),
+        panel.border = element_rect(colour = "black",fill = NA, size=0.5),
         panel.grid = element_blank(),
         axis.text.x   = element_text(size= 12, color = "darkblue",family = "sans",hjust = 0.5),
         axis.text.y   = element_text(size= 12, color = "darkblue",family = "sans",vjust = 0.5,hjust = 0.5),
         axis.title  = element_text(size=12, color = "darkred",family = "sans"),
         axis.ticks =  element_line(size= 0.5),
-        axis.ticks.length = unit(3, "pt"))
+        axis.ticks.length = unit(3, "pt")
+        )
 p1
 ```
 
@@ -296,27 +332,41 @@ p1
 绘制基于`ggplot2`的漂亮图片：
 
 ```{r}
-ryegrass_1 <- aggregate(ryegrass[1],list(conc = ryegrass$conc),FUN = mean)
-ryegrass_1$sd <- aggregate(ryegrass[1],list(conc = ryegrass$conc),FUN = sd)$rootl
-ryegrass_1
+data_1 <- aggregate(d_long["response"], list(conc = d_long$drug_con), FUN = mean)
+data_1$sd <- aggregate(d_long["response"], list(conc = d_long$drug_con), FUN = sd)$response
+ic50_value <- round(efficacy_metrics["EC50", ], 3)
 
 
-p2 <- ggplot(data = ryegrass_1,
-             aes(x = conc, y = rootl)) + 
-  geom_point(col = "red", size=3, shape=21, fill="green",position = "identity") + 
-  geom_errorbar(aes(ymin=rootl-sd, ymax=rootl+sd), width=.05,position = "identity")+
-  geom_smooth(method = drm,col = "skyblue", method.args = list(fct = L.4()), se = F) +
-  labs(title= "", x = "Dose (mM)",  y = "Root length (cm)") + 
-  theme(legend.position = "",
-        panel.background = element_blank(),
-        panel.border = element_rect(colour = "black", fill=NA, size=0),
-        panel.grid = element_blank(),
-        axis.text.x   = element_text(size= 12, color = "darkblue",family = "sans",hjust = 0.5),
-        axis.text.y   = element_text(size= 12, color = "darkblue",family = "sans",vjust = 0.5,hjust = 0.5),
-        axis.title  = element_text(size=12, color = "darkred",family = "sans"),
-        axis.ticks =  element_line(size= 0.5),
-        axis.ticks.length = unit(3, "pt")) +
-        scale_x_log10() 
+p2 <- ggplot(
+  data = data_1,
+  aes(x = conc, y = response)
+) +
+  geom_point(col = "red", size = 3, shape = 21, fill = "yellowgreen", position = "identity") +
+  geom_errorbar(aes(ymin = response - sd, ymax = response + sd), width = .05, position = "identity") +
+  geom_smooth(method = drm, col = "skyblue", method.args = list(fct = L.4()), se = F) +
+  scale_x_log10() +
+  ggplot2::annotate(
+    geom = "text", x = 0.2, y = 0.2, size = 8,
+    label = glue::glue("IC50 = {ic50_value}")
+  ) +
+  labs(
+    title = "GT19637",
+    x = "Log Drug Concentration(nM)", y = "Relative Cell viability"
+  ) +
+  theme(
+    legend.position = "",
+    panel.background = element_blank(),
+    # panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+    panel.grid = element_blank(),
+    axis.text.x = element_text(size = 12, color = "darkblue", family = "sans", hjust = 0.5),
+    axis.text.y = element_text(size = 12, color = "darkblue", family = "sans", vjust = 0.5, hjust = 0.5),
+    axis.title = element_text(size = 16, color = "darkred", family = "sans"),
+    axis.ticks = element_line(size = 1),
+    axis.line = element_line(size = 1),
+    axis.ticks.length = unit(3, "pt"),
+    plot.title = element_text(size = 20, colour = "black", hjust = 0.5, vjust = -1, face = "bold")
+  )
+
 p2
 ```
 
