@@ -129,6 +129,11 @@ summary(fitted_curve2)
 
 lmtest::coeftest(fitted_curve2, vcov = sandwich)
 # summary(multcomp::glht(ryegrass.LL.4)) # same result as above
+
+broom::tidy(fitted_curve2) %>% 
+  bind_cols(tibble(rowname = c('E0', 'Einf', 'EC50'))) %>% 
+  dplyr::relocate(rowname, everything()) %>% 
+  bind_cols(confint(fitted_curve2))
 ```
 
 
@@ -140,10 +145,11 @@ modelFit(fitted_curve2)
 cor(d_long$response, fitted(fitted_curve2))
 ```
 
-对于连续变量结局模型的评价，lack-of-fit的P值大于0.05表明模型还不错，不过Prism有提供R2值，目前`drc`包还没有找到计算R2的方法。
+对于连续变量结局模型的评价，lack-of-fit的P值大于0.05表明模型还不错，不过Prism有提供R2值，目前`drc`包还没有找到计算R2的方法。for lack-of-fit test (against a one-way ANOVA model): the larger (the p-value) the better. 
 
 
 计算ED值：
+Delta refers to the asymptotics-based method to calculate confident intervals. 
 
 ```{r}
 ED(fitted_curve2, c(5, 10, 50, 80), interval = "delta")
@@ -172,6 +178,8 @@ ic_50
 
 *选择合适的model*
 
+我们所使用的数据是和control组进行对比所得到的比值，是具有浓度为0的数据点，应该在计算IC50时带入，不过并没有必要对此要设置最大最小值的默认值，自己去计算E0，Einf是完全可行的。依据不同的实验设计选择不同的参数。
+
 ```{r}
 
 mselect(fitted_curve, fctList = list(W1.3(fixed=c(NA, 100, NA)),
@@ -185,7 +193,7 @@ mselect(fitted_curve, fctList = list(W1.3(fixed=c(NA, 100, NA)),
 
 
 
-利用ggplot2绘制漂亮的图片：
+### 利用ggplot2绘制漂亮的图片：
 
 ```{r}
 # new dose levels as support for the line
