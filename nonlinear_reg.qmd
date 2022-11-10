@@ -1,0 +1,159 @@
+---
+title: "nonlinear regression analysis"
+format: html
+---
+
+## nonlinear regression analysis
+
+> http://www.sthda.com/english/articles/40-regression-analysis/162-nonlinear-regression-essentials-in-r-polynomial-and-spline-regression-models/
+
+非线性模型是一系列模型的统称。在以前的笔记中所涉及到的GAM，splines, Polynomial 等都是非线性模型的应用。 GLMs也是将非线性的数据进行转换成线性而进行分析的。
+
+GAM应该可以直接代替多项式、spline等模型。
+
+
+1. Michaelis-Menten Regression model
+2. Generalized Additive Models
+3. loess (package ‘stats’)
+4. quantile regression (packages ’quantreg*’)
+5. segmented regression (segmented in package ‘segmented’)
+
+
+非线性回归中的convergence fails问题：
+Convergence problems in nonlinear models can be caused by many different reasons. These are a few of them:
+
+The model is not appropriate for the observed data (or viceversa)
+The model is conceptually correct but there is an error in the formula
+The model is too complex; a simpler model should be used
+The model is too simple; a more complex model should be used
+Starting values are too far from the solution
+
+
+
+```{r}
+library(nlraa)
+library(minpack.lm)
+library(nls2)
+```
+
+
+
+### base R
+
+`stats::nls()`函数中start
+
+```{r}
+stats::nls()
+```
+
+
+### Polynomial regression
+
+```{r}
+data("Boston", package = "MASS")
+
+training.samples <- Boston$medv %>%
+  caret::createDataPartition(p = 0.8, list = FALSE)
+train.data  <- Boston[training.samples, ]
+test.data <- Boston[-training.samples, ]
+
+
+lm(medv ~ lstat + I(lstat^2), data = train.data)
+lm(medv ~ poly(lstat, 2, raw = TRUE), data = train.data)
+
+
+
+```
+
+
+```{r}
+ggplot(train.data, aes(lstat, medv) ) +
+  geom_point() +
+  stat_smooth(method = lm, formula = y ~ poly(x, 5, raw = TRUE))
+```
+
+
+*Log transformation*
+
+```{r}
+# Build the model
+model <- lm(medv ~ log(lstat), data = train.data)
+# Make predictions
+predictions <- model %>% predict(test.data)
+# Model performance
+data.frame(
+  RMSE = RMSE(predictions, test.data$medv),
+  R2 = R2(predictions, test.data$medv)
+)
+
+
+ggplot(train.data, aes(lstat, medv) ) +
+  geom_point() +
+  stat_smooth(method = lm, formula = y ~ log(x))
+```
+
+
+### Spline regression
+
+
+
+```{r}
+library(splines)
+# Build the model
+knots <- quantile(train.data$lstat, p = c(0.25, 0.5, 0.75))
+model <- lm (medv ~ bs(lstat, knots = knots), data = train.data)
+# Make predictions
+predictions <- model %>% predict(test.data)
+# Model performance
+data.frame(
+  RMSE = RMSE(predictions, test.data$medv),
+  R2 = R2(predictions, test.data$medv)
+)
+```
+
+
+
+### self-starting functions
+
+```{r}
+library(nlraa)
+```
+
+
+不同于`stats::nls()`中的start参数需要自己提供, `stats`包还有
+
+1. Michaelis-Menten Model(SSmicmen)
+2. Asymptotic Regression Model (SSasymp)
+3. Four Parameter Logistic Model (SSfpl)
+4. Self-Starting First-Order Compartment Function (SSfol)
+5. Self-Starting Weibull Growth Function (SSweibull)
+6. SSlogis (Logistic)
+7. SSasympOff (Asymptotic with an offset)
+8. SSasympOrig (Asymptotic through the Origin)
+9. SSbiexp (Bi-exponential)
+10. SSfpl (Four parameter logistic)
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
