@@ -19,15 +19,15 @@ knitr::opts_chunk$set(echo = TRUE)
 本笔记主要记录较为完整的Cox回归模型和KM分析，其中对于Lasso-Cox、mixed-Cox等，详见*lasso_cox.Rmd*,
 *mixed_cox.Rmd*这两个笔记。
 
-生存分析所分析的数据特点为time-to-event数据，time总是from to
-end的，比如Time from response to recurrence
+生存分析所分析的数据特点为time-to-event数据，time总是from to end的，比如Time from response to recurrence
 这类最常见的数据，在面对此类数据时除了period需要考察外还需要考虑起始时间的特点，这一点在删失数据的各种分类更需注意。
-对于左删失和interval
-censor数据需要别的数据处理方法，此处主要讨论以右删失数据为主。
+对于左删失和interval censor数据需要别的数据处理方法，此处主要讨论以右删失数据为主。
+
+右删失数据是在实验结束之时，事件还没有发生，也不知道它啥时候发生，是比较常见的。
 
 ## cox regression
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 library(easystats)
 library(survival)
@@ -69,16 +69,45 @@ summary(mod_strata)
 
 ```
 
-变量筛选
+*对于Cox回归结果的解释：*P值和CI为此系数是否对模型具有影响,检验系数值是否为0。而coef或者exp(coef)为HR值，HR值等于1为变量中的因素之间没有差异，对于分类变量而言，sex解读为女性(2)比男性(1)降低了57%的风险；对于自变量为连续变量的数据而言，其值一般正值表示预后更差。 these results indicate that age makes a smaller contribution to the difference in the HR after adjusting for the ph.ecog values and patient’s sex, and only trend toward significance.holding the other covariates constant, an additional year of age induce daily hazard of death by a factor of exp(beta) = 1.01, or 1%, which is not a significant contribution.
+
+
+变量筛选:
 
 ```{r}
 # 提取模型estimate
-broom::tidy(mod, exp = TRUE)
+# 并转化成HR值
+broom::tidy(mod, 
+            exp = TRUE
+            )
 
 # 输出漂亮表格
 gtsummary::tbl_regression(mod, exp = T)
 
 ```
+
+
+
+
+*简答起见可以选择finalfit进行拟合*下面是一个示例：
+
+参考官方文档。
+
+```{r}
+melanoma = boot::melanoma
+
+dependent_os  <- "Surv(time, status_os)"
+dependent_dss <- "Surv(time, status_dss)"
+dependent_crr <- "Surv(time, status_crr)"
+explanatory   <- c("age", "sex", "thickness", "ulcer")
+
+melanoma %>% 
+    finalfit::finalfit(dependent_os, explanatory)
+```
+
+
+
+
 
 c-index以及校准曲线:
 c-index用于评估模型的区分度，可以理解为模型拟合后自身的区分能力。
@@ -270,8 +299,8 @@ ggplot(dca1,
 
 
 *多因素cox回归分析后的单因素的KM曲线*
-或者应该说是
-cofounder-adjusted expected survival probabilities, 不知此时是否还合适称之为KMplot.
+
+或者应该说是cofounder-adjusted expected survival probabilities, 不知此时是否还合适称之为KMplot.
 
 在混杂因素纳入模型后，聚焦的单一变量在一些文献中，也会绘制Adjusted Survival Curves. The `survfit` function estimates $S(t)$, by default at the mean values of the covariates:
 
@@ -324,6 +353,8 @@ anova(mod2, mod) #fist the reduced model, second the full model
 
 
 *KM plot*
+
+KM plot一个很重要的点在于，得有一个分类数据。
 
 ```{r}
 fit <- survfit(Surv(time, status==2) ~ sex, data = lung,
@@ -403,6 +434,8 @@ pp$plot <- pp$plot +
   scale_y_continuous(expand = c(0, 0))
 pp
 ```
+
+
 
 *Landmark分析：*如果随访的不同时间段间基础风险发生变化，需要分时间段分别分析。处理KM曲线交叉的情况.
 
