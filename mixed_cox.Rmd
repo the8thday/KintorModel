@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Mixed effects cox regression
 
+> https://stats.oarc.ucla.edu/r/dae/mixed-effects-cox-regression/
+
 Mixed effects cox regression models are used to model survival data when there
 are repeated measures on an individual, individuals nested within some other
 hierarchy, or some other reason to have both fixed and random effects
