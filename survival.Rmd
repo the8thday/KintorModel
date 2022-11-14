@@ -12,6 +12,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 # 生存分析的COX回归和KM分析
 
 <https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html>
@@ -25,6 +26,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 右删失数据是在实验结束之时，事件还没有发生，也不知道它啥时候发生，是比较常见的。
 
+任何数据分析，统计分析，开始都需要对数据进行探索和清洗，此处暂且略过。
+
 ## cox regression
 
 ```{r, include=FALSE}
@@ -35,10 +38,11 @@ library(survminer) # for KM plot
 library(riskRegression)
 library(rms)
 library(gtsummary) # for beautiful table
+library(ggsurvfit) # recomend use survfit2
 ```
 
-建模. 对于cox回归其实质同线性回归;
-需要满足等比例假设，对于不满足的自变量采用分层分析的方法。
+建模. 对于cox回归其实质同线性回归;cox回归需要满足等比例假设，对于不满足的自变量采用分层分析的方法。
+
 _对于因子变量_应如何纳入到具体的模型中呢？对于设置成factor的因子R中模型常见的处理方式是将其自动设置为dummy变量。就像`model.matrix(~ 0 + factor(ph.ecog), lung)`
 
 ```{r}
@@ -94,7 +98,7 @@ gtsummary::tbl_regression(mod, exp = T)
 参考官方文档。
 
 ```{r}
-melanoma = boot::melanoma
+# melanoma = boot::melanoma
 
 dependent_os  <- "Surv(time, status_os)"
 dependent_dss <- "Surv(time, status_dss)"
@@ -103,10 +107,11 @@ explanatory   <- c("age", "sex", "thickness", "ulcer")
 
 melanoma %>% 
     finalfit::finalfit(dependent_os, explanatory)
+
+
+melanoma %>% 
+    hr_plot(dependent_os, explanatory)
 ```
-
-
-
 
 
 c-index以及校准曲线:
@@ -352,7 +357,7 @@ anova(mod2, mod) #fist the reduced model, second the full model
 
 
 
-*KM plot*
+## *KM plot*
 
 KM plot一个很重要的点在于，得有一个分类数据。
 
@@ -436,6 +441,34 @@ pp
 ```
 
 
+*此处增加一个ggsurvfit包的示例*
+
+此包推荐拟合时用其包装好的survfit2函数;
+`CDISC ADaM ADTTE`推荐的数据格式中，1竟然是censored。。。无语。。需要注意。。。   
+
+```{r}
+fit2 <- survfit2(Surv(time, status==2) ~ sex, data = lung,
+               conf.int = 0.95,
+               se.fit = TRUE
+               )
+
+fit2 %>% 
+  ggsurvfit::ggsurvfit() +
+  add_confidence_interval() +
+  add_risktable() +
+  add_quantile(y_value = 0.6, color = "gray50", size = 0.75) +
+  scale_color_manual(values = c('#54738E', '#82AC7C')) +
+  scale_fill_manual(values = c('#54738E', '#82AC7C')) +
+  add_pvalue(caption = "Log-rank {p.value}") +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(ncol = 1)) +
+  labs(title = "KM plot",
+       y = "Percentage Survival")
+```
+
+
+
+
 
 *Landmark分析：*如果随访的不同时间段间基础风险发生变化，需要分时间段分别分析。处理KM曲线交叉的情况.
 
@@ -469,7 +502,7 @@ p3 <- jskm(fit,
 
 ```
 
-### Random Forests Model for survival
+## Random Forests Model for survival
 
 ```{r}
 # ranger model
