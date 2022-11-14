@@ -529,3 +529,74 @@ plot(r_fit$unique.death.times,r_fit$survival[1,],
      main = "Patient Survival Curves")
 
 ```
+
+
+
+## Parametric Survival Analysis
+
+> https://github.com/FJRubio67/ShortCourseParamSurvival
+> https://rpubs.com/FJRubio/PSM
+> https://rpubs.com/FJRubio/PSRM
+
+
+two regression models: PH(the proportional hazards) and AFT(accelerated failure time).
+
+By selecting a parametric from the catalogue of distributions, we are making assumptions about the possible hazard rates of the true distribution. Selecting the best model using formal tools is usually recommended.
+对于参数类的生存分析，需要选择所使用的参数方法。
+
+- Weibull, Lognormal, and Generalised Gamma.(没有太看明白，难道不能加协变量吗？)
+- PH
+- AFT
+- General Hazard (GH) model
+
+
+
+```{r}
+library(flexsurv) # 此包提供诸多参数类的拟合
+library(eha)
+
+```
+
+类似的三个模型是？
+
+```{r}
+# Survival model using a Weibull distribution
+fit.weibull <- flexsurvreg(formula = Surv(time, status) ~ 1, data = lung,
+                           dist = "weibull")
+
+fit.weibull
+```
+
+
+
+```{r}
+# AFT model using a lognormal baseline distribution
+fit.aft <- eha::aftreg(formula = Surv(time, status) ~ age + sex, data = lung,
+                         dist = "lognormal" # 此处参数可以选择weibull等
+                         )
+
+summary(fit.aft)
+
+# PH model using a lognormal baseline distribution
+fit.ph <- eha::phreg(formula = Surv(time, status) ~ age + sex , data = lung,
+                dist = "lognormal")
+
+summary(fit.ph)
+```
+
+
+```{r}
+# Comparison of the three models using AIC
+AIC.aft <- -2*(fit.aft$loglik[2]) + 2*length(fit.aft$coefficients)
+AIC.ph <- -2*(fit.ph$loglik[2]) + 2*length(fit.ph$coefficients)
+
+AIC.aft
+AIC.ph
+```
+
+
+
+
+
+
+
