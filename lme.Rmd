@@ -98,6 +98,28 @@ lme模型和gee.Rmd中的示例为同一数据，我们在只考虑随机截距�
 
 
 ```{r}
+sjPlot::tab_model(lme_model,
+                  p.val = "kr", # kr 方法计算的p值更为精准
+                  show.df = TRUE
+                  )
+
+gtsummary::tbl_regression(lme_model,
+                          intercept = TRUE
+                          )
+```
+
+
+```{r}
+VarCorr(lme_model)
+
+# 可重复性
+# 如果你得到的重复性小于1.0，那么个体内测量结果之间的变化来源是什么。仅是测量误差吗？
+216.0^2/(216.0^2 + 417.9^2)
+```
+
+
+
+```{r}
 test_performance(lme_model, lme_model2)
 
 compare_performance(lme_model, lme_model2)
@@ -127,8 +149,7 @@ anova(lme_model)
 # to see all 134 models
 # coef(lme_model)
 
-plot(ggemmeans(lme_model, terms = c("time", "class"), 
-               condition = c(diagnose = "severe"))) + 
+plot(ggemmeans(lme_model, terms = c("time", "class"))) + 
   ggplot2::ggtitle("GLMER Effect plot")
 ```
 
