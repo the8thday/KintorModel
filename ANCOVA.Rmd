@@ -242,7 +242,7 @@ pred_data %>%
 
 estimate the relationship between the response and the two predictors.
 
-三组用药组的diffW24都随着W1D1的增加有下降的趋势，可以考虑在入组时患者
+三组用药组的diffW24都随着W1D1的增加有下降的趋势，可以考虑在入组时患者screen期的数据不要太大。
 
 ```{r}
 predicted <- estimate_expectation(aov_res, data = "grid")
