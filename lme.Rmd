@@ -10,8 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## linear mixed effect model
-https://m-clark.github.io/mixed-models-with-R/random_intercepts.html
-https://poissonisfish.com/2017/12/11/linear-mixed-effect-models-in-r/
+
+> https://m-clark.github.io/mixed-models-with-R/random_intercepts.html
+> https://poissonisfish.com/2017/12/11/linear-mixed-effect-models-in-r/
+> https://bbolker.github.io/mixedmodels-misc/
+
 
 对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
 
@@ -268,3 +271,73 @@ compare_performance(lme_model, glme_model)
 
 plot(compare_performance(lme_model, glme_model))
 ```
+
+
+
+## lme by tidymodels
+
+tidymodels 有提供一系列的统计模型的方法，这是基于R生态的优势之所在。但`tidymodels`一贯的以预测作为模型的主要目的，而在我们的分析中，很多时候模型是作为解释自变量对因变量的影响而展开的。
+
+multilevelmod包支持的模型还是极为广泛的。不过如果只是作为一个模型拟合的过程，似乎没有必要用到tidymodels，毕竟一个模型的拟合所涉及到的各种自变量的问题，是一个需要循环往复的过程，模型的诊断、对比、选择、解释等等才是分析时需要大量考虑的事情。
+
+下面仅在tidymodel的框架下复现一个线性混合模型的应用：
+
+```{r, include=FALSE}
+
+library(tidyverse)
+library(tidymodels)
+library(multilevelmod)
+library(broom.mixed)
+
+tidymodels_prefer()
+theme_set(theme_bw())
+```
+
+
+```{r, include=FALSE}
+df <- read_csv('~/OneDrive/kintor/Daily_Work/US30001_COVID/lme_data.csv')
+```
+
+
+GEE模型
+```{r}
+gee_spec <- 
+  linear_reg() %>% 
+  set_engine("gee", corstr = "exchangeable")
+```
+
+
+MME模型
+```{r}
+lmer_spec <- 
+  linear_reg() %>% 
+  set_engine("lmer")
+
+lmer_fit <- 
+  lmer_spec %>% 
+  fit(LOGCHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE + (1 | SUBJID), data = df)
+
+lmer_fit
+```
+
+`parsnip`类一般包含有模型自身的一些信息
+```{r}
+lmer_fit %>% extract_fit_engine() %>% 
+  summary()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
