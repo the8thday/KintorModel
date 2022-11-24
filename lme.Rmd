@@ -23,7 +23,7 @@ knitr::opts_chunk$set(echo = TRUE)
 线性混合模型的应用较多，此处只针对医学研究中常见的重复测量数据分析。
 
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 library(easystats)
 library(lme4)
@@ -36,18 +36,29 @@ library(emmeans)
 
 ## use lmer
 
-https://ase.tufts.edu/bugs/guide/assets/mixed_model_guide.html
+> https://ase.tufts.edu/bugs/guide/assets/mixed_model_guide.html
+
 首先是检验数据因变量的概率分布，在这一点上似乎和广义线性模型相似，线性混合模型需要因变量满足正态性.
 如果不符合正态性检验，需选择正确的建模方法，比如penalized quasilikelihood (PQL) 、Laplace approximation and Markov chain Monte Carlo algorithms (MCMC).
 
+PQL is a flexible technique that can deal with non-normal data, unbalanced design, and crossed random effects. However, it produces biased estimates if your response variable fits a discrete count distribution, like Poisson or binomial, and the mean is less than 5 - or if your response variable is binary.
+
+The Laplace approximation can handle up to 3 random effects.Any more than that, and you'll have to use MCMC, which is a Bayesian method that can be somewhat confusing.
+
+the Laplace approximation is a special case of a parameter estimation method called Gauss-Hermite quadrature (GHQ), with one iteration. GHQ is more accurate than Laplace due to repeated iterations, but becomes less flexible after the first iteration, so you can only use it for one random effect. 
+
 不过通过performance::check_models似乎更安全 ，不确定此处的正态性检验是对因变量还是残差。   
 
-除此之外，对于outlier等数据的处理，
+除此之外，对于outlier等数据的处理，NA值的处理等。
 
 ```{r}
 df2 <- readRDS('./datasets/df2.rds')
 
 car::qqPlot(df2$score)
+car::qqp(log(df2$score))
+car::qqp(df2$score, 'lnorm')
+# 可以看到数据不是很符合正态分布，但符合正态分布在实际中不是一件简单的事情，差不多就可以。
+# 像本次数据的分布有些过于不符合了
 ```
 
 寻找最佳随机效应结构,找到了模型最好的随机效应结构，接下来我们就给模型加入固定效应。
@@ -58,28 +69,30 @@ REML estimation is unbiased but does not allow for comparing models with differe
 
 所以在进行效应选择的时候，用ML算法。
 
-
+*随机效应的选择*
 ```{r}
-nullmodel1 <- lmer( score ~ 1 + (1|PatientID), data = df2, REML=FALSE)
-nullmodel2 <- lmer( score ~ 1 + (1 + class |PatientID), data = df2, REML=FALSE)
-nullmodel3 <- lmer( score ~ 1 + (1 + class * time |PatientID), data = df2, REML=FALSE)
+nullmodel1 <- lme4::lmer(score ~ 1 + (1|PatientID), data = df2, REML=FALSE)
+nullmodel2 <- lme4::lmer( score ~ 1 + (1 + class |PatientID), data = df2, REML=FALSE)
+nullmodel3 <- lme4::lmer( score ~ 1 + (1 + time |PatientID), data = df2, REML=FALSE)
+
 anova (nullmodel1, nullmodel2) #  基于LRT比的模型间的对比，同时还考虑模型的AIC/BIC/
 ```
 
 ```{r}
-test_performance(nullmodel1, nullmodel3)
+test_performance(nullmodel1, nullmodel2)
 
-compare_performance(nullmodel1, nullmodel3)
+compare_performance(nullmodel1, nullmodel2) |> plot()
 ```
 
 
 上面的结果可以看到，nullmodel1有较好的指标，所以只选择随机intersect即可，不用考虑其他变量的随机slope。
 
-假如固定效应
+固定效应的纳入，一般结合具体问题和样本量进行取舍。变量的纳入参考10人1⃣️变量。
 
 ```{r}
 # https://rpubs.com/rslbliss/r_mlm_ws#:~:text=To%20run%20a%20multilevel%20linear,we%20have%20used%20thus%20far.&text=Note%20that%20R%20uses%20restricted%20maximum%20likelihood%20to%20fit%20the%20model.
 # same df2 data as in gee.Rmd
+
 # 以入组后的2次测量值为因变量， 以处理效应、时间效应等为固定效应， 以不同病人作为随机效
 lme_model <- 
   lmerTest::lmer(score ~ time + class + AGE + (1|`PatientID`),
@@ -91,6 +104,7 @@ lme_model2 <-
   lme4::lmer(score ~ time * class + AGE + (0 + class |`PatientID`),
              data = df2
              )
+
 lme_model3 <- update(lme_model2, .~.-AGE)
 # To keep the intercept fixed while keeping the random slope, replace the “1” with a “0”
 ```
@@ -127,7 +141,7 @@ Estimates of Covariance Parameters:
 对随机截距进行检验, 简单理解为不同观察者Y指标初始值之间的差异具有显著统计学意义。
 
 ```{r}
-lmerTest::ranova(lme_res)
+lmerTest::ranova(lme_model)
 ```
 
 
@@ -135,8 +149,13 @@ lmerTest::ranova(lme_res)
 ```{r}
 test_performance(lme_model, lme_model2)
 
-compare_performance(lme_model, lme_model2)
+compare_performance(lme_model, lme_model2) |> plot()
 ```
+
+```{r}
+check_model(lme_model)
+```
+
 
 Group-level Effects
 
@@ -247,7 +266,24 @@ performance::performance(lme_model)
 parameters::parameters(lme_model)
 ```
 
-*use glmer 广义混合模型*, glmer可以用于处理因变量为分类数据，即是*Multilevel logistic models*
+
+对模型计算effectsize时得到的是Standardization的结果？
+
+```{r}
+effectsize::effectsize(lme_model)
+```
+
+
+
+
+
+
+*use glmer 广义混合模型*
+
+glmer可以用于处理因变量为分类的数据，即是*Multilevel logistic models*，以及种种其他不符合正态分布的因变量数据。
+
+对log转换后的数据进行符合正态分布的线性分析并不是一件值得去做的事情。
+The reason we want to use a GLMM for this is that if we imagine a stastical method as E(x), E(ln(x)) is not the same as ln(E(x)). 
 
 ```{r}
 glme_model <- 
@@ -299,6 +335,13 @@ df <- read_csv('~/OneDrive/kintor/Daily_Work/US30001_COVID/lme_data.csv')
 ```
 
 
+```{r}
+car::qqp(df$LOGCHG, 'norm')
+
+car::qqPlot(df$LOGCHG, 'lnorm')
+```
+
+
 GEE模型
 ```{r}
 gee_spec <- 
@@ -327,11 +370,46 @@ lmer_fit %>% extract_fit_engine() %>%
 ```
 
 
+*上图的分布提醒我们终然log后的数据，其也呈现出非正态分布的倾向，那么对原始数据AVAL直接进行广义混合模型似乎是一件更为合理的事情 ：*
+
+`MASS::glmmPQL`是对`nlme::lme`的封装，继承`lme`类。
+
+```{r}
+car::qqp(df$CHG, 'lnorm')
+
+car::qqp(log10(df$CHG), 'norm')
+```
 
 
+```{r}
+PQL_m <- MASS::glmmPQL(fixed = CHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE,
+                       random = ~ 1| SUBJID,
+                       family = gaussian(link = "log"),
+                       data = df
+                       )
+```
+
+```{r}
+GHQ <- lme4::glmer(LOGCHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE + (1 | SUBJID), 
+             data = df,
+             family = gaussian(link = "log"), 
+             nAGQ = 1
+             )  # Set nAGQ to # of desired iterations, =1就是 Laplace approximation
+```
 
 
+one R structure needs to be specified for each fixed effect and one G structure needs to be specified for each random effect.
 
+```{r}
+require(MCMCglmm)
+```
+
+
+```{r}
+plot(fitted(lme_model), residuals(lme_model), xlab = "Fitted Values", ylab = "Residuals")
+abline(h = 0, lty = 2)
+lines(smooth.spline(fitted(lme_model), residuals(lme_model)))
+```
 
 
 
