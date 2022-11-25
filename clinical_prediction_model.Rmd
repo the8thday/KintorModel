@@ -19,13 +19,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 模型的区分度指标是指对于一个模型本身区分或者说预测outcome的准确度，混淆矩阵/AUC/NRI/IDI等就是常用的指标，但是校准曲线是看待结局实际发生的概率和预测的概率的一致性，其calibration refers to the agreement between the estimated and the "true" risk of an outcome关注点在于每一个预测，在回归模型中容易理解，现举一个在分类问题中的例子：比如在逻辑回归中通过0.5来判断二分类的是与否，但每一个样本其实是有对应分类发生的概率的，而这些个体实际上发生的概率（比如10个人中有几个人是患病的）这样的的一个散点图就是校准曲线，看待的是二者的一致性，自然图的解读就是对角线为好。这的重点在于某种风险发生的具体的概率，可以通过Hosmer-Lemeshow检验得到统计检验。
 
-决策曲线关注的是净收益和阈概率（ThresholdProbability）之间的关系，比如说我们在预测一个阳性患者后还需要考虑假如 我们预测的是假阳性可能对患者的损害，我们希望自己做出来的预测模型在临床使用中，在任何时候依照模型结果进行干预净受益都比默认的好（最常见的默认情况就是全干预和全不干预）。`In brief, decision curve analysis calculates a clinical “net benefit” for one or more prediction models or diagnostic tests in comparison to default strategies of treating all or no patients.`阈概率（Threshold Probability），表示的是只有病人的预测概率超过这个阈概率，干预才有受益， 才值得干预。
+决策曲线关注的是净收益和阈概率（Threshold Probability）之间的关系，比如说我们在预测一个阳性患者后还需要考虑假如 我们预测的是假阳性可能对患者的损害，我们希望自己做出来的预测模型在临床使用中，在任何时候依照模型结果进行干预净受益都比默认的好（最常见的默认情况就是全干预和全不干预）。`In brief, decision curve analysis calculates a clinical “net benefit” for one or more prediction models or diagnostic tests in comparison to default strategies of treating all or no patients.`阈概率（Threshold Probability），表示的是只有病人的预测概率超过这个阈概率，干预才有受益， 才值得干预。
 
 下面以一个示例记录详细的建模过程。
 
 所使用数据集为Hosmer研究的对低体重新生儿具有影响的因素。变量为二分类变量，考虑采用逻辑回归。 探索影响新生儿体重的独立影响因素。
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 library(easystats)
 library(rms)
@@ -43,10 +43,11 @@ get_logistic_pred = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) 
 1.  混杂因素的矫正
 2.  临床中一些变量终然在单变量回归中没有达到统计p值，也应该纳入最终的多因素模型中，基于临床专业知识的变量纳入是最为基本的考量
 3.  常见的先单因素再多因素的方法（在统计效能不足时）
-4.  一个单变量至少有20个有效样本量
+4.  一个单变量至少有10-20个有效样本量
 5.  在临床模型的构建上，变量筛选时应考虑一些统计方法同时还需要考虑具体的数据大小等。
 6.  对于连续变量可以考虑各种分类变量变化；对于等级资料设定dummy变量，比上同一个level；对于无序多分类变量设置dummy
-7.  dummy 变量设置后在模型解释上，可以突出其所比对的reference。除了`ifelse`之外还可以用R包`fastDummies`以及base包里的`model.matrix`函数。建立模型时什么时候需要用到dummy变量呢，
+7.  dummy 变量设置后在模型解释上，可以突出其所比对的reference。除了`ifelse`之外还可以用R包`fastDummies`以及base包里的`model.matrix`函数。建立模型时什么时候需要用到dummy变量呢，在R中对于factor变量会自动dummy的。
+
 
 ```{r}
 # 一个生成dummy变量的示例
@@ -64,7 +65,7 @@ dummies <- df %>%
 
 
 ```{r}
-# 读入带label的SPSS数据对于下游的一些分析会带来麻烦，此处待解决
+# 读入带label的SPSS数据对于下游的一些分析会带来麻烦，此时可以用labeled包进行处理
 df1 <- haven::read_sav('./datasets/Lowweight.sav')
 # df1 <- foreign::read.spss('./datasets/Lowweight.sav') %>% as.data.frame()
 
@@ -80,15 +81,17 @@ df1
 
 ```
 
-### rms
+### rms包的应用
 
 利用**rms**包展开分析，此包提供了多种对于回归模型的包装函数。包括拟合、区分度分析、校准曲线、nomogram等。
+适合临床中的种种应用。
 
 ```{r}
 # 为防止影响下游分析将每一列进行类型转换
-df1 <- df1 %>% 
-  mutate(across(everything(), as.numeric)) %>% 
-  as.data.frame()
+# 忘记了当时为何要全部转为数字了，但应该是错误的，在R中指定因子还是重要的
+# df1 <- df1 %>% 
+#   mutate(across(everything(), as.numeric)) %>% 
+#   as.data.frame()
 
 attach(df1)
 dd <- datadist(df1)
@@ -101,11 +104,19 @@ fit1 <- rms::lrm(formula = low ~ age+ftv+ht+lwt+ptl+smoke+ui+race1+race2,
 
 fit1
 
+
+```
+
+```{r}
 # 以下为rms包所提供的一些方便的功能
 plot(anova(fit1), what='proportion chisq') # relative importance
+
 plot(Predict(fit1, fun=plogis)) # predicted values
+
 rms::validate(fit1, method="boot", B=500) # bootstrapped validation
+
 vif(fit1) # test for multicolinearity
+
 Predict(fit1)
 
 # penalty <- pentrace(mod1, penalty=c(0.5,1,2,3,4,6,8,12,16,24), maxit=25)
@@ -113,6 +124,8 @@ Predict(fit1)
 # effective.df(mod1_pen)
 # mod1_pen
 ```
+
+
 
 *模型检验* 在建模时需要检验模型是否满足其对应的assumption，比如对于线性回归模型应满足LINE，对于Cox回归应该满足等风险比例，对于逻辑回归其outcome应该是分类变量、残差符合正态分布等。
 
@@ -131,7 +144,9 @@ performance::performance(fit1)
 
 Calibration plot and Hosmer-Lemeshow goodness-of-fit test assess calibration.Calibration is the agreement between observed outcomes and model's prediction.
 
-对于下图的解读：三条线分别为，Ideal线为 n=189 Mean absolute error=0.037 Mean squared error=0.00177 0.9 Quantile of absolute error=0.057
+对于下图的解读：三条线分别为，Ideal线为 n=189,Mean absolute error=0.037 Mean squared error=0.00177 0.9 Quantile of absolute error=0.057
+
+
 
 ```{r}
 cal1 <- rms::calibrate(fit = fit1, method = 'boot',
@@ -158,10 +173,12 @@ ROC/AUC
 library(ROCR)
 
 
-df1$predvalue <- predict(fit1)
+df1$predvalue <- predict(fit1, type = 'fitted')
 
-pred <- ROCR::prediction(df1$predvalue, df1$low)
-perf <- performance(pred,
+pred <- ROCR::prediction(predictions = df1$predvalue, 
+                         labels = df1$low)
+
+perf <- ROCR::performance(pred,
                     measure = "tpr",
                     x.measure = "fpr")
 plot(perf, colorize=TRUE,
@@ -172,7 +189,7 @@ plot(perf,
      lty=3,
      col="grey78",
      add=TRUE)
-auc <- performance(pred,"auc")
+auc <- ROCR::performance(pred,"auc")
 auc@y.values
 
 # for C-statistic, fit1的输出中已经包含有c-index的值，此处尝试加上置信区间
@@ -182,7 +199,11 @@ Hmisc::somers2(df1$predvalue, df1$low)
 对于ROC曲线的分析似乎`pROC`是一个不错的选择。下面以`pROC`作为示例：
 
 ```{r}
+library(pROC)
 
+roc_score<- roc(df1$low, df1$predvalue, ci = TRUE) #AUC score
+
+plot(roc_score ,main ="ROC curve -- Logistic Regression ")
 ```
 
 *nomogram*
@@ -220,7 +241,7 @@ fit2
 
 *DCA*
 
-在R中做DCA曲线的有`ggDCA`, `rmda`等R包，但似乎都差些意思。需要一个更好更强大的R包。 DCA曲线的解读如上文所述，看我们得到的模型是不是比All干预时所有的净收益都要好，如图可以看到模型整体的净收益都比all曲线的净收益要好。 评估模型的临床效用。
+在R中做DCA曲线的有`ggDCA`, `rmda`等R包，但似乎都差些意思。需要一个更好更强大的R包。 DCA曲线的解读如上文所述，看我们得到的模型是不是比All干预时所有的净收益都要好，如图可以看到模型整体的净收益都比all曲线的净收益要好。 评估模型的临床效用，可以的出结论此模型在 临床应用中会有较好的应用。
 
 ```{r}
 library(ggDCA)
@@ -283,20 +304,63 @@ nricens::nribin(mdl.std = logistic.model.list[["fit1"]],
 
 
 
-## use glm
+## use glm()
+
+逻辑回归需要满足几个假设条件，
+
+`stats`包`glm`的应用：
 
 ```{r}
-model_glm <- glm(low ~ age + ftv + ht + lwt + ptl + smoke + 
-     ui + race1 + race2, data = df1, family = "binomial")
-
-predict(model_glm)  # 默认predict为predict.glm, type为on the scale of the linear predictors
-predict(model_glm, type = 'response')
-
+df1 <- df1 %>% 
+  # labelled::remove_labels() %>% 
+  as_tibble() %>% 
+  mutate(race = factor(race),
+         across(c(ht, ptl, smoke, ui), as.factor)
+         # ftv = factor(ftv)
+         )
 ```
 
 
 ```{r}
-### 马修斯相关系数, matthews correlation coefficient
+model_glm <- stats::glm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race1 + race2, 
+                        data = df1, family = "binomial")
+
+model_glm2 <- glm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race, 
+                  data = df1, family = "binomial")
+
+# predict(model_glm)  # 默认predict为predict.glm, type为on the scale of the linear predictors
+# predict(model_glm, type = 'response')
+
+```
+
+```{r, eval=FALSE}
+summary(model_glm)
+```
+
+```{r}
+check_collinearity(model_glm) %>% 
+  print_md()
+
+# check_normality(model_glm) %>%
+#   print_md()
+
+DHARMa::testDispersion(model_glm)
+```
+
+
+```{r}
+# 计算相关参数
+# 逻辑回归默认predict返回的为其的log odds值，
+log_odds <- predict(model_glm)
+odds <- exp(log_odds)
+probabilities <- plogis(log_odds)
+odds_ratio <- exp(coef(model_glm))
+```
+
+
+```{r}
+### 马修斯相关系数, matthews correlation coefficient(phi coefficient)
+# 此指数用于指定模型预测的忧度
 Logistic_Predictions = predict(model_glm, type = 'response')
 Logistic_Predictions_binomial=ifelse(Logistic_Predictions>0.5,1,0)
 con_Logistic <- caret::confusionMatrix(factor(Logistic_Predictions_binomial), factor(df1$low))
@@ -322,32 +386,57 @@ yardstick::mcc(con_Logistic$table)
 
 ```{r}
 # assumption
+# 奇怪以前是支持glm类的呀。。搞半天似乎是我自己模型的问题。。。在经过不断debug后，竟然是vst不能设置成因子
+# m1 <- stats::glm(vs ~ wt + disp, data = mtcars, family = 'binomial')
+# m2 <- stats::glm(low ~ age + ftv, data = df1, family = "binomial")
 performance::check_model(model_glm)
 
 # 模型整体的表现
 performance::performance(model_glm)
+
+
+result <- binned_residuals(model_glm)
+plot(result)
+
+check_collinearity(model_glm) |> plot()
+
+check_outliers(model_glm) %>% plot(., type = "dots")
+
+check_normality(model_glm) %>% plot(., type = "qq")
+
+check_posterior_predictions(model_glm)
 ```
 
+The default predictions are on the scale of the log odds. These predictions are also available through the type = "link", type= 'response' probability scale.
 
 ```{r}
 model_glm_pred <- ifelse(predict(model_glm, type = "link") > 0, "Yes", "No")
 
-train_tab = table(predicted = model_glm_pred, actual = default_trn$default)
+train_tab = table(predicted = model_glm_pred, actual = df1$low)
 
 train_con_mat = caret::confusionMatrix(train_tab, positive = "Yes")
+
 c(train_con_mat$overall["Accuracy"], 
   train_con_mat$byClass["Sensitivity"], 
   train_con_mat$byClass["Specificity"])
 
-get_logistic_error(model_glm, data = default_trn, 
+get_logistic_error(model_glm, data = df1, 
                    res = "default", pos = "Yes", neg = "No", cut = 0.5)
 ```
 
 
+
 ```{r}
 library(pROC)
-test_prob = predict(model_glm, newdata = default_tst, type = "response")
-test_roc = roc(default_tst$default ~ test_prob, plot = TRUE, print.auc = TRUE)
+
+test_prob <- predict(model_glm, newdata = df1, type = "response")
+
+test_roc <- roc(df1$low ~ test_prob, plot = TRUE, print.auc = TRUE)
+```
+
+
+```{r}
+performance_roc(model, new_data = test_data)
 ```
 
 
@@ -355,9 +444,36 @@ To perform multinomial logistic regression, we use the multinom function from th
 
 ```{r}
 library(nnet)
+
 model_multi = multinom(Species ~ ., data = iris_trn, trace = FALSE)
 summary(model_multi)$coefficients
 
 head(predict(model_multi, newdata = iris_trn, type = "prob"))
 ```
+
+
+```{r}
+visreg::visreg(model_glm)
+```
+
+
+```{r}
+modelbased::estimate_means(model_glm2, at = c('race'))
+```
+
+
+```{r}
+modelbased::estimate_slopes(model_glm)
+```
+
+
+
+
+```{r}
+model_gamm <- mgcv::gamm(low ~ s(age) + ftv + ht)
+```
+
+
+
+
 
