@@ -16,6 +16,9 @@ knitr::opts_chunk$set(echo = TRUE)
 主要关注点在于 计算标准化回归系数。
 同时还会加上：Nomogram，森林图，校准曲线，DCA曲线等预测模型常见的内容。
 
+回归模型的一大特点便是其具有a one-unit change in x has the same effect on Y regardless of what the other terms in the model are.
+contrast plots和conditional plots的异同点在于？conditional plot是在考虑其他所有term的情况下展示某一term的方法， 一般其他term set to their median if the term is numberic or the most common category if the term is a factor. contrast plot 是对单位变化的绘制。
+
 所用数据为`lasso_model.Rmd`中的office数据集。
 
 标准化回归系数，是指消除了因变量和自变量所取单位的影响之后的回归系数，其绝对值的大小直接反映了自变量对因变量的影响程度。标准化回归系数的比较结果只是适用于某一特定环境的，而不是绝对正确的，它可能因时因地而变化。
@@ -71,14 +74,109 @@ sjPlot::plot_model(lreg,
 
 
 # 给出各个变量的标准化回归系数
-sjPlot::tab_model(lreg)
+sjPlot::tab_model(lreg, show.std = 'std')
 
 ```
 
+模型变量的重要性。
 
 ```{r}
 vip::vi(lreg)
 ```
+
+
+*通过线性模型理解dummy变量和contrast*
+
+在R中分类变量会被R默认设置为dummy变量。
+
+
+```{r}
+df2 <- readRDS('./datasets/df2.rds')
+
+
+lm_fit <- lm(
+  score ~ time,
+  data = df2
+)
+```
+
+```{r}
+tapply(df2$score, df2$time, mean)
+```
+
+
+_手动设置分类变量的编码形式_
+
+> https://stats.oarc.ucla.edu/r/library/r-library-contrast-coding-systems-for-categorical-variables/
+
+`stats::contr.XX`提供了很多contrast的方法。
+
+不同的编码方式会影响分类变量的回归系数值。不过contrast应该不会变的吧？对于一个有分类变量的回归模型而言，其的方程式为相较于reference的变化，连续变量为每改变一个单位因变量的改变。
+
+```{r, eval=FALSE}
+# Don't run!!!
+contrasts(df2$time)
+
+# 设置完成后df2数据并不会发生变化，但是在后续的模型构建中会采用不同的编码方式
+contrasts(df2$time) <- contr.treatment(3) # 依据因子的level数量设置
+
+
+# 设置简单编码simple code
+# 简单编码的Intercept为总的平均值tapply(df2$score, df2$time, mean) |> mean()
+sim.code <- contr.treatment(3) - matrix(rep(1/3, 6), ncol=2)
+# contrasts(df2$time) <- sim.code
+
+
+# Deviation coding
+contrasts(df2$time) <- contr.sum(3)
+
+# Orthogonal Polynomial Coding
+# 正交多项式编码一般用于有序分类变量，R默认对有序分类采用此编码方式
+is.ordered(df2$time)
+as.ordered(df2$time)
+contrasts(df2$time) <- contr.poly(3)
+
+
+# Helmert Coding, Reverse Helmert Coding
+# Helmert Coding比较的是当前类别下的因变量平均值和后面的类别的因变量平均值。
+# 和Helmert Coding刚好完全相反，每一个类别和它前面的类别比较。
+# R中提供了contr.helmert，可以进行Reverse Helmert Coding：
+contr.helmert(3)
+
+
+# Forward Difference Coding/Backward Difference Coding
+# 这种编码方式比较的是当前类别的因变量均值和它相邻的下一个类别的因变量均值；这种编码方式和前一种刚好相反，比较的是当前类别和它相邻的前一个类别的因变量均值。
+# 在R中没有对应的函数，但是上面链接有提供
+
+```
+
+```{r}
+lm_fit <- lm(
+  score ~ time,
+  data = df2
+)
+```
+
+
+```{r}
+summary(lm_fit)
+```
+*interpret* 在一个简单的线性模型中，time这一分类变量会自动变成dummy变量，Intercept的Estimate值为612.26，和因变量按照分类变量计算的均值中的Day0（即reference）均值是一样的，且-147.26=465.0000-612.2597，-64.70=547.5584-612.2597，以此类推。既是讲对于分类变量而言模型的系数为分组变量减去reference后的值。
+
+
+*对于纳入了一个协变量的线性模型而言：*
+
+```{r}
+lm_fit2 <- lm(
+  score ~ time + AGE,
+  data = df2
+)
+
+summary(lm_fit2)
+```
+
+*interpret* 模型分类变量的Estimate值和lm_fit1的是保持一致的，但是Intercept截距的值变成了529.597，这是在纳入AGE协变量后的取值。
+
 
 
 regplot绘制列线图
