@@ -63,7 +63,8 @@ summary(mod) # Concordance 即是c-index
 (z <- cox.zph(mod))
 ggcoxzph(z)
 
-# 下面为分层分析后的变量，以下暂不考虑
+# 下面为分层分析后的变量，以下暂不考虑，此处只做一个记录
+# 
 mod_strata <- coxph(Surv(time, status)~age + sex + ph.ecog + strata(ph.karno) + meal.cal + wt.loss, 
              data = lung, 
              y=TRUE, 
@@ -73,7 +74,55 @@ summary(mod_strata)
 
 ```
 
+```{r}
+#ggcoxdiagnostics(fit, type = "schoenfeld")
+plot(z[3])
+abline(0,0, col="red") # 0水平线
+abline(h=mod$coef[3], col="green", lwd=2, lty=2) 
+```
+
+
 *对于Cox回归结果的解释：*P值和CI为此系数是否对模型具有影响,检验系数值是否为0。而coef或者exp(coef)为HR值，HR值等于1为变量中的因素之间没有差异，对于分类变量而言，sex解读为女性(2)比男性(1)降低了57%的风险；对于自变量为连续变量的数据而言，其值一般正值表示预后更差。 these results indicate that age makes a smaller contribution to the difference in the HR after adjusting for the ph.ecog values and patient’s sex, and only trend toward significance.holding the other covariates constant, an additional year of age induce daily hazard of death by a factor of exp(beta) = 1.01, or 1%, which is not a significant contribution.
+
+
+*对于不满足等比例假设的另一种方法：*
+
+上文有看到别人对某一变量进行strata分层，此处再介绍两种。对于这个主题本笔记还需进一步的整理。
+
+处理不满足等比例假设的方式中对数据进行分层，以及对数据进行转换：
+
+```{r}
+# 通过对不符合PH假设的变量，即时依变量随时间变化的分层节点进行分层
+# 此函数提供的是将整个数据集进行分层
+# 以下survival包中的示例表明按照karno变量进行分层
+
+vet2 <- survival::survSplit(Surv(time, status) ~ ., 
+                    data= veteran, 
+                    cut=c(60, 120), # 依据具体的变化情况设置分段的拐点
+                    episode= "timegroup", 
+                    id="id" # add an identifier
+                    )
+
+fit2 <- coxph(Surv(tstart, time, status) ~ karno* strata(timegroup) +
+                age + trt, data= vet2)
+
+c(overall= coef(fit1)[1],
+  t0_60  = coef(fit2)[1],
+  t60_120= sum(coef(fit2)[c(1,4)]),
+  t120   = sum(coef(fit2)[c(1,5)]))
+
+cox.zph(fit2)
+
+```
+
+对数据进行转换
+```{r}
+fit3 <- coxph(Surv(time, status) ~ trt + prior + karno + tt(karno), # 对karno进行变换
+              data = veteran, 
+              tt = function(x, t, ...) x * log(t+20) # 具体变换方式
+              )
+fit3
+```
 
 
 变量筛选:
