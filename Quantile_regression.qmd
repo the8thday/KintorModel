@@ -1,0 +1,65 @@
+---
+title: "Quantile regression"
+format: html
+---
+
+## Quantile regression
+
+分位数回归（Quantile regression, QR回归)，其原理是将数据按因变量进行拆分成多个分位数点，研究不同分位点情况下时的回归影响关系情况。
+
+中位数回归的估计方法与最小二乘法相比，估计结果对离群值（极值）则表现的更加稳健.
+分位数回归对误差项不要求“误差项呈正态分布”。因此对于非正态分布而言，分位数回归系数 估计量则更加稳健。
+
+
+
+
+```{r}
+library(easystats)
+library(quantreg)
+```
+
+
+```{r}
+# Model: Quantile Regression
+Quan_fit <- quantreg::rq(disp ~ wt, data = mtcars, 
+                         tau = 0.5 # f分为数
+                         )
+Quan_fit
+  
+# Summary of Model
+summary(Quan_fit)
+
+```
+
+
+```{r}
+# Plot
+plot(disp ~ wt, data = mtcars, pch = 16, main = "Plot")
+abline(lm(disp ~ wt, data = mtcars), col = "red", lty = 2)
+abline(rq(disp ~ wt, data = mtcars), col = "blue", lty = 2)
+```
+
+
+```{r}
+require(ggplot2)
+
+#create scatterplot with quantile regression line
+ggplot(mtcars, aes(wt,disp)) +
+  geom_point() + 
+  geom_abline(intercept=coef(Quan_fit)[1], slope=coef(Quan_fit)[2]) +
+  geom_smooth(method="lm", se=F)
+```
+
+
+```{r}
+performance::performance(Quan_fit)
+```
+
+
+
+```{r}
+
+```
+
+
+
