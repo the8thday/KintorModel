@@ -13,6 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 探索性数据的分布和缺失值的分布是较为常规的操作，一个优秀的R包会加快这个过程。现就几个R包进行一些探索性操作的笔记。
 
+有时，解释缺失值出现的原因可能很简单，比如，可能是由于记录不全，各种意外等，但实现这一解释的过程可能并不简单，而且可能需要比开发探索性数据分析和模型所需的更多时间。
+
+
 ```{r}
 library(dlookr) # 数据探索的包
 # library(SmartEDA)
@@ -25,7 +28,59 @@ library(naniar) # NA值的统计、绘图等
 ```
 
 
-`dlookr`是一个帮助进行数据探索的包。
+### `naniar`可以可视化NA值，并提供其他的一系列函数统计NA值的分布数目等
+
+不过也只是一种可视化的手段，其提供的按照NA值存在与否看待其他变量分布的手段是很实用的。以及利用NA值建模也可以提供一种分析NA值的手段，不过为什么那么多warning而不改正呢。。
+
+```{r}
+# 二者的结果一致, 同一个作者
+naniar::vis_miss(airquality)
+
+visdat::vis_miss(airquality)
+```
+
+`naniar`中较为好用的一个方法是，其在进行ggplot2的绘图时，不会删掉NA值：
+
+```{r}
+ggplot(airquality, 
+       aes(x = Solar.R, 
+           y = Ozone)) + 
+  naniar::geom_miss_point()
+```
+
+展示NA值缺失的数量：
+
+```{r}
+gg_miss_var(airquality)
+```
+
+`naniar`所提供的NA shadow的操作，对于不大的数据集而言，是一个很好的可视化的数据来源，其还可以整合`simputation`包的impute结果：图中两个颜色的散点
+
+```{r}
+airquality %>% 
+  naniar::nabular() %>% 
+  as.data.frame() %>% 
+  simputation::impute_lm(Ozone ~ Temp + Wind) %>% 
+  ggplot(aes(x = Temp,
+             y = Ozone,
+             colour = Ozone_NA)) + 
+  geom_point()
+```
+
+*对NA值建模：*
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+airquality %>%
+  add_prop_miss() %>%
+  rpart(prop_miss_all ~ ., data = .) %>%
+  prp(type = 4, extra = 101, prefix = "Prop. Miss = ")
+```
+
+
+### `dlookr`是一个帮助进行数据探索的包。
 
 对于数据诊断和数据探索都提供了方便的函数。
 
@@ -88,15 +143,6 @@ find_skewness(flights)
 
 
 
-`naniar`可以可视化NA值，不过也只是一种可视化的手段，其提供的按照NA值存在与否看待其他变量分布的手段是很实用的。
-
-```{r}
-# 二者的结果一致, 同一个作者
-naniar::vis_miss(airquality)
-
-visdat::vis_miss(airquality)
-```
-
 ```{r}
 gg_miss_var(airquality)
 
@@ -134,6 +180,19 @@ airquality %>%
 
 ## fill NA
 
+> https://data.library.virginia.edu/getting-started-with-multiple-imputation-in-r/
+
+Missing Data Assumptions
+Rubin (1976) classified types of missing data in three categories: MCAR, MAR, MNAR
+
+MCAR: Missing Completely at Random – the reason for the missingness of data points are at random, meaning that the pattern of missing values is uncorrelated with the structure of the data. An example would be a random sample taken from the population: data on some people will be missing, but it will be at random since everyone had the same chance of being included in the sample.
+
+MAR: Missing at Random – the missingness is not completely random, but the propensity of missingness depends on the observed data, not the missing data. An example would be a survey respondent choosing not to answer a question on income because they believe the privacy of personal information. As seen in this case, the missing value for income can be predicted by looking at the answers for the personal information question.
+
+MNAR: Missing Not at Random – the missing is not random, it correlates with unobservable characteristics unknown to a researcher. An example would be social desirability bias in survey – where respondents with certain characteristics we can’t observe systematically shy away from answering questions on racial issues.
+
+All multiple imputation techniques start with the MAR assumption. While MCAR is desirable, in general it is unrealistic for the data. Thus, researchers make the assumption that missing values can be replaced by predictions derived by the observable portion of the dataset. This is a fundamental assumption to make, otherwise we wouldn’t be able to predict plausible values of missing data points from the observed data.
+
 impute NA value.
 选择合适的impute NA的方法。
 
@@ -141,13 +200,20 @@ impute NA value.
 下面记录一下`mice`包用于多重插补。当你认为数据是MCAR或MAR，并且缺失数据问题非常复杂时，多重插补将是一个非常实用方法。
 
 
-```{r}
+```{r, include=FALSE}
 library(mde)
 library(mice)
+library(ggmice)
+# library(miceadds)
 library(VIM) # visualization of missing and imputed values
-# library(simputation)
+library(simputation) # 此包在简化缺失值插补的流程，提供了统一的使用语法，提供多种常见的插补缺失值的方法，可以和管道符%>%连用
 
 ```
+
+
+### VIM
+
+use VIM package for plot.
 
 ```{r}
 data(sleep, package="VIM")
@@ -173,7 +239,9 @@ col=c("darkgray", "red", "blue"))
 ```
 
 
-`mice`包
+### `mice`包提供多重插补方法
+
+具体使用和对应的概念参考其文档。8个Vignettes的内容着实详实。
 
 mice 包的插补分析过程：
 library(mice)
@@ -190,21 +258,136 @@ summary(pooled)
 
 
 
-将多重插补法应用到 sleep 数据集，如下所示
+将多重插补法应用到 sleep 数据集，如下所示，在m=1时既是插补一次，这和下文的`simputation`所提供的应该是一只的。
 
 ```{r}
-imp <- mice(sleep, seed=1234)
-fit <- with(imp, lm(Dream ~ Span + Gest))
-pooled <- pool(fit)
+# 多重插补
+# ?mice 中有详细描述其所支持的method方法
+imp <- mice(sleep, seed=42, m = 5, method = 'pmm',
+            print=F
+            )
+# attributes(imp)
+
+imp_data <- mice::complete(imp, action = 1L) # ?complete
+
+fit <- with(imp, lm(Dream ~ Span + Gest)) # 对impute后的数据集进行你所想要的分析
+pooled <- pool(fit) # 将多次建模的结果整合在一起
 
 summary(pooled)
+
+```
+
+
+
+可以看到默认是其他的所用变量用来impute具有NA值的变量。
+怎么按照自身的先验知识选择列呢？
+```{r}
+imp$pred
+
+ini <- mice(nhanes, maxit=0, print=F)
+pred <- ini$pred
+pred
+pred[ ,"hyp"] <- 0 # 删掉不想要的列
+imp <- mice(nhanes, pred=pred, print=F)
+```
+
+```{r}
+plot(imp)
+```
+
+Change the imputation method
+
+这种语法也太麻烦了点吧。。。
+
+```{r}
+ini <- mice(nhanes2, maxit = 0)
+meth <- ini$meth
+meth
+
+meth["bmi"] <- "norm"
+meth
+
+imp <- mice(nhanes2, meth = meth, print=F)
+```
+
+
+
+```{r}
+mice::D3()
+```
+
+
+```{r}
+ggmice::ggmice(boys, aes(age, bmi)) +
+  geom_point()
+
+ggmice(imp, aes(age, bmi)) + geom_point()
 ```
 
 
 
 
+### `simputation`提供的填充方法易于使用，不知是否有多重插补的方法。
+
+Ad Hoc imputation methods
+
+使用`simputation`简化填补的流程：
+
+基于模型的方法:
+
+线性回归
+稳健线性回归
+岭回归/弹性网络/lasso回归
+CART模型（决策树）
+随机森林
+多元插补
+
+基于最大期望值的方法:
+missForest
+Donor imputation (including various donor pool specifications)
+
+K最近邻法:
+sequential hotdeck (LOCF, NOCB)
+random hotdeck
+Predictive mean matching
+其他
+
+median imputation:
+Proxy imputation: 使用其他列的值或使用简单的转换得到的值.
+Apply trained models for imputation purposes.
 
 
+*提供的函数：*
+impute_rlm: robust linear model
+impute_en: ridge/elasticnet/lasso
+impute_cart: CART
+impute_rf: random forest
+impute_rhd: random hot deck
+impute_shd: sequential hot deck
+impute_knn: k nearest neighbours
+impute_mf: missForest
+impute_em: mv-normal
+impute_const: 用一个固定值插补
+impute_lm: linear regression
+impute_pmm: Hot-deck imputation
+impute_median: 均值插补
+impute_proxy: 自定义公式插补，可以用均值等
+
+```{r}
+#
+
+dat1 <- simputation::impute_lm(sleep, 
+                               Dream ~ Span + Gest)
+
+```
+
+此处Dream的第4个值还是NA，这是因为Span这一列的第3个值是NA导致的，线性回归不能插补这样的缺失值。可以采用其他的方法进行impute。
+
+
+使用一个固定值进行插补:
+```{r}
+impute_const(sleep, Dream ~ 7)
+```
 
 
 
