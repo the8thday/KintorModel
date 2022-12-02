@@ -11,18 +11,41 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 非线性混合效应模型
 
-非线性混合模型（nonlinear mixed effect model）是
+> http://sia.webpopix.org/nlme.html
 
-```{r}
+
+非线性混合模型（nonlinear mixed effect model）是非线性模型的扩展。非线性模型我们是熟悉的，包括常见的多项式回归和GAM 等模型。非线性混合模型是指一个或多个coefficients出现非线性的情况。在处理重复测量数据（Longitudinal data）时，亦可扩展到此方法 的应用。
+
+广义混合效应模型是广义线性模型的扩展。They also inherit from GLMs the idea of extending linear mixed models to non-normal data.
+
+
+
+
+
+
+
+```{r, include=FALSE}
+# 首先是找到好用的R包
+
+library(tidyverse)
 library(nlme)
 library(lme4)
 library(saemix)
 library(ggPMX)
+library(minpack.lm)
+
+# for nonlinear mixed effects models
+library(nlmixr2)
+library(rxode2)
 ```
+
+
+### nlme包的线性混合模型
 
 ```{r}
 # 线性混合模型，visual0作为协变量
 data(armd, package="nlmeU")
+
 lme1 <- lme(
   visual ~ visual0 + time + treat.f,
   random = ~ 1 | subject,
@@ -43,16 +66,21 @@ lme2.ml <- update(lme2, method="ML")
 anova(lme1.ml, lme2.ml)
 ```
 
-#### 开始非线性混合模型
 
-http://sia.webpopix.org/nlme.html
-首先似乎其在药代动力学中应用较多，遂采用一个药代动力学的数据集
+
+### 开始非线性混合模型
+
+> http://sia.webpopix.org/nlme.html
+
+首先似乎其在药代动力学中应用较多，遂采用一个药代动力学的数据集:
 
 ```{r}
 # Find all rows where "DV"==NA and replace the 0 in "MDV" with 1
 # Find all rows where "DV"==NA and replace the 0 in "AMT" with the "DOSE" of that row
 data(Theoph, package ='datasets')
 
+
+# The 12 subjects received 320 mg of theophylline at time 0.
 theophylline <- structure(list(ID = c(1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 
 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 3L, 3L, 3L, 3L, 
 3L, 3L, 3L, 3L, 3L, 3L, 3L, 4L, 4L, 4L, 4L, 4L, 4L, 4L, 4L, 4L, 
@@ -126,18 +154,27 @@ theophylline <- structure(list(ID = c(1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L,
 -132L), class = "data.frame")
 ```
 
+
 #### use saemix for nlme
-https://jchiquet.github.io/MAP566/docs/mixed-models/map566-lecture-nonlinear-mixed-model.html
+
+> https://jchiquet.github.io/MAP566/docs/mixed-models/map566-lecture-nonlinear-mixed-model.html
+
+`saemix`的语法和`nlme`, `lme4`包的语法差别较大，其更像是结构方程模型的语法。
 
 _concentration_ is the response variable y, _time_ is the explanatory variable (or predictor) t and _id_ is the grouping variable
+
+此包在当前目录下所生成的newdir目下有每个样本随时间变化曲线图和所有样本随时间变化的曲线。
 
 ```{r}
 # 创建data
 saemix_data <- saemixData(name.data       = Theoph,
                           name.group      = "Subject",
-                          name.predictors = "Time",
-                          name.response   = "conc")
+                          name.predictors = "Time", # predictor
+                          name.response   = "conc" # response
+                          )
 
+# structural model
+# 先吸收后排出的过程
 model1_nlme <- function(psi,id,x) {
   D   <- 320
   t   <- x[,1]
@@ -148,28 +185,138 @@ model1_nlme <- function(psi,id,x) {
   fpred
 }
 
+# structural model和initial值的选择和设定应该是PK模型的重点
+# psi0: initial estimates of the fixed parameters 
 saemix_model <- saemixModel(model = model1_nlme,
-                            psi0  = c(ka=1,V=20,ke=0.5))
+                            psi0  = c(ka=1,V=20,ke=0.5),
+                            modeltype = "structural",
+                            error.model = 'constant'
+                            )
 
-saemix_options <- list(map=TRUE, fim=TRUE, ll.is=FALSE, displayProgress=FALSE, save=FALSE, seed=632545)
-saemix_fit1    <- saemix(saemix_model, saemix_data, saemix_options)
+
+saemix_options <- list(map=TRUE, fim=TRUE, ll.is=FALSE, 
+                       displayProgress=FALSE, save=FALSE, seed=632545
+                       )
+
+# fit model
+saemix_fit1 <- saemix(saemix_model, saemix_data, saemix_options)
 
 saemix_fit1@results
 ```
+
+*interpret the results: *
+
+
+
+`psi`函数所返回的是，每一个样本的参数：
+structural model里的参数，
+
 ```{r}
 # The individual parameters estimates are also available
 psi <- psi(saemix_fit1)
 psi
+
+```
+
+
+```{r}
 
 # These individual parameter estimates can be used for computing and plotting individual predictions
 saemix_fit <- saemix.predict(saemix_fit1)
 saemix.plot.fits(saemix_fit1)
 
 ```
-### use lme4 for nlme
+
+
+模型诊断：
+
+the observations versus individual predictions:
+
+结果最好能在一条对角线。
+
+```{r}
+saemix.plot.obsvspred(saemix_fit1,level=1)
+```
+
+the residuals versus time, and versus individual predictions，
+
+残差的分布最好在置信区间内。
+
+```{r}
+saemix.plot.scatterresiduals(saemix_fit1, level=1)
+```
+
+
+
+
+#### use lme4 for nlme
+
+首先查看数据的focus变量（感兴趣的一半是因变量）随不同时期采样的变化。
+the concentration first increases during the absorption phase adn then decreases during the elimination phase.
+每一个个体都呈现PK模型的数据特点，而混合模型可以考虑inter individual variability，既是population approach
+
+```{r}
+theme_set(theme_bw())
+
+pl <- ggplot(data=theophylline, aes(x=TIME, y=DV)) + 
+  geom_point(color="#993399", size=2) +
+  xlab("time (h)") + ylab("concentration (mg/l)")
+
+pl +geom_line(color="#993399", aes(group=ID))
+```
+
+Fitting a nonlinear model to a single subject
+
+```{r}
+theo1 <- theophylline[theophylline$ID==1 ,c("TIME","DV")]
+```
+
+```{r}
+pk.model1 <- function(psi, t) {
+  D <- 320
+  ka <- psi[1]
+  V <- psi[2]
+  ke <- psi[3]
+  f <- D * ka / V / (ka - ke) * (exp(-ke * t) - exp(-ka * t))
+  return(f)
+}
+
+pkm1 <- nlme::nls(DV ~ pk.model1(psi, TIME), start = list(psi = c(ka = 1, V = 40, ke = 0.1)), 
+            data = theo1
+            )
+coef(pkm1)
+```
+
+
+`pkm.all`模型因为没有考虑样本间的
+
+```{r}
+pkm.all <- nlme::nls(concentration ~ pk.model1(psi, time), 
+                     start=list(psi=c(ka=1, V=40, ke=0.1)), data=theo.data)
+coef(pkm.all)
+```
+
+Fitting a unique nonlinear model to several subjects
+
+```{r}
+pl1 <- ggplot(data=theo1, aes(x=time,y=concentration)) + geom_point( color="#993399", size=3) + 
+  xlab("time (h)") + ylab("concentration (mg/l)") + ylim(c(0,11))
+pl1 + geom_line(color="#993399")
+```
+
+
+```{r}
+new.df$pred.all <- predict(pkm.all, newdata=new.df)
+pl +  geom_line(data=new.df, aes(x=time,y=pred.all), colour="#339900", size=1)
+```
+
 
 ```{r}
 
 ```
+
+
+
+
 
 
