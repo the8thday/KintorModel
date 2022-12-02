@@ -5,31 +5,75 @@ date: "1/12/2022"
 output: pdf_document
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## pharmacokinetics modelling by R
-http://sia.webpopix.org/pharmacokinetics.html
-Once a drug is administered, we usually describe subsequent processes within the organism by the pharmacokinetics (PK) process known as ADME: absorption, distribution, metabolism, excretion.
 
-```{r}
+## pharmacokinetics modelling by R
+
+> http://sia.webpopix.org/pharmacokinetics.html
+> http://sia.webpopix.org/nlme.html
+> 熟悉nlmixr2包的文档
+> https://www.pkpd-info.com/PK_introduction.php
+
+
+Once a drug is administered, we usually describe subsequent processes within the organism by the pharmacokinetics (PK) process known as ADME: absorption, distribution, metabolism, excretion.
+具体的关于PK的一些描述可以参见第四个链接。
+
+将人体简化为depot compartment。PK compartment models assume that drug concentration is perfectly homogeneous in each compartment of the body at all times. 
+
+PK models do not describe how a drug is administered. Administered doses are source terms, i.e., inputs that dynamically modify the state of a system. This is important to note because it means that the same PK model can be used for different dose regimens.
+
+ordinary differential equations (ODEs):
+
+PK模型有很多，但非线性混合模型是PK建模中常用的模型。下面以一个测试数据集进行初步的学习，此处做一笔记。
+
+k : rate constants (kinetic) --> movement from 'x' to 'y'
+Ka: absorption constant
+Vc: distribution compartment (central)
+Q: rate constant between Vc and Vp
+Vp: distribution compartment (periph.)
+CL: elimination constant (clearance)
+Described by differential equations of change in compartment (A) over time (T): dA/dT
+
+```{r, include=FALSE}
 # library(saemix)
-library(nlmixr)
+# library(nlmixr) # 主要学习的R包，不过和2的版本不兼容，二者先library一个
+library(nlmixr2)
+library(rxode2)
 library(ggPMX)
 # library(ubiquity)
+library(PKNCA)
+library(xpose)
+
+# library('nonmem2R')
+
 ```
 
+
 ### single-dose
- fitting a simple one-compartment PK model 
+
+ fitting a simple one-compartment PK model use `nlmixr2` package.
+ 
+ one-compartment指的是，
+ 
+ 下面的模型中，和在使用`saemix`包时是一致的，包括模型和起始值。`nlmixr2`包的语法和ini的命名系统是模仿的NONMEM软件。在ini中设置值时一般的是一个值，或者三个值（c(lower, est, upper)）,`~`是方差或相关性，`<-`是参数赋值,`#`后面的内容是 label的内容会在Parameter展现，也可以用label函数。
+ 
+ 
+其中，model部分的意思是：A mathematical model which best describes the data
+
+theo_sd是常见的theophylline数据集。在`nlmixr2`中数据
 
 ```{r}
+#  ordinary differential equations (ODEs) model
 one.compartment.saem <- function() {
     ini({
         tka <- .5   # Log Ka
         tcl <- -3.2 # Log Cl
         tv <- -1    # Log V
-        eta.ka ~ 1
+        eta.ka ~ 1 ## BSV Ka
         eta.cl ~ 2
         eta.v ~ 1
         add.err <- 0.1 # residual variability
@@ -45,19 +89,65 @@ one.compartment.saem <- function() {
     })
 }
 
-fit <- nlmixr(one.compartment.saem, theo_sd, est="saem")
+# 数据集相关的变量啥也不用指定吗？？
+fit <- nlmixr2(one.compartment.saem, 
+               data = theo_sd, 
+               est="saem" # nlmixr2est::nlmixr2AllEst()
+               )
 
+```
+
+```{r}
 print(fit)
 ```
+
+
+base
 
 ```{r}
 plot(fit)
 ```
+
+除上述通过`base`包得到的诊断图之外，还提供了`xpose`包的使用，`xpose`包是aims to reduce the post processing burden and improve diagnostics commonly associated the development of non-linear mixed effect models.
+
+```{r}
+library(xpose.nlmixr2)
+
+xpdb <- xpose_data_nlmixr(fit) # 此object可以使用xpose包的函数
+
+xpose::dv_vs_ipred(xpdb)
+```
+
+
+
+
+
+
 
 本文主要从处方前研究、剂型开发、食物效应、预测人体药代动力学以及仿制药的生物等效性研究等方面介绍了PBPK 建模在药剂学领域中的应用
 
 ```{r}
 
 ```
+
+
+
+
+### use PKNCA 包
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
