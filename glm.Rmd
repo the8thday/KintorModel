@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include=FALSE}
 library(easystats)
 library(glmnet)
 library(glm2)
@@ -21,8 +21,14 @@ library(emmeans)
 
 ## interpret glm results
 
+> https://biologyforfun.wordpress.com/2014/04/08/interpreting-interaction-coefficient-in-r-part1-lm/
+
+
+广义线性模型是指一类，
+
+
 ```{r}
-df2 <- readRDS('./df2.rds')
+df2 <- readRDS('./datasets/df2.rds')
 
 glm_model <- glm(
   formula = score ~ time * class + AGE,
@@ -31,16 +37,29 @@ glm_model <- glm(
 )
 
 summary(glm_model)
-anova(glm_model)
+
 ```
 
-**interpret the results:** 首先是Coefficients, 可以看到，对于这批次数据而言，lme/gee的结果极为类似
+**interpret the results:** 首先是Coefficients, 可以看到，对于这批次数据而言，lme/gee的结果极为类似.
+
+带有交互作用的解释：Intercept值为532.929，score值在timeDay0和class0这二者分类变量的baseline值。timeDay 1, score 对比baseline增加 94.286 在Day==1以及class==0等在control时。以此类推。timeDay 1:class1，class ==1、在timeDay1时score值 相比于class==1、timeDay0减少了-332，既是timeday==1、class==0时score增加的94.286，在timeday==1，class==1时score值变化为532.929-4.761+ 94.286-332.125.
+
+在多个covariates的多重线性回归中，定量变量的解释是在其他定量变量constant的情况下其每改变一个单位，因变量改变的值，而不用去考虑分类变量是否为control，处于哪个组都可以。
+
+
+```{r}
+anova(glm_model)
+```
+*结果解读：*
+
 
 ## interpret lm results
 
+对于线性回归还是适合用`lm`函数。
+
 ```{r}
 # 线性回归需要符合LINE条件，其在临床预测模型和诊断模型. 模型自身的评价标准和对test数据集的评价
-# 线性模型里面能用*号吗？按照模型的定义应该是不可以的。
+# 线性模型里面能用*号吗？按照模型的定义应该是不可以的。因为这样便引入了交互项、共线性？
 
 lm_fit <- lm(
   score ~ class*time + AGE,
@@ -48,11 +67,73 @@ lm_fit <- lm(
 )
 
 summary(lm_fit)
-anova(lm_fit)
+
 ```
 
 *interpret results:* Residuals指的是模型的每一个预测值和真实值间的差值，通过`summary(df2$score-lm_fit$fitted.values)`可以得到类似的结果. 在利用QQplot图观察时，可以进一步分析模型在两端的预测情况。Coefficients中Estimate指的是在利用诸如最小二乘法估计最小离差平方和得到的slope和intercept，再加入交互效应时，SE可以用来计算estimate的CI（比如1.96*SE+—）,而且一般而言SE大于estimate值，其P值一般没有意义。t值为Estimate/SE。P值为系数为0的概率，比如我们可以说class0的timeDay7在模型中是有意义的变量, class1没有统计学意义，则样本在两分组中没有差异。Residual standard error指的是残差的均值(the average amount that the actual values of Y (the dots) differ from the predictions (the line) in units of Y. In general, we want the smallest residual standard error possible, because that means our model’s prediction line is very close to the actual values, on average)。对于R2, multiple 一般用于简单线性模型，adjusted一般用于多变量模型。F-statistic和p-value是模型整体假设检验，可以理解为其null假设为模型的所有系数都是0。
 在线性回归中，对于简单的一元线性回归，t检验值和F检验值是一样的，在多元线性回归中F检验假设模型整体。
+
+
+```{r}
+anova(lm_fit) # anova的结果为Type II tests
+
+car::Anova(lm_fit, type = 'III')
+```
+
+*结果解读：*anova对线性模型的分析是计算，其结果中p值小于0.05的一般认为是对模型有贡献的变量。
+
+
+conditional plot, 在其他因素保持不变的情况下，某一变量在
+
+```{r}
+visreg::visreg(lm_fit, xvar = 'class', by = 'time', type = 'conditional')
+```
+
+```{r}
+modelbased::estimate_contrasts(lm_fit, contrast = c("class", "time"))
+```
+
+
+```{r}
+modelbased::estimate_means(lm_fit, at = c("time", 'class'))
+
+ggeffects::ggemmeans(lm_fit, terms = c("time", 'class')) |> plot()
+```
+对于分类变量一般会计算emmeans，其是指在矫正了其他变量
+
+
+```{r}
+modelbased::estimate_slopes(lm_fit)
+```
+针对一般线性模型中的连续变量，
+
+
+
+标准化回归系数对比不同自变量对因变量的影响：
+一般线性回归模型的效应值就是其std.coeff.
+
+```{r}
+sjPlot::plot_model(lm_fit,
+           type = "std",      # 计算标准化回归系数
+           sort.est = TRUE,    # 进行排序
+           show.values = TRUE,  # 显示数值
+           show.p = TRUE,     # 显示p值
+           value.offset = 0.2,  # 调整数值的位置
+           vline.color = "gray",    # 修改穿越0的线条颜色
+           title = "Summary of the regression model")    # 添加题目
+
+# effectsize::effectsize(lm_fit)
+```
+
+
+
+
+```{r}
+lm_fit2 <- lm(
+  score ~ class + time + AGE,
+  data = df2
+)
+```
 
 
 ## by glmnet
