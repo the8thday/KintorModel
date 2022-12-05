@@ -17,6 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 > http://sia.webpopix.org/nlme.html
 > 熟悉nlmixr2包的文档
 > https://www.pkpd-info.com/PK_introduction.php
+> http://opensource.nibr.com/xgx/index.html
 
 
 Once a drug is administered, we usually describe subsequent processes within the organism by the pharmacokinetics (PK) process known as ADME: absorption, distribution, metabolism, excretion.
@@ -38,17 +39,23 @@ Vp: distribution compartment (periph.)
 CL: elimination constant (clearance)
 Described by differential equations of change in compartment (A) over time (T): dA/dT
 
+对于非线性混合效应模型，The system will support but not be limited to the following estimation methods:
+FO, FOI, FOCE, FOCEI, Laplacian, Lindstrom and Bates, MCMC, MCPEM,
+SAEM, Gaussian quadrature, and nonparametric methods。
+
 ```{r, include=FALSE}
 # library(saemix)
 # library(nlmixr) # 主要学习的R包，不过和2的版本不兼容，二者先library一个
-library(nlmixr2)
+library(nlmixr2) # 目前看起来是一个整合了多种nlme的包
 library(rxode2)
+library(nlmixr2data)
 library(ggPMX)
 # library(ubiquity)
 library(PKNCA)
 library(xpose)
 
 # library('nonmem2R')
+library(xgxr) # 诺华 提供的一个探索性R包
 
 ```
 
@@ -64,7 +71,10 @@ library(xpose)
  
 其中，model部分的意思是：A mathematical model which best describes the data
 
-theo_sd是常见的theophylline数据集。在`nlmixr2`中数据
+theo_sd是常见的theophylline数据集，是longitudinal repeated measures data，每一个个体其随时间测得的血药浓度在PK 中都是非线性的。 The form of the nonlinear model is determined by the pharmacokinetic theory, not derived
+from the data. 但是依据PK理论所得到的每一个个体的PK参数是有变化的，不同的，所以还要考虑population，引入个体间的random effect。
+在`nlmixr2`中数据的列名是有要求的吗？毕竟文档的示例中直接就输入了数据名。。在saemix中尚且需要指定数据。
+
 
 ```{r}
 #  ordinary differential equations (ODEs) model
@@ -121,30 +131,57 @@ xpose::dv_vs_ipred(xpdb)
 
 
 
+### use PKNCA 包
 
+此包主要是提供non-compartmental analysis (NCA) PK计算方法, NCA is used as method of description of PK with minimal assumptions of the rates of distribution of the drug through the body. NCA is typically used to describe the PK of a drug in clinical studies with many samples per subject on the same and sequential days.
 
+以我这两天查资料的情况来看，NCA和上文的modeling方法还是不一样的。顾名思义，一个把人体理解为compartment，一个没有。
 
-本文主要从处方前研究、剂型开发、食物效应、预测人体药代动力学以及仿制药的生物等效性研究等方面介绍了PBPK 建模在药剂学领域中的应用
+其需要两个数据集，分别是浓度数据集和dose数据集，对于每个数据集中的分类变量，其的语法为：
+
 
 ```{r}
+library(PKData)
+```
 
+12例样本，每一个样本都在同一个dose浓度下，测量11个时间点的血清浓度数据。
+
+```{r}
+head(datasets::Theoph)
+
+Theoph <- Theoph %>% as.data.frame()
 ```
 
 
+```{r}
+PKNCA.options()
+```
+
+```{r}
+# 
+conc_obj <- PKNCAconc(Theoph, conc~Time|Subject)
+
+#
+d_dose <- unique(datasets::Theoph[datasets::Theoph$Time == 0,
+                                  c("Dose", "Time", "Subject")])
+dose_obj <- PKNCAdose(d_dose, Dose~Time|Subject)
+```
 
 
-### use PKNCA 包
+```{r}
+data_obj_automatic <- PKNCAdata(conc_obj, dose_obj)
+```
 
 
+```{r}
+results_obj_automatic <- pk.nca(data_obj_automatic)
 
+results_obj_automatic
+```
 
-
-
-
-
-
-
-
+```{r}
+summary(results_obj_automatic)
+```
 
 
 
