@@ -62,6 +62,11 @@ dummies <- df %>%
   bake()
 ```
 
+另一个dummy变量设置的方式
+这种方式为R里默认的方式
+```{r}
+contrasts(df1$race.f) <- contr.treatment(3)
+```
 
 
 ```{r}
@@ -74,7 +79,9 @@ df1 <- df1 %>%
   mutate(
     race1 = if_else(race == 1, 1, 0),
     race2 = if_else(race == 2, 1, 0),
-    race3 = if_else(race == 3, 1, 0)
+    race3 = if_else(race == 3, 1, 0),
+    race.f = factor(race, levels = c(1,2,3),
+                    labels = c('white', 'black', 'other'))
   )
 
 df1
@@ -304,28 +311,38 @@ nricens::nribin(mdl.std = logistic.model.list[["fit1"]],
 
 
 
-## use glm()
+## use glm()函数进行罗辑回归
 
-逻辑回归需要满足几个假设条件，
+logistic model，又名logit model, In the logit model the log odds of the outcome is modeled as a linear combination of the predictor variables.
+
+logistic regression是GLM的一种，GLM所有的特点其自然也是具有的。
+逻辑回归需要满足几个假设条件:
+- response variable  is a binomial random variable with a single trial and success probability 
+- Y值的独立性
+- 线性，
+
 
 `stats`包`glm`的应用：
 
 ```{r}
 df1 <- df1 %>% 
-  # labelled::remove_labels() %>% 
+  labelled::remove_labels() %>%
   as_tibble() %>% 
   mutate(race = factor(race),
-         across(c(ht, ptl, smoke, ui), as.factor)
+         across(c(ht, smoke, ui), as.factor)
          # ftv = factor(ftv)
          )
 ```
 
 
+在R中建模，是没有必要对factor显示指定编码方法的，对于无序因子变量，R中默认采用dummy编码方法：
+下面的两个模型其结果应该是一致的。
+
 ```{r}
-model_glm <- stats::glm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race1 + race2, 
+model_glm2 <- stats::glm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race2 + race3, 
                         data = df1, family = "binomial")
 
-model_glm2 <- glm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race, 
+model_glm <- glm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race, 
                   data = df1, family = "binomial")
 
 # predict(model_glm)  # 默认predict为predict.glm, type为on the scale of the linear predictors
@@ -336,8 +353,39 @@ model_glm2 <- glm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race,
 ```{r, eval=FALSE}
 summary(model_glm)
 ```
+*interpret results：*第一部分为残差的summary结果, `summary(residuals(model_glm))`。
+Coefficients的解释和线性模型是一致的。
+
+
+
+模型检验：
+和R中的大多数模型一样，base包中的generic函数都是支持的。
 
 ```{r}
+# assumption
+plot(model_glm)
+
+# 奇怪以前是支持glm类的呀。。搞半天似乎是我自己模型的问题。。。在经过不断debug后,是spss数据格式的问题
+# m1 <- stats::glm(vs ~ wt + disp, data = mtcars, family = 'binomial')
+# m2 <- stats::glm(low ~ age + ftv, data = df1, family = "binomial")
+
+performance::check_model(model_glm)
+
+# 模型整体的表现
+performance::performance(model_glm)
+
+
+result <- binned_residuals(model_glm)
+plot(result)
+
+check_collinearity(model_glm) |> plot()
+
+check_outliers(model_glm) %>% plot(., type = "dots")
+
+check_normality(model_glm) %>% plot(., type = "qq")
+
+check_posterior_predictions(model_glm)
+
 check_collinearity(model_glm) %>% 
   print_md()
 
@@ -348,13 +396,47 @@ DHARMa::testDispersion(model_glm)
 ```
 
 
+The default predictions are on the scale of the log odds. These predictions are also available through the type = "link" 默认, type= 'response' probability scale.
+
 ```{r}
 # 计算相关参数
 # 逻辑回归默认predict返回的为其的log odds值，
 log_odds <- predict(model_glm)
+
 odds <- exp(log_odds)
-probabilities <- plogis(log_odds)
+probabilities <- plogis(log_odds) # == predict(model_glm, type = 'response')
 odds_ratio <- exp(coef(model_glm))
+
+
+```
+
+
+```{r}
+ggeffects::ggpredict(model = model_glm)
+```
+
+
+在模型完成后，需要评价模型的指标，在临床上用到的几个指标在上一部分已经介绍，在预测模型中，罗辑回归或者类似的分类模型会考虑AUC、等指标。
+
+```{r}
+# 通过caret包 计算混淆矩阵
+model_glm_pred <- ifelse(predict(model_glm, type = "link") > 0, "1", "0")
+# 等价于 model_glm_pred <- ifelse(predict(model_glm, type = "response") > 0.5, "Yes", "No")
+
+train_tab = table(predicted = model_glm_pred, actual = df1$low)
+
+train_con_mat = caret::confusionMatrix(train_tab, positive = "1")
+
+c(train_con_mat$overall["Accuracy"], 
+  train_con_mat$byClass["Sensitivity"], 
+  train_con_mat$byClass["Specificity"])
+
+
+# 选取不同cutoff情况下的结果
+aa <- get_logistic_pred(model_glm, data = df1, 
+                   res = "default", pos = "Yes", neg = "No", 
+                   cut = 0.5
+                   )
 ```
 
 
@@ -376,6 +458,7 @@ MCC_Logistic <- list(
 
 
 # use yardisk
+# yardstick 有一系列的函数可以得到所需之结果，输入为混淆矩阵
 yardstick::mcc(con_Logistic$table)
 
 
@@ -383,62 +466,45 @@ yardstick::mcc(con_Logistic$table)
 # PRROC::pr.curve
 ```
 
-
-```{r}
-# assumption
-# 奇怪以前是支持glm类的呀。。搞半天似乎是我自己模型的问题。。。在经过不断debug后，竟然是vst不能设置成因子
-# m1 <- stats::glm(vs ~ wt + disp, data = mtcars, family = 'binomial')
-# m2 <- stats::glm(low ~ age + ftv, data = df1, family = "binomial")
-performance::check_model(model_glm)
-
-# 模型整体的表现
-performance::performance(model_glm)
-
-
-result <- binned_residuals(model_glm)
-plot(result)
-
-check_collinearity(model_glm) |> plot()
-
-check_outliers(model_glm) %>% plot(., type = "dots")
-
-check_normality(model_glm) %>% plot(., type = "qq")
-
-check_posterior_predictions(model_glm)
-```
-
-The default predictions are on the scale of the log odds. These predictions are also available through the type = "link", type= 'response' probability scale.
-
-```{r}
-model_glm_pred <- ifelse(predict(model_glm, type = "link") > 0, "Yes", "No")
-
-train_tab = table(predicted = model_glm_pred, actual = df1$low)
-
-train_con_mat = caret::confusionMatrix(train_tab, positive = "Yes")
-
-c(train_con_mat$overall["Accuracy"], 
-  train_con_mat$byClass["Sensitivity"], 
-  train_con_mat$byClass["Specificity"])
-
-get_logistic_error(model_glm, data = df1, 
-                   res = "default", pos = "Yes", neg = "No", cut = 0.5)
-```
-
-
+ROC曲线，
+此处以df1进行计算，最好是以test数据集进行，不过对于自身模型而言，ROC值也可以作为模型自身的一个判断标准。
 
 ```{r}
 library(pROC)
 
 test_prob <- predict(model_glm, newdata = df1, type = "response")
 
-test_roc <- roc(df1$low ~ test_prob, plot = TRUE, print.auc = TRUE)
+test_roc <- roc(df1$low ~ test_prob, plot = TRUE, print.auc = TRUE,
+                ci = TRUE
+                )
 ```
 
 
 ```{r}
-performance_roc(model, new_data = test_data)
+performance::performance_roc(model_glm, new_data = df1) |> plot() +
+  ggplot2::theme_bw()
 ```
 
+
+对于罗辑回归模型，也从变量和预测两个角度去分析模型，模型是否具有类似线性模型
+
+```{r}
+visreg::visreg(model_glm)
+```
+
+
+```{r}
+modelbased::estimate_means(model_glm, at = c('race'))
+```
+
+
+```{r}
+modelbased::estimate_slopes(model_glm)
+```
+
+
+
+*multinomial logistic regression*
 
 To perform multinomial logistic regression, we use the multinom function from the nnet package. Training using multinom() is done using similar syntax to lm() and glm(). We add the trace = FALSE argument to suppress information about updates to the optimization routine as the model is trained.
 
@@ -450,23 +516,6 @@ summary(model_multi)$coefficients
 
 head(predict(model_multi, newdata = iris_trn, type = "prob"))
 ```
-
-
-```{r}
-visreg::visreg(model_glm)
-```
-
-
-```{r}
-modelbased::estimate_means(model_glm2, at = c('race'))
-```
-
-
-```{r}
-modelbased::estimate_slopes(model_glm)
-```
-
-
 
 
 ```{r}
