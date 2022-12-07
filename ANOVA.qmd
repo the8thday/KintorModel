@@ -1,0 +1,10 @@
+---
+title: "ANOVA"
+format: html
+---
+
+## 方差分析
+
+
+方差指的是，
+
