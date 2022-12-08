@@ -6,5 +6,172 @@ format: html
 ## 方差分析
 
 
-方差指的是，
+方差(variance)指的是，一组数字和其均值间的度量，描述的是一个变量的离散程度，是随机变量与其总体均值或样本均值的离差的平方的期望值。方差是标准差的平方、分布的二阶矩，以及随机变量与其自身的协方差。
+
+
+方差分析(analysis of variance)的实验设计：
+- between group
+- within group
+- one-way/two-way, et.al...
+- balanced/unbalanced
+- mixed-model ANOVA: When a factorial design includes both between-groups and within-groups factors
+
+在引入了多个因子变量的情况下，interaction是一定需要设计的吗？three-way，four-way呢？这种交互情况就复杂了。
+
+一些基本概念：
+one-way ANOVA: 一个因子自变量，一个因变量
+混淆变量(confounding factor)：即影响自变量，也影响因变量
+ANCOVA: covariate协变量一般是一个连续变量，在对感兴趣因子进行分析前，adjust for 协变量的影响
+MANOVA/MANCOVA: 因变量多于两个
+
+
+一些公式：
+One-way ANOVA: $y ~ A$
+One-way ANCOVA with 1 covariate: $y ~ x + A$ 注意顺序
+two-way factorial ANOVA: $y ~ A * B$
+Randomized block: $y ~ B + A$(B is a blocking factor) 注意顺序
+
+For example, in a two-way ANOVA with unequal numbers of observations in the treatment combinations, the model `y ~ A*B` will not produce the same results as the model `y ~ B*A`. R默认采用TypeI（sequential），还有Type II (hierarchical)、Type III (marginal)，SAS and SPSS employ the Type III approach by default.
+
+
+在本笔记中，重点关注医学统计中的一些用法示例，其中会涉及到医学统计中常用到的概念，不过多也是以上描述的一些不同命名方式罢了。比如随机区组设计资料的方差分析，就是指的two-way ANOVA中的Randomized block。
+
+
+```{r}
+library(tidyverse)
+library(easystats)
+library(car)
+library(multcomp)
+library(statsExpressions)
+```
+
+
+### stats 包 aov函数
+
+如上文所述，`aov`函数提供TypeI for partitioning the variance in y among the effects on the right side of this equation.
+其是包装的lm函数，不过其的输出更符合常规ANOVA的结构。
+
+
+#### 完全随机设计资料的方差分析
+
+one-way ANOVA，其假设条件为因变量正态分布、独立、各组间方差相等、线性。
+
+假设检验为：H0 五个分组之间均值相等；H1
+
+```{r}
+data(cholesterol, package="multcomp")
+```
+
+
+描述性统计，以及数据检查：
+```{r}
+
+
+```
+
+
+```{r}
+fit1 <- aov(response ~ trt, data=cholesterol)
+
+summary(fit1)
+
+report::report_model(fit1)
+```
+
+Type III anova:
+
+```{r}
+car::Anova(fit1, type = 'III')
+```
+
+
+模型检验：
+
+```{r}
+# 和线性模型一样
+plot(fit1) # 输出四幅模型诊断的图片
+
+performance::check_model(fit1)
+
+# 除了满足模型假设外，还需要控制outlier
+car::outlierTest(fit1)
+```
+
+对于one-way ANOVA其效应值为eta^2^
+```{r}
+effectsize::effectsize(fit1)
+```
+
+
+```{r}
+ggeffects::ggeffect(fit1) |> plot()
+```
+
+
+*post-hoc*分析：
+
+One-way 方差分析的结果表明五个分组间其均值不等，还需要事后检验分析哪二者间不同，一般采用TukeyHSD方法，此方法和emmeans包的paires有何异同呢？
+
+```{r}
+(stats::TukeyHSD(fit1)) |> plot()
+```
+
+```{r}
+emmeans::emmeans(fit1, specs = 'trt') |> pairs()
+```
+
+
+利用`multcomp`包进行多重检验，此处因为是笔记的缘故，故会多个包实现一个目的：
+
+```{r}
+tuk <- multcomp::glht(fit, linfct=mcp(trt="Tukey"))
+
+summary(tuk)
+
+labels1 <- cld(tuk, level=.05)$mcletters$Letters
+```
+
+
+#### One-way ANCOVA
+
+在ANOVA的基础上加一个定量的协变量。协变量在`aov`函数中放在公式的前面。不过在`car::Anova`直接包裹时是不用考虑顺序的。
+
+```{r}
+# gesttime 是连续性变量
+# dose 为分类变量
+fit2 <- aov(weight ~ gesttime + dose, data=litter)
+
+summary(fit2)
+```
+
+
+*post-hoc analysis*
+
+因为有一个协变量，分组均值应该用adjusted后的，既是the group means obtained after partialing out the effects of the covariate. 这里的事后检验通常包括矫正后的均值和contrasts。
+
+```{r}
+# 均值
+```
+
+
+```{r}
+# contrsts
+
+
+```
+
+
+
+
+#### 随机区组设计资料的方差分析
+
+
+
+#### 拉丁方设计方差分析
+
+
+#### 两阶段交叉设计资料方差分析
+
+
+
 
