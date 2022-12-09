@@ -21,11 +21,14 @@ contrast plots和conditional plots的异同点在于？conditional plot是在考
 
 所用数据为`lasso_model.Rmd`中的office数据集。
 
+
+
+### 标准化回归系数
+
 标准化回归系数，是指消除了因变量和自变量所取单位的影响之后的回归系数，其绝对值的大小直接反映了自变量对因变量的影响程度。标准化回归系数的比较结果只是适用于某一特定环境的，而不是绝对正确的，它可能因时因地而变化。
 通常我们在构建多因素回归模型时，方程中呈现的是未标准化回归系数，它是方程中不同自变量对应的原始的回归系数。它反映了在其他因素不变的情况下，该自变量每变化一个单位对因变量的作用大小。通过未标准化回归系数和常数项构建的方程，便可以对因变量进行预测，并得出结论。
 而对于标准化回归系数，它是在对自变量和因变量同时进行标准化处理后所得到的回归系数，数据经过标准化处理后消除了量纲、数量级等差异的影响，使得不同变量之间具有可比性，因此可以用标准化回归系数来比较不同自变量对因变量的作用大小。
 *通常我们主要关注的是标准化回归系数的绝对值大小，绝对值越大，可认为它对因变量的影响就越大。*
-
 
 
 ```{r}
@@ -38,6 +41,84 @@ library(regplot) # A function to plot a regression nomogram of regression object
 library(finalfit) #
 ```
 
+
+#### 一个lm的示例
+
+最小二乘法，最小实际response变量和预测response值间的difference，即minimize the sum of squared residuals。OLS also assumes that the independent variables are fixed and measured without error, but this assumption is typically relaxed in practice. 既是讲OLS将自变量Predictor视为一个固定值，通常在GLM中自变量被视为随机变量。
+
+除了`lm()`外，R中还提供了一系列的函数帮助提取lm对象的内容：
+- `summary()` Displays detailed results for the fitted model
+- `coefficients()` Lists the model parameters (intercept and slopes) for the fitted model
+- `confint()` Provides confidence intervals for the model parameters (95% by default)
+- `fitted()` Lists the predicted values in a fitted model
+- `residuals()` Lists the residual values in a fitted model
+- `anova()` Generates an ANOVA table for a fitted model, or an ANOVA table comparing two or more fitted models
+- `vcov()` Lists the covariance matrix for model parameters
+- `AIC()` Prints Akaike’s Information Criterion
+- `plot()` Generates diagnostic plots for evaluating the fit of a model 
+- `predict()` Uses a fitted model to predict response values for a new dataset
+
+
+##### 简单线性回归
+
+```{r}
+# 
+fit1 <- lm(weight ~ height, data=women)
+
+summary(fit1)
+```
+*interpret: *The residual standard error (1.53 pounds) can be thought of as the average error in predicting weight from height using this model. 
+
+```{r}
+cor(women$weight, fitted(fit1))^2
+```
+
+
+```{r}
+broom::augment(fit1)
+```
+
+```{r}
+plot(women$height,women$weight, xlab="Height (in inches)", ylab="Weight (in pounds)")
+
+abline(fit1)
+```
+
+##### 多项式回归
+
+多项式回归或者通过log等对自变量进行转化后的模型依旧是线性模型，似乎对非线性模型有所误解呀我。。
+
+```{r}
+fit2 <- lm(weight ~ height + I(height^2), data=women)
+
+summary(fit2)
+
+# an nth-degree polynomial produces a curve with n-1 bends
+fit3 <- lm(weight ~ height + I(height^2) +I(height^3), data=women)
+```
+
+
+##### multiple regression
+
+```{r}
+states <- as.data.frame(state.x77[,c("Murder", "Population", "Illiteracy", "Income", "Frost")])
+```
+
+```{r}
+car::scatterplotMatrix(states, smooth=FALSE, main="Scatter Plot Matrix")
+```
+
+```{r}
+fit4 <- lm(Murder ~ Population + Illiteracy + Income + Frost, data=states)
+
+summary(fit4)
+```
+*interpret: *When there’s more than one predictor variable, the regression coefficients indicate the increase in the dependent variable for a unit change in a predictor variable, holding all other predictor variables constant. For example, the regression coefficient for Illiteracy is 4.14, suggesting that an increase of 1% in illiteracy is associated with a 4.14% increase in the murder rate, controlling for population, income, and temperature. 
+
+
+
+
+#### 一些指标
 
 
 像在`glm.Rmd`中演示的那样，用glm或lm所得到的线性模型结果是一致的。
@@ -78,14 +159,14 @@ sjPlot::tab_model(lreg, show.std = 'std')
 
 ```
 
-模型变量的重要性。
+### 模型变量的重要性。
 
 ```{r}
 vip::vi(lreg)
 ```
 
 
-*通过线性模型理解dummy变量和contrast*
+### *通过线性模型理解dummy变量和contrast*
 
 在R中分类变量会被R默认设置为dummy变量。
 
@@ -179,14 +260,17 @@ summary(lm_fit2)
 
 
 
-regplot绘制列线图
+### regplot绘制列线图
+
 ```{r}
 regplot::regplot(lreg)
 ```
 
 
 
-利用`finalfit`一步法得到回归模型。finalfit支持的模型包括：linear lm(), logistic glm(), hierarchical logistic lme4::glmer() and Cox proportional hazards survival::coxph() regression models.
+### 利用`finalfit`一步法得到回归模型。
+
+finalfit支持的模型包括：linear lm(), logistic glm(), hierarchical logistic lme4::glmer() and Cox proportional hazards survival::coxph() regression models.
 ```{r}
 library(finalfit)
 
