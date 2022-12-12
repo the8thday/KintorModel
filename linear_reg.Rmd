@@ -31,7 +31,7 @@ contrast plots和conditional plots的异同点在于？conditional plot是在考
 *通常我们主要关注的是标准化回归系数的绝对值大小，绝对值越大，可认为它对因变量的影响就越大。*
 
 
-```{r}
+```{r, include=FALSE}
 library(glmnet)
 library(rms)
 library(sjPlot) # 绘制标准化回归系数
@@ -116,9 +116,142 @@ summary(fit4)
 *interpret: *When there’s more than one predictor variable, the regression coefficients indicate the increase in the dependent variable for a unit change in a predictor variable, holding all other predictor variables constant. For example, the regression coefficient for Illiteracy is 4.14, suggesting that an increase of 1% in illiteracy is associated with a 4.14% increase in the murder rate, controlling for population, income, and temperature. 
 
 
+##### 交互作用的示例
+
+以一个只含有交互作用的简单例子进行解释，如果增加额外的变量要视变量类型进行分析。
+
+```{r}
+fit5 <- fit <- lm(mpg ~ hp + wt + hp:wt, data=mtcars)
+
+summary(fit5)
+```
+*interpret results: *mpg = 49.81 – 0.12 × hp – 8.22 × wt + 0.03 × hp × wt
+上述公式很好的说明了交互作用的考量。
 
 
-#### 一些指标
+```{r}
+
+plot(effects::effect("hp:wt", fit5,, list(wt = c(2.2, 3.2, 4.2))),
+  lines = c(1, 2, 3), multiline = TRUE
+)
+
+```
+
+模型诊断（model diagnostics）
+
+模型诊断在`base`R中通过`plot`函数提供了常见的四幅图。不过更为常用的还是基于`car`包中所提供的函数，果然做回归相关的事情是离不开此包的。
+
+以下为`car`包中所提供的常用的模型诊断函数。
+
+qqPlot()   Quantile comparisons plot
+durbinWatsonTest()    Durbin–Watson test for autocorrelated errors
+crPlots()    Component plus residual plots
+ncvTest()    Score test for nonconstant error variance
+spreadLevelPlot()     Spread-level plots
+outlierTest()   Bonferroni outlier test
+avPlots()      Added variable plots
+influencePlot()    Regression influence plots
+scatterplot()   Enhanced scatter plots
+scatterplotMatrix() Enhanced scatter plot matrixes
+vif()       Variance inflation factors
+
+```{r}
+# NORMALITY
+car::qqPlot(fit5)
+
+# INDEPENDENCE OF ERRORS
+car::durbinWatsonTest(fit)
+
+# LINEARITY
+car::crPlot(fit)
+
+# HOMOSCEDASTICITY
+car::ncvTest(fit)
+car::spreadLevelPlot(fit)
+
+# Multicollinearity
+car::vif(fit4)
+car::vif(fit5, type ='predictor')
+```
+
+
+在展开回归分析时，同时应该考虑异常样本的情况，比如outlier等，有些样本的存在对回归系数的影响颇大，这不是一个好的方向，往往也会影响模型的泛化能力。
+
+```{r}
+car::outlierTest(fit4)
+# Nevada 这一观测 为outlier样本
+
+# 和check_outlier对比
+performance::check_outliers(fit4)
+```
+
+此函数整合了outlier, leverage, and influence plots into one informative plot
+```{r}
+car::influencePlot(fit4, 
+                   id=TRUE, 
+                   main="Influence Plot",
+                   sub="Circle size is proportional to Cook's distance")
+```
+*interpret results:* 此图超过|2|的为outlier，States above 0.2 or 0.3 on the horizontal axis have high leverage。
+
+
+在`car`包所提供的丰富的信息中，还有提供在回归模型不满足条件时对Y变量的转换，包括删除outlier、transformation Y等。
+什么时候可以对变量进行转换，什么时候不可以呢？比如在进行log转换时，结果的interpret要在转换后的基础上进行阐释。
+
+```{r}
+# 函数powerTransform提供的结果可供参考
+summary(car::powerTransform(states$Murder))
+
+
+```
+
+
+##### 模型选择和对比
+
+`anova`只能针对nested models进行？？？
+Note that although the ANOVA approach requires nested models, the AIC approach doesn’t.
+
+```{r}
+fit6 <- lm(Murder ~ Population + Illiteracy, data=states)
+
+anova(fit4, fit6)
+
+AIC(fit4, fit6)
+```
+
+*stepwise regression:*
+```{r}
+stats::step(fit4, direction="backward")
+```
+
+
+*ALL SUBSETS REGRESSION*
+
+In all subsets regression, every possible model is inspected. 在这一点上可以看出其比step方法要好一些。
+All subsets regression is performed using the regsubsets() function from the leaps package.
+
+```{r}
+leaps <- leaps::regsubsets(Murder ~ Population + Illiteracy + Income + Frost, data=states, nbest=4)
+
+leaps
+```
+
+
+```{r}
+subsTable <- function(obj,scale){
+  x <- summary(leaps)
+  m <- cbind(round(x[[scale]],3), x$which[,-1]) 
+  colnames(m)[1] <- scale
+  m[order(m[,1]), ]
+}
+
+subsTable(leaps, scale="adjr2")
+```
+
+
+
+
+#### 一些线性模型应用中常用到的指标
 
 
 像在`glm.Rmd`中演示的那样，用glm或lm所得到的线性模型结果是一致的。
