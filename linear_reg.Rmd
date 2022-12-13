@@ -32,6 +32,8 @@ contrast plots和conditional plots的异同点在于？conditional plot是在考
 
 
 ```{r, include=FALSE}
+library(car)
+library(MASS)
 library(glmnet)
 library(rms)
 library(sjPlot) # 绘制标准化回归系数
@@ -249,6 +251,72 @@ subsTable(leaps, scale="adjr2")
 ```
 
 
+##### 模型泛化与预测
+
+以预测为目的的模型和以interpret为目的模型在模型拟合上具有不同之处，OLS/ML等都是在尽量让数据符合模型而得到的参数，而预测模型同时还需要考虑其的泛化能力。
+
+这些知识点在机器学习的部分已经有更为充分的函数和脚本，此处暂且不论。
+
+
+*变量对outcome的重要性：*
+
+除了标准化回归系数以外还有一些其他的方法：
+
+Several possible approaches to relative importance are captured in the `relaimpo` package.
+
+```{r}
+vip::vip(fit4) +
+  ggthemes::theme_economist()
+```
+```{r}
+
+sjPlot::tab_model(fit4, show.std = 'std')
+```
+可以看到二者的结果还是相似的。
+
+```{r}
+relaimpo::boot.relimp(fit4)
+```
+
+```{r}
+relweights <- function(fit, ...) {
+  R <- cor(fit$model)
+  nvar <- ncol(R)
+  rxx <- R[2:nvar, 2:nvar]
+  rxy <- R[2:nvar, 1]
+  svd <- eigen(rxx)
+  evec <- svd$vectors
+  ev <- svd$values
+  delta <- diag(sqrt(ev))
+  lambda <- evec %*% delta %*% t(evec)
+  lambdasq <- lambda^2
+  beta <- solve(lambda) %*% rxy
+  rsquare <- colSums(beta^2)
+  rawwgt <- lambdasq %*% beta^2
+  import <- (rawwgt / rsquare) * 100
+  import <- as.data.frame(import)
+  row.names(import) <- names(fit$model[2:nvar])
+  names(import) <- "Weights"
+  import <- import[order(import), 1, drop = FALSE]
+  dotchart(import$Weights,
+    labels = row.names(import),
+    xlab = "% of R-Square", pch = 19,
+    main = "Relative Importance of Predictor Variables", sub = paste("Total R-Square=", round(rsquare, digits = 3)), ...
+  )
+  return(import)
+}
+```
+
+
+书中所提供的这种更为合理的方法，所得到的结果和上文的结果差异蛮大呀。。。
+```{r}
+relweights(fit4, col="blue")
+
+```
+
+
+
+
 
 
 #### 一些线性模型应用中常用到的指标
@@ -264,6 +332,7 @@ lreg <- glm(imdb_rating ~ ., data=dat, family = 'gaussian')
 
 绘制某变量的 校正其它变量后，再作图观察某一个自变量与应变量之间的关系, 亦可同时绘制全部。既是矫正后的散点图。
 此处绘制`kelly`变量的散点图。
+
 ```{r}
 visreg::visreg(lreg, 'kelly')
 ```
