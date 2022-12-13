@@ -1,5 +1,5 @@
 ---
-title: "global linear regression"
+title: "Generalized linear model"
 author: "liuc"
 date: "11/2/2021"
 output: html_document
@@ -22,10 +22,42 @@ library(emmeans)
 ## interpret glm results
 
 > https://biologyforfun.wordpress.com/2014/04/08/interpreting-interaction-coefficient-in-r-part1-lm/
+> https://online.stat.psu.edu/stat504/lesson/6/6.1
 
 
-广义线性模型是指一类，
+广义线性模型(Generalized linear model, GLIMs)是指一类，通过不同的link function将因变量和自变量的关系变成线性模型。
+The term "generalized" linear model (GLIM or GLM) refers to a larger class of models popularized by McCullagh and Nelder (1982, 2nd edition 1989).
 
+There are three components to any GLM:
+- Random Component: specifies the probability distribution of the response variable
+- Systematic Component: specifies the explanatory variables  in the model
+- Link Function: specifies the link between the random and the systematic components.
+
+因变量本身就是随机的，是GLM思考的一个出发点；而在一般线性模型中，误差项所引入的随机因素是常考虑的部分。
+
+Assumptions:
+- Y值独立，cases are indenpendent
+- GLM不需要Y值为正态分布，but it typically assumes a distribution from an exponential family (e.g. binomial, Poisson, multinomial, normal, etc.)
+- but it does assume a linear relationship between the transformed expected response in terms of the link function and the explanatory variables
+- The homogeneity of variance does NOT need to be satisfied
+- Errors need to be independent but NOT normally distributed
+- Parameter estimation uses maximum likelihood estimation (MLE) rather than ordinary least squares (OLS)
+
+
+Family                            Default link function
+binomial                          (link = "logit")
+gaussian                          (link = "identity")
+gamma                             (link = "inverse")
+inverse.gaussian                  (link = "1/mu^2")
+poisson                           (link = "log")
+quasi                             (link = "identity", variance = "constant")
+quasibinomial                     (link = "logit")
+quasipoisson                      (link = "log")
+
+
+### glm实现简单线性模型
+
+以下是一个glm函数实现简单线性回归的示例
 
 ```{r}
 df2 <- readRDS('./datasets/df2.rds')
@@ -53,9 +85,12 @@ anova(glm_model)
 *结果解读：*
 
 
-## interpret lm results
+### interpret lm results
 
 对于线性回归还是适合用`lm`函数。
+
+回归(Regression)在统计分析中无疑处于核心的地位。其具有大量的模型和方法，也是我们在现实世界应用最多的方法，通过对数据的采集，来理解变量间的关系、预测未来的事件，这都只能归结为客观世界本身具备可量化的方程。
+科学研究中的规律，比如由观察数据所得到的定理，如 $G = m * g$ 其是否具备误差项。
 
 ```{r}
 # 线性回归需要符合LINE条件，其在临床预测模型和诊断模型. 模型自身的评价标准和对test数据集的评价
@@ -81,6 +116,16 @@ car::Anova(lm_fit, type = 'III')
 ```
 
 *结果解读：*anova对线性模型的分析是计算，其结果中p值小于0.05的一般认为是对模型有贡献的变量。
+
+
+
+Global Validation of Linear Models Assumptions.
+和`performance::check_models`做一个对比。
+```{r}
+gvmodel<-gvlma::gvlma(f)
+summary(gvmodel)
+```
+
 
 
 conditional plot, 在其他因素保持不变的情况下，某一变量在
@@ -126,6 +171,23 @@ sjPlot::plot_model(lm_fit,
 ```
 
 
+逐步选择法：
+
+```{r}
+MASS::stepAIC(fit, direction = "backward")
+stats::step(fit, direction = "backward")
+
+# 全局择优法
+# Cp是越小越好的，从上面这幅图来看，纳入3个自变量（tg/ri/hba）时最好。
+
+library(leaps)
+leaps <- regsubsets(fpg ~ cho + tg + ri + hba, data = df15_1, nbest=4)
+
+plot(leaps, scale = "Cp") # 通过Cp判断
+
+```
+
+
 
 
 ```{r}
@@ -136,7 +198,7 @@ lm_fit2 <- lm(
 ```
 
 
-## by glmnet
+### by glmnet
 
 ```{r}
 X <- df2 %>% dplyr::select()
@@ -147,9 +209,11 @@ lm_fit2 <- glmnet::glmnet(x = X,
 summary(lm_fit2)
 ```
 
+
+
 ## different family
 
-对于广义线性模型，对不同数据具有不同的模型选择。
+对于广义线性模型，对不同数据具有不同的模型选择。依据Y变量的不同
 
 
 
@@ -177,6 +241,9 @@ exp(est)
 summary(m1)
 anova(m1)
 ```
+
+
+R包`mvabund`的负二项分布建模：
 
 ```{r}
 # mvabund 负二项分布建模
@@ -278,6 +345,22 @@ lb <- logbin(
 performance::performance(lb)
 ```
 
+```{r}
+car::influencePlot(l_reg)
+```
+```{r}
+plot(predict(l_reg, type="response"), residuals(l_reg, type= "deviance"))
+```
+
+
+```{r}
+plot(hatvalues(l_reg)) 
+plot(rstudent(l_reg)) 
+plot(cooks.distance(l_reg))
+```
+
+
+
 
 
 ### modified Poisson regression
@@ -362,5 +445,6 @@ cbind(
   OddsRatio = exp(coef(mp0))
 )
 ```
+
 
 
