@@ -1,0 +1,58 @@
+---
+title: "table data"
+format: html
+---
+
+## table 类数据
+
+此处做一个table类数据分析的记录。
+
+
+
+```{r}
+library(vcd)
+library(gmodels)
+```
+
+table类数据此处主要记录，诸如Frequency and contingency tables。
+
+```{r}
+mytable1 <- xtabs(~ Treatment + Improved + Sex, data = Arthritis)
+
+mytable2 <- xtabs(~ Treatment + Improved, data = Arthritis)
+```
+
+
+
+```{r}
+class(mytable2)
+
+class(with(Arthritis, table(Treatment, Improved)))
+```
+
+
+
+```{r}
+vcd::mosaic(mytable1, shade=TRUE, legend=TRUE)
+```
+
+
+```{r}
+mytable1 |> mantelhaen.test()
+```
+
+
+```{r}
+mytable2 |> fisher.test()
+```
+
+
+
+```{r}
+vcd::assocstats(mytable2)
+```
+
+
+
+
+
