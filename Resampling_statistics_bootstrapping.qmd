@@ -1,0 +1,172 @@
+---
+title: "Resampling_statistics_bootstrapping"
+format: html
+---
+
+
+## Resampling_statistics_bootstrapping
+
+
+传统假设检验总是假设数据有一个具体的分布，既是参数类的分析方法，而在不符合这些条件的时候，重采样和bootstrap方法就比较适用。对于样本量少、有outlier等情况，permutation和bootstrap方法比较robust，computer-intensive。
+
+
+其基本逻辑是：比如在两样本独立ttest中，传统的假设检验分别假设两组间的均值相等，等等。而permutation在计算完t统计值后，会把两组的样本混合在一起，randomly的再把数据分成两组然后计算t-statistic，重复此步只到完成所有的组合。再然后对所有的t-statistic值排序，并得到一个经验分布，然后检验t0第一个t-statistic是否落在95%的区间。
+
+其并不是像bootstrap那样进行有放回的重采样，只是通过采样把一个分析做个1000遍，其是把数据re-randomization tests的， 然后通过得到的empirical distribution进行判断。
+
+
+### permutation
+
+“Permutation tests, also called randomization or re-randomization tests, have been around for decades, but it took the advent of high-speed computers to make them practically available.”
+
+
+```{r, include=FALSE}
+library(easystats)
+
+# cion 包提供一系列的函数可以代替传统的test的函数
+library(coin) # Conditional Inference Procedures in a Permutation Test Framework
+library(lmPerm) # provides a permutation approach to linear models, including regression and analysis of variance
+```
+
+cion包的一些重点：“If distribution="exact", the distribution under the null hypothesis is computed exactly (that is, from all possible permutations). The distribution can also be approximated by its asymptotic distribution (distribution="asymptotic") or via Monte Carlo resampling (distribution="approximate(nresample=n)"), where n indicates the number of random replications used to approximate the exact distribution. The default is 10,000 replications. At present, distribution="exact" is only available for two-sample problems.”
+
+Excerpt From
+R in Action, Third Edition
+Robert I. Kabacoff
+
+常见的经典统计中的函数其都有对应的函数，使用起来相比还是很方便的。
+
+```{r}
+set.seed(42)
+
+# one-way permutation test
+# 在下面书中的例子中，传统的ttest结果和permutation结果有出入，选择相信permutation的结果
+
+score <- c(40, 57, 45, 55, 58, 57, 64, 55, 62, 65)
+treatment <- factor(c(rep("A", 5), rep("B", 5)))
+mydata <- data.frame(treatment, score)
+
+t.test(score ~ treatment, data = mydata, var.equal = TRUE)
+```
+
+```{r}
+coin::oneway_test(score ~ treatment, data = mydata, distribution = "exact")
+```
+
+
+```{r}
+# ANOVA 分析
+
+coin::oneway_test(response ~ trt,
+  data = cholesterol,
+  distribution = approximate(nresample = 9999)
+)
+```
+
+
+`lmPerm`包的使用，provides a permutation approach to linear models, including regression and analysis of variance.
+In particular, the lmp() and aovp() functions are the lm() and aov() functions modified to perform permutation tests rather than normal theory tests. The parameters in the lmp() and aovp() functions are similar to those in the lm() and aov() functions, with the addition of a perm= parameter. The perm= option can take the value Exact, Prob, or SPR.
+
+```{r}
+fit1 <- lmp(weight ~ height, data = women, perm = "Prob")
+
+summary(fit1)
+```
+
+
+```{r}
+fit2 <- lmPerm::aovp(weight ~ gesttime + dose, data = litter, perm = "Prob")
+
+summary(fit2)
+```
+```{r}
+anova(fit2)
+```
+
+
+
+### bootstrap
+
+permutation 主要以提供pvalue区队null假设做判断，其很难给出CI。这在pvalue日益收到批评的研究氛围内愈发显得不太合适，bootstrap在这一点上具有相对的优势。
+
+Bootstrapping generates an empirical distribution of a test statistic or set of test statistics by repeated random sampling with replacement from the original sample. It allows you to generate confidence intervals and test statistical hypotheses without having to assume a specific underlying theoretical distribution.
+
+上文的介绍可以看到，和permutation相比，二者都不用考虑一个先验分布的存在。
+
+
+In general, bootstrapping involves three main steps:
+
+1. Write a function that returns the statistic or statistics of interest. If there is a single statistic (for example, a median), the function should return a number. If there is a set of statistics (for example, a set of regression coefficients), the function should return a vector.
+2. Process this function through the boot() function to generate R bootstrap replications of the statistic(s).
+3. Use the boot.ci() function to obtain confidence intervals for the statistic(s) generated in step 2.
+
+
+`boot::boot`函数的主要用法为：
+
+```{r}
+library(boot)
+library(bootstrap)
+```
+
+
+```{r}
+set.seed(42)
+
+
+rsq <- function(formula, data, indices) {
+  d <- data[indices, ]
+  fit <- lm(formula, data = d)
+  return(summary(fit)$r.square)
+}
+
+results <- boot(
+  data = mtcars, statistic = rsq,
+  R = 1000, formula = mpg ~ wt + disp
+)
+```
+
+
+```{r}
+print(results)
+
+plot(results)
+```
+
+```{r}
+boot.ci(results, type = c("perc", "bca"))
+```
+
+
+`boot`函数的一贯用法，首先对所要bootstrap的系数写一个返回的函数，然后进行bootstrap，bootstrap可以简单的理解为对一批数据反复有放回的采样，得到迭代次数的系数。
+
+```{r}
+bs <- function(formula, data, indices) {
+  d <- data[indices, ]
+  fit <- lm(formula, data = d)
+  return(coef(fit))
+}
+
+
+results2 <- boot(
+  data = mtcars, statistic = bs,
+  R = 1000, formula = mpg ~ wt + disp
+)
+
+```
+
+
+对于多个统计指标的boot，在plot和boot.ci中
+
+```{r}
+print(results2)
+
+plot(results2, index = 1)
+```
+
+```{r}
+boot.ci(results2, type="bca", index=3)
+```
+
+
+
+
