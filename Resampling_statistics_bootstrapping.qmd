@@ -170,3 +170,108 @@ boot.ci(results2, type="bca", index=3)
 
 
 
+
+
+### infer package
+
+在完成上述内容的笔记后，我们可以看待下`tidymodels`中的`infer`包的使用，其是一个以randomization-based statistical inference。
+文档附件中的modern statistic值得一读，下一步打算分享这本书的笔记。
+
+```{r, include=FALSE}
+library(tidymodels)
+library(infer)
+```
+
+
+首先和`coin`包分析的两样本独立ttest检验进行对比：
+
+```{r}
+coin::oneway_test(score ~ treatment, data = mydata, distribution = "exact")
+```
+
+以permutation的方法计算同样数据：
+
+
+```{r}
+# calculate the observed statistic
+observed_statistic <- mydata %>%
+  specify(score ~ treatment) %>%
+  calculate(stat = "diff in means", order = c("A", "B"))
+
+observed_statistic
+
+# generate the null distribution with randomization
+null_dist_2_sample <- mydata %>%
+  specify(score ~ treatment) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("A", "B"))
+
+
+null_dist_2_sample %>%
+  visualize() + 
+  shade_p_value(observed_statistic,
+                direction = "two-sided")
+```
+```{r}
+null_dist_2_sample |>
+  get_p_value(observed_statistic,
+              direction = "two-sided")
+```
+
+```{r}
+null_dist_2_sample2 <- mydata %>%
+  specify(score ~ treatment) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "diff in means", order = c("A", "B"))
+
+
+null_dist_2_sample2 %>%
+  visualize() + 
+  shade_p_value(observed_statistic,
+                direction = "two-sided")
+```
+```{r}
+null_dist_2_sample2 |>
+  infer::get_ci()
+```
+
+
+
+```{r}
+mydata <- transform(mydata, treatment = factor(treatment))
+
+p_value <- function(formula, data, indices) {
+  d <- data[indices, ]
+  fit <- t.test(formula, data = d, var.equal = TRUE)
+  return(fit$p.value)
+}
+
+
+res1 <- boot::boot(
+  data = mydata, 
+  statistic = p_value,
+  R = 1000, 
+  formula = score ~ treatment
+)
+
+print(res1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
