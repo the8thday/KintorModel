@@ -6,12 +6,22 @@ format: html
 
 ##  sample size calculated in R
 
+> R in action
+> 
+
+
+首先，理解什么是样本量计算，为什么需要样本量计算？样本量计算是假设检验才需要的吗？对于bootstrap、bayes等统计方法需要计算样本量吗？基础研究中经常用到3个Test、3个Control的设计其合理性在哪里？
+
+
 临床研究中样本量计算的几个示例。
 
-在计算所需样本量时，effect size是最需要考量的指标，毕竟power和significant level易于指定。
+在计算所需样本量时，effect size是最需要考量的指标，毕竟power和significant level易于指定。以ttest为例：
 
 $$Effect Size=(Mean_{A}-Mean_{0})/std.var$$
 effect size (cohen's D)本质上是h1假设下和h0假设下的差值除以数据标准差。
+Effect size is the magnitude of the effect under the alternate or research hypothesis. The formula for effect size depends on the statistical methodology employed in the hypothesis testing.
+
+
 
 
 ### Proportion结局的样本量计算
@@ -42,8 +52,44 @@ pwr::pwr.2p.test(
 ```
 
 
+### 线性模型
+
+For linear models (such as multiple regression), the pwr.f2.test() function can be used to carry out a power analysis.
+
+where u and v are the numerator and denominator degrees of freedom and f2 is the effect size.
+
+```{r}
+pwr.f2.test(u=3, f2=0.0769, sig.level=0.05, power=0.90)
+```
 
 
+
+### ANOVA
+
+这是`R in action`上的一个示例，很好的说明了在不清楚`effect size`的情况下的一些思路。
+
+```{r}
+library(pwr)
+es <- seq(.1, .5, .01)                                               
+nes <- length(es)
+ 
+samsize <- NULL                                                      
+for (i in 1:nes){                                                    
+    result <- pwr.anova.test(k=5, f=es[i], sig.level=.05, power=.9)  
+    samsize[i] <- ceiling(result$n)                                  
+}                                                                    
+ 
+plotdata <- data.frame(es, samsize)
+
+library(ggplot2)
+ggplot(plotdata, aes(x=samsize, y=es)) +
+  geom_line(color="red", size=1) +
+  theme_bw() +
+  labs(title="One Way ANOVA (5 groups)",
+       subtitle="Power = 0.90,  Alpha = 0.05",
+       x="Sample Size (per group)",
+       y="Effect Size")
+```
 
 
 
