@@ -26,10 +26,17 @@ library(ggdist)
 在base R中，用来生成分布的函数主要有四种：
 
 - stats::
+`[dpqr]distribution_abbreviation()`
 
+d = Density
+p = Distribution function
+q = Quantile function
+r = Random generation (random deviates)
 
 
 ### stats中二项分布：
+
+主要记住每一个函数返回的结果是啥。
 
 ```{r}
 # 在10次实验中成功2次的概率, 返回概率
@@ -56,6 +63,27 @@ table(rbinom(n = 1000,
        prob = 0.2
        ))
 ```
+
+
+##### 生成多变量的silulate的数据
+
+Pseudo-random number generation for 11 multivariate distributions: Normal, t, Uniform, Bernoulli, Hypergeometric, Beta (Dirichlet), Multinomial, Dirichlet-Multinomial, Laplace, Wishart, and Inverted Wishart.
+
+```{r}
+library(MultiRNG)
+
+options(digits = 3)
+set.seed(42)
+
+mean <- c(230.7, 146.7, 3.6)
+sigma <- matrix(c(15360.8, 6721.2, -47.1, 6721.2, 4700.9, -16.5,-47.1,  -16.5,   0.3), 
+                nrow=3, ncol=3)
+
+mydata <- draw.d.variate.normal(500, 3, mean, sigma)
+mydata <- as.data.frame(mydata)
+
+```
+
 
 
 ### distr6 包中二项式分布的操作
@@ -128,6 +156,35 @@ P$quantile(0.9)
 
 P$summary()
 ```
+
+
+
+## 检查某一数据的分布
+
+记录几个检查数据分布的函数。
+
+```{r}
+require(MASS)
+require(fitdistrplus)
+```
+
+
+除了正态分布外还有几个参数可以选择：
+
+```{r}
+car::qqp(recog$Aggression.t, "norm")
+```
+
+检查是否是gamma分布：
+```{r}
+gamma <- MASS::fitdistr(recog$Aggression.t, "gamma")
+car::qqp(recog$Aggression.t, "gamma", shape = gamma$estimate[[1]], rate = gamma$estimate[[2]])
+```
+
+
+
+
+
 
 
 
