@@ -1,0 +1,237 @@
+---
+title: "Constrained Ordination"
+author: "liuc"
+date: '2022-06-08'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## unConstrained Ordination
+
+非约束排序（unConstrained Ordination）While PCA preserves Euclidean distances among samples and CA chi-square distances, PCoA provides Euclidean representation of a set of objects whose relationship is measured by any dissimilarity index.
+非约束排序只是描述性方法，不存在检验评估排序结果是否显著性的问题，约束排序则需要对排序结果进行显著性检验。
+
+
+此处记录几种常见的非约束排序类型，经验主要来自微生物组数据分析，包括：PCA/CA(eigenanalysis-based ordination methods), PCoA/NMDS(distance-based unconstrained ordination)
+
+MDS等的算法的一般过程
+> https://stats.stackexchange.com/questions/14002/whats-the-difference-between-principal-component-analysis-and-multidimensional
+> https://www.davidzeleny.net/anadat-r/doku.php/en:pcoa_nmds
+
+
+约束排序和非约束排序的意思是在生态学中常用的一些概念，在统计学中主要以对变量操作的方法来进行理解解释。排序，故名思义是按照样本的变量对样本进行排序，只是因为数据维度太高，需要一种手段将其映射到低纬度上去。
+
+
+除了上文提到的非约束性排序外，约束性排序主要包括Common constrained ordinations in ecology are redundancy analysis, canonical correlation, canonical correspondence analysis, canonical discriminant (or canonical variate) analysis, and more recently canonical analysis of principal coordinates.
+
+
+
+```{r, include=FALSE}
+library(vegan)
+library(FactoMineR)
+library(psych)
+```
+
+
+
+### PCoA
+
+
+关于PCoA的负特征根
+
+PCoA算法本身的问题，如果输入的距离测度并非欧式距离属性，则PCoA的计算结果中可能会产生负特征根，正负特征根之间可能还会夹带0值的特征根。负特征根不能有效反映真实的PCoA轴贡献度信息。
+PCoA只包含样本信息，原始PCoA的物种变量在计算距离矩阵后丢失。
+
+
+
+```{r}
+
+```
+
+
+### PCA
+
+PCA和EFA之间的差别是什么呢？二者都用一些变量代表其他的变量。PCA是将多个相关变量变成一个PC，这个PC与PC之间一般而言是不具备相关性的，而EFA或者说验证性因子分析cfa，其是寻找到显示变量间的关系而得到隐变量间的关系。PCA中对每一个变量赋予一个权重都是为了最大化PC之间的方差，让PC之间不相关。而因子分析中的F1、F2等是为了解释显变量产生的原因，往往在我们的分析中还会再进一步的看待F1、F2等间的关系。
+
+简单而言，PCA是为了降维，而FA是为了发现潜变量。
+PCA的衍生变量PC其是其他变量的线性相加：
+$$PC_1=a_1x_1 + a_2x_2 + ...+a_kx_k$$
+首先，是确定所需要的PC数目，确定PC数目的方法有多种，包括先验的分组信息和依据eigenvalue进行的分组。
+此处记录依据eigenvalue进行PC数目的确认。
+
+```{r}
+# 利用已包装好的函数
+psych::fa.parallel(USJudgeRatings, fa = 'pc', n.iter = 100, 
+                   show.legend = FALSE, main = 'Scree plot with parallel analysis'
+                   )
+```
+上述示例数据从结果来看不是很合适，不过此处仅作为演示。
+
+
+再确定了PC的数目后，展开PCA分析，因为PC1的演示意义不是很大，此处用两个PC
+```{r}
+pc <- psych::principal(USJudgeRatings, nfactors = 1)
+
+pc
+```
+*interpret：*h2为该变量被PC解释的方差，u2为没有解释的部分。Proportion Var是每一个PC解释的方差占比。
+
+
+如果输入的是一个相关性矩阵的话，不需要指定吗？
+```{r}
+pc2 <- psych::principal(Harman23.cor$cov, nfactors = 2, n.obs = 302, 
+                        rotate = 'varimax')
+
+pc2
+```
+
+*interpret: * The column names change from PC to RC to denote rotated components.
+
+
+The principal component scores are saved in the scores element of the object returned by the principal() function when the option `scores=TRUE`.
+```{r}
+head(pc$scores)
+```
+
+
+
+*下面对比几个常用函数在计算PCA时用法的不同*
+
+There are two general methods to perform PCA in R :
+
+1. Spectral decomposition which examines the covariances / correlations between variables
+2. Singular value decomposition which examines the covariances / correlations between individuals
+
+`stats::prcomp` the singular value decomposition (SVD)
+`stats::princomp` uses the spectral decomposition approach
+
+```{r}
+wdbc <- read.csv("./datasets/wdbc.data.csv", header = F)
+features <- c("radius", "texture", "perimeter", "area", "smoothness", "compactness", "concavity", "concave_points", "symmetry", "fractal_dimension")
+names(wdbc) <- c("id", "diagnosis", paste0(features,"_mean"), paste0(features,"_se"), paste0(features,"_worst"))
+```
+
+
+```{r}
+pc <- stats::prcomp(wdbc[c(3:32)],
+             center = TRUE,
+            scale. = TRUE)
+attributes(pc)
+
+#reverse the signs
+pc$rotation <- -1 * pc$rotation
+
+#display principal components
+pc$rotation |> head()
+
+```
+
+```{r}
+biplot(pc)
+```
+
+
+```{r}
+g <- ggbiplot::ggbiplot(pc,
+              obs.scale = 1,
+              var.scale = 1,
+              groups = training$Species,
+              ellipse = TRUE,
+              circle = TRUE,
+              ellipse.prob = 0.68)
+```
+
+```{r}
+screeplot(pc, type = "l", npcs = 15, main = "Screeplot of the first 10 PCs")
+abline(h = 1, col = "red", lty = 5)
+legend("topright",
+  legend = c("Eigenvalue = 1"),
+  col = c("red"), lty = 5, cex = 0.6
+)
+cumpro <- cumsum(pc$sdev^2 / sum(pc$sdev^2))
+plot(cumpro[0:15], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 6, col = "blue", lty = 5)
+abline(h = 0.88759, col = "blue", lty = 5)
+legend("topleft",
+  legend = c("Cut-off @ PC6"),
+  col = c("blue"), lty = 5, cex = 0.6
+)
+```
+```{r}
+library("factoextra")
+
+
+fviz_pca_ind(pc, geom.ind = "point", pointshape = 21, 
+             pointsize = 2, 
+             fill.ind = wdbc$diagnosis, 
+             col.ind = "black", 
+             palette = "jco", 
+             addEllipses = TRUE,
+             label = "var",
+             col.var = "black",
+             repel = TRUE,
+             legend.title = "Diagnosis") +
+  ggtitle("2D PCA-plot from 30 feature dataset") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+`FactoMineR::PCA`包：此包提供的多个函数都比较可靠。
+
+```{r}
+pca.data <- FactoMineR::PCA(wdbc[c(3:32)], scale.unit = TRUE, graph = FALSE)
+```
+
+```{r}
+fviz_eig(pca.data, addlabels = TRUE, ylim = c(0, 70))
+
+fviz_pca_var(pca.data, col.var = "cos2",
+             gradient.cols = c("#FFCC00", "#CC9933", "#660033", "#330033"),
+             repel = TRUE) 
+```
+
+`psych`包，即上述的用法：
+
+```{r}
+psych::fa.parallel(wdbc[c(3:32)], fa = 'pc', n.iter = 100, 
+                   show.legend = FALSE, main = 'Scree plot with parallel analysis'
+                   )
+```
+```{r}
+pc_varimax <- psych::principal(wdbc[c(3:32)], nfactors = 5, rotate = 'varimax')
+
+pc_varimax
+```
+
+
+
+
+`vegan`包里提供的分析：
+
+在生态学里面，PCA的应用有其对应的一些特点，因为数据中经常出现双零问题，会对物种数据采用Hellinger转化后再进行分析，当然对于诸如环境类的数据采用上述分析即可。
+更推荐的方法是使用主坐标分析（Principal Coordinate Analysis，PCoA）代替PCA，通过计算样方间的定量非对称距离测度 （如Bray-curtis距离），实现多维物种空间中的样方排序。
+
+```{r}
+species_hel <- decostand(species, method = 'hellinger')
+```
+
+
+
+
+### NMDS
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
