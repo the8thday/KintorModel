@@ -3,16 +3,22 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+
+> https://towardsdatascience.com/exploratory-factor-analysis-in-r-e31b0015f224
+
+
+
 类似主成分分析（Principal Component Analysis，PCA），探索性因子分析（Exploratory Factor Analysis，EFA）也是常用于探索和简化多变量复杂关系的常用方法，它们之间有联系也有区别。二者相比，如果期望使用一组较少的不相关特征（主成分）来代替大量相关变量，通常使用PCA；EFA则更多用于发现一组可观测变量背后潜在的或无法观测的结构（因子）。 当获得一些变数的观测值，并希望识别反应数据变化的隐形因子的个数和本质，当想识别一组数据背后的因子结构时，可以采用因子分析。因子和误差均无法直接测量，通过变量间的相互关系推导得到。
+因子分析，引入了潜变量的思想。
 
 ```{r}
-# https://towardsdatascience.com/exploratory-factor-analysis-in-r-e31b0015f224
+# 
 library(psych)
 library(FactoMineR)
 ```
 
 ```{r}
-url <- 'https://raw.githubusercontent.com/housecricket/data/main/efa/sample1.csv'
+url <- './datasets/efa_sample1.csv'
 data_survey <- read.csv(url, sep = ',')
 dat <- data_survey[ , -1] 
 head(dat)
@@ -38,52 +44,84 @@ cortest.bartlett(X) # Bartlett’s Test of Sphericity, Small values (8.84e-290 <
 det(datamatrix)
 ```
 
-判断需提取的公共因子的数量，每个因子被认为可解释多个观测变量间共有的方差，因此它们常被称为公共因子。
+判断需提取的公共因子的数量，每个因子被认为可解释多个观测变量间共有的方差，因此它们常被称为公共因子(common factor)。
 
 ```{r}
 #确定最佳因子数量，详情 ?fa.parallel
 #输入变量间的相关矩阵，并手动输入原始变量集的对象数量（n.obs）
-fa.parallel(datamatrix, n.obs = ncol(X), fa = 'both', n.iter = 100)
+psych::fa.parallel(datamatrix, n.obs = ncol(X), fa = 'both', n.iter = 100)
+
+
 #或者直接使用原始变量集
-fa.parallel(X, fa = 'both', n.iter = 100)
+psych::fa.parallel(X, fa = 'both', n.iter = 100)
+abline(h=c(0, 1))
+
 ```
 
-EFA中提取因子的方法很多，如最大似然法（ml）、主轴迭代法（pa）、加权最小二乘法（wls）、广义加权最小二乘法（gls）、最小残差法（minres）等。这里选择了主轴迭代法。
+
+EFA中提取因子的方法很多，如最大似然法（ml）、主轴迭代法（pa）、加权最小二乘法（wls）、广义加权最小二乘法（gls）、最小残差法（minres）等。这里选择了主轴迭代法。Statisticians tend to prefer the maximum likelihood approach because of its well-defined statistical model. Sometimes this approach fails to converge, in which case the iterated principal axis option often works well..
+
+`r` is a correlation matrix or a raw data matrix.
+`nfactors` specifies the number of factors to extract (1 by default).
+`n.obs` is the number of observations (if a correlation matrix is input).
+`rotate` indicates the rotation to be applied (oblimin by default).
+`scores` specifies whether to calculate factor scores (false by default).
+`fm` specifies the factoring method (minres by default).
+
 
 ```{r}
 #EFA 分析，详情 ?fa
 #输入变量间的相关矩阵，nfactors 指定提取的因子数量，并手动输入原始变量集的对象数量（n.obs）
 #rotate 设定旋转的方法，fm 设定因子化方法
-fa_varimax <- fa(r = datamatrix, nfactors = 4, n.obs = ncol(X), max.iter=100,
-                 rotate = 'varimax', fm = 'pa') # fm=pa “pa” is principal axis factoring
+fa_varimax <- psych::fa(r = datamatrix, nfactors = 4, n.obs = ncol(X), max.iter=100,
+                 rotate = 'varimax', # By using an orthogonal rotation, you artificially force the two factors to be uncorrelated. 采用oblique rotation more realistic。
+                 fm = 'pa') # fm=pa “pa” is principal axis factoring
+
+fa_promax <- psych::fa(r = datamatrix, nfactors = 4, n.obs = ncol(X), max.iter=100,
+                       rotate = 'promax',
+                       fm = 'pa'
+                       )
  
 #或者也可直接使用原始变量集
-fa_varimax2 <- fa(r = X, nfactors = 4, rotate = 'varimax', fm = 'pa', max.iter=100)
+# 使用raw data 的 好处是在psych包中可以得到factor score/PCA score
+fa_varimax2 <- psych::fa(r = X, nfactors = 4, rotate = 'varimax', fm = 'pa', max.iter=100)
  
 fa_varimax
 ```
 
-Graph Factor Loading Matrices
+Graph Factor Loading Matrices:
+绘制FA分析中的一些图片。
 
 ```{r}
 fa.diagram(fa_varimax)
+
+factor.plot(fa_varimax)
 ```
 
-因子得分
+因子得分：
+因子得分和Unlike component scores, which are calculated exactly, factor scores can only be estimated.
 
 ```{r}
 #因子得分，以正交旋转结果为例
-fa_var <- fa(r = X, nfactors = 4, rotate = 'varimax', fm = 'pa', score = 'regression')
+fa_var <- fa(r = X, nfactors = 4, rotate = 'varimax', 
+             fm = 'pa', 
+             score = 'regression'
+             )
+
 head(fa_var$scores)
  
 #得分系数（标准化的回归权重）
 head(fa_var$weight)
 ```
 
+
+
 ### use FA result in a regression model
 
+在得到目标个数的因子后，可以将因子当成新的变量展开一些回归分析。或者感兴趣的分析。
+
 ```{r}
-# 在得到目标个数的因子后，可以将因子当成新的变量展开一些回归分析
+# 
 
 regdata <- cbind(dat['QD'], fa_var$scores)
 names(regdata) <- c('QD', 'F1', 'F2','F3', 'F4')
@@ -91,5 +129,12 @@ head(regdata)
 
 model.fa.score = lm(QD~., regdata)
 summary(model.fa.score)
+
 vif(model.fa.score)
+
 ```
+
+
+
+
+
