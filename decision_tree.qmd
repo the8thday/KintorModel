@@ -1,0 +1,141 @@
+---
+title: "decision tree"
+format: html
+---
+
+## decision tree
+
+一个不错的数据集搜集的网站。
+> https://archive-beta.ics.uci.edu/
+
+
+决策树，
+classical trees & conditional inference trees.
+
+
+```{r, include=FALSE}
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(partykit)
+```
+
+
+
+```{r}
+# 9和自变量的小数据集
+breast <- read.table('./datasets/breast-cancer-wisconsin.data', sep = ',',
+                     header = FALSE,
+                     na.strings = '?'
+                     )
+names(breast) <- c("ID", "clumpThickness", "sizeUniformity", "shapeUniformity", "maginalAdhesion",
+                   "singleEpithelialCellSize", "bareNuclei",
+                   "blandChromatin", "normalNucleoli","mitosis", "class")
+df <- breast[-1]
+
+df$class <- factor(df$class, levels=c(2,4),
+                   labels=c("benign", "malignant"))
+
+df <- na.omit(df)
+```
+
+
+```{r}
+set.seed(1234)
+index <- sample(nrow(df), 0.7*nrow(df))
+
+train_df <- df[index, ]
+test_df <- df[-index, ]
+```
+
+
+### 利用`rpart`包进行决策树的构建。
+
+```{r}
+dtree <- rpart::rpart(class ~ ., data = train_df,
+                      method = 'class',
+                      parms=list(split="information")
+                      )
+
+# summary(dtree)
+```
+
+CP(complexity parameter)
+```{r}
+dtree$cptable
+```
+*interpret: *To choose a final tree size, examine the cptable component of the list returned by rpart(). It contains data about the prediction error for various tree sizes. The complexity parameter (cp) is used to penalize larger trees. Tree size is defined by the number of branch splits (nsplit). A tree with n splits has n + 1 terminal nodes. The rel error column contains the error rate for a tree of a given size in the training sample. The cross-validated error (xerror) is based on 10-fold cross-validation (also using the training sample). The xstd column contains the standard error of the cross-validation error.
+
+
+```{r}
+plotcp(dtree)
+```
+*interpret: *选择多少个split作为
+
+
+
+依据上面的分析，得到nsplit个数所对应的CP值，带入进行修剪。
+```{r}
+dtree.prune <- prune(dtree, cp = 0.01705)
+```
+
+```{r}
+rattle::fancyRpartPlot(dtree.prune, sub="Classification Tree")
+```
+
+```{r}
+plot(as.party(dtree.prune), gp = gpar(fontsize = 6))
+```
+
+
+```{r}
+dtree.pred <- predict(dtree.pruned, test, type="class")
+
+dtree.perf <- table(test$class, dtree.pred,
+                    dnn=c("Actual", "Predicted"))
+```
+
+
+*Conditional inference trees* are similar to traditional trees, but variables and splits are selected based on significance tests rather than purity/homogeneity measures. The significance tests are permutation tests.
+
+Note that pruning isn’t required for conditional inference trees, and the process is somewhat more automated.
+
+```{r}
+# conditional inference tree
+fit.ctree <- partykit::ctree(class~., data=train_df)
+```
+
+```{r}
+plot(fit.ctree, main = 'Conditional Inference Tree',
+     gp = gpar(fontsize = 6)
+     )
+```
+
+```{r}
+ctree.pred <- predict(fit.ctree, test_df, type="response")
+
+ctree.perf <- table(test_df$class, ctree.pred,
+                    dnn=c("Actual", "Predicted"))
+
+ctree.perf
+```
+
+
+
+
+### tidymodels中的决策树构建
+
+具体参见`random_forest_tidymodels.Rmd`文件。
+
+
+
+
+
+
+
+
+
+
+
+
+
