@@ -1,0 +1,210 @@
+---
+title: "cluster analysis"
+format: html
+---
+
+## Cluster Analysis
+
+> R in action
+
+
+聚类方法一般是为了寻找样本间的相似性，将样本划分为几个亚组，亚组里的样本具有相当的相似性和距离。不同于降维等针对变量的方法，其主要针对的是样本。在统计分析、生信分析中，常用到两类聚类方法，以层次聚类为代表的层次聚集聚类，和以k-means/PMA为代表的分区聚类，层次聚类从每一个样本开始，两两的计算样本间的距离，只到所有样本达到同一分枝；partitioning- cluster则需要提供欲分成的cluster数目。二者作为非监督性方法，再探索性的研究样本分组时最为重要的果然还是分组的validate和分组的数目。
+
+
+关于确定有多少个cluster的问题：The NbClust() function in the NbClust package provides 26 different indices to help you make this decision (which elegantly demonstrates how unresolved this issue is). 
+
+
+Validate the results. Validating the cluster solution involves asking the question, “Are these groupings in some sense real and not a manifestation of unique aspects of this dataset or statistical technique?” If a different cluster method or different sample is employed, would the same clusters be obtained? The `fpc`, `clv`, and `clValid` packages each contain functions for evaluating the stability of a clustering solution.
+
+
+```{r, include=FALSE}
+
+library(cluster)
+library(flexclust)
+library(NbClust)
+```
+
+
+```{r}
+data(nutrient, package = 'flexclust')
+```
+
+### dist
+
+距离的计算一般是针对连续性数值数据。两样本间欧氏距离的计算就是一个很好的示例。
+
+But if other variable types are present, alternative dissimilarity measures are required. You can use the `daisy()` function in the `cluster` package to obtain a dissimilarity matrix among observations that have any combination of binary, nominal, ordinal, and continuous attributes. `agnes()` offers agglomerative hierarchical clustering, and `pam()` provides partitioning around medoids..
+
+```{r}
+
+```
+
+
+### Hierarchical cluster
+
+`hclust` 的输入样本间的距离，dist函数有提供多种的距离计算方法。
+需要注意的是，变量间的量纲对此多有影响，最好再计算前对数据做scale等处理。
+
+`average`方法和Single、Complete相比，It’s less likely to chain and is less susceptible to outliers. It also has a tendency to join clusters with small variances.
+
+```{r}
+nutrient.scaled <- scale(nutrient)
+d <- dist(nutrient.scaled)
+fit.average <- hclust(d, method="average")
+
+ggdendro::ggdedgrogram(fit.average) + labs(title="Average Linkage Clustering")
+```
+
+
+确定最佳的cluster数目：
+
+```{r}
+nc <- NbClust::NbClust(nutrient.scaled, distance="euclidean", 
+                min.nc=2, max.nc=15, method="average")
+
+
+fviz_nbclust(nc)
+```
+
+再确定了最佳的cluster数目后，便可以尝试进行分组
+```{r}
+# The cutree() function is used to cut the tree into 5 clusters
+clusters <- cutree(fit.average, k=5)
+
+table(clusters)
+
+nutrient.scaled$clusters <- clusters
+```
+
+```{r}
+colorhcplot::colorhcplot(fit.average, cl, hang=-1, lab.cex=.8, lwd=2,
+            main="Average-Linkage Clustering\n5 Cluster Solution")
+```
+
+
+
+### k-means
+
+K-means clustering can handle larger datasets than hierarchical clustering approaches.
+不过其只能用于定量数据，且容易收到outlier的影响，同时过于偏态和U性数据表现不是很好。
+
+```{r}
+set.seed(42)
+
+# plot of within-group sums of squares
+wssplot <- function(data, nc = 15, seed = 1234) {
+  require(ggplot2)
+  wss <- numeric(nc)
+  for (i in 1:nc) {
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers = i)$withinss)
+  }
+  results <- data.frame(cluster = 1:nc, wss = wss)
+  ggplot(results, aes(x = cluster, y = wss)) +
+    geom_point(color = "steelblue", size = 2) +
+    geom_line(color = "grey") +
+    theme_bw()
+}
+```
+
+```{r}
+data(wine, package="rattle")
+
+
+# 不同变量的量纲差异会影响聚类
+df <- scale(wine[-1])
+
+wssplot(df)
+```
+
+拿到数据，再决定做聚类分析之前，可以通过散点图等确定数据有无聚类的必要，书中提到的两种确定是否需要进行聚类的方法现记录如下：
+
+```{r}
+# 方法一
+library(clusterability)
+
+clusterabilitytest(df, "dip")
+```
+*interpret: * 上述
+
+
+```{r}
+# 方法二
+# 需要先跑下一步，此处因为记录的缘故，姑且先放在此处
+
+CCC = nc$All.index[, 4]
+
+k <- length(CCC)
+plotdata <- data.frame(CCC = CCC, k = seq_len(k))
+
+ggplot(plotdata, aes(x=k, y=CCC)) +
+  geom_point() + geom_line() +
+  theme_minimal() +
+  scale_x_continuous(breaks=seq_len(k)) +
+  labs(x="Number of Clusters")
+```
+
+*interpret: * When the CCC values are all negative and decreasing for two or more clusters, the distribution is typically unimodal.
+
+
+*确定聚类数目。*
+
+```{r}
+nc <- NbClust(df, min.nc=2, max.nc=15, method="kmeans")
+
+factoextra::fviz_nbclust(nc)
+```
+*interpret: *首先是文字表述，会推荐一个最佳的K值。最后一幅图比较直观，y轴值更高的为推荐的cluster数目。
+
+
+
+```{r}
+set.seed(42)
+
+fit.km <- kmeans(df, 
+                 centers = 3, 
+                 nstart=25, # recommended
+                 iter.max = 10
+                 )
+# 每个center中observation的个数
+fit.km$size
+
+# 
+fit.km$centers
+```
+
+```{r}
+fviz_cluster(fit.km, data=df) +
+  theme_bw()
+```
+
+
+
+### PAM
+
+不同于k-means利用均值进行聚类，PAM对于outlier没那么敏感，也可以用于分类数据等。其利用`medoid`每个cluster中最具代表性的observation identified.
+PAM可以选择多种距离和dissimilarity measure。
+
+
+```{r}
+fit.pam <- cluster::pam(wine[, -1], k = 3,
+                        metric = 'euclidean',
+                        stand = TRUE
+                        )
+
+# summary(fit.pam)
+
+```
+
+
+`medoids`是数据集中具体的observation，这个k-means的均值是不同的。
+那么PAM得到的这三个样本，会是某种特定的样本？
+
+```{r}
+fit.pam$medoids
+```
+
+
+
+
+
