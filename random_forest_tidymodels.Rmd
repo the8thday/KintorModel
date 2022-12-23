@@ -9,11 +9,15 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## random_forest_tidymodels
+## random forest by tidymodels
 
-Random forest model by tidymodels
+Random forest model by tidymodels.
 
-```{r echo=FALSE}
+随机森林，采用随机抽样的ensembled决策树构建的模型。
+A `bagging model` is the same as a random forest where mtry is equal to the number of predictors.
+
+```{r, include=FALSE}
+
 library(tidyverse)
 library(tidymodels)
 library(vip)
@@ -21,30 +25,39 @@ library(usemodels)
 
 
 tidymodels_prefer()
-doParallel::registerDoParallel()
+cl <- makePSOCKcluster(4)
+doParallel::registerDoParallel(cl)
 ```
 
 
 *prepare input data*:
+
 以下链接有多了癌症组织表达数据集：https://file.biolab.si/biolab/supp/bi-cancer/projections/
 可以拿来做测试数据。
-The prostate data set (Singh et al.) includes the gene expression measurements for 52 prostate tumors and 50 adjacent normal prostate tissue samples.
 
-```{r}
+The prostate data set (Singh et al.) includes the gene expression measurements for 52 prostate tumors and 50 adjacent normal prostate tissue samples.
+本测试数据虽则样本数量不是很多，但是变量挺多，采用决策树模型并非是一个好的策略。
+
+```{r, include=FALSE}
+
 expr_file <- "datasets/prostat.expr.symbol.txt"
 metadata_file <- "datasets/prostat.metadata.txt"
 
-expr_mat <- read_delim(expr_file, delim = '\t') %>% 
+expr_mat <- read_delim(expr_file, delim = "\t") %>%
   janitor::clean_names()
-metadata <- read_delim(metadata_file, delim = '\t') %>% 
+metadata <- read_delim(metadata_file, delim = "\t") %>%
   janitor::clean_names()
 
 # 此处或可以加上`Boruta`的结果进行一些变量筛选工作
-input_data <- expr_mat %>% column_to_rownames('symbol') %>% t() %>% 
-  as.data.frame() %>% rownames_to_column() %>% as_tibble() %>% 
-  janitor::clean_names() %>% 
-  left_join(metadata, by = c('rowname'='sample')) %>% 
-  mutate(class = if_else(class=='tumor', 1, 0)) %>% 
+input_data <- expr_mat %>%
+  column_to_rownames("symbol") %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  as_tibble() %>%
+  janitor::clean_names() %>%
+  left_join(metadata, by = c("rowname" = "sample")) %>%
+  mutate(class = if_else(class == "tumor", 1, 0)) %>%
   mutate(class = as_factor(class))
 
 
@@ -58,7 +71,11 @@ df_test <- testing(df_split)
 ```
 
 
-#### rpart 分类问题
+#### tidymodels做决策树分类问题
+
+首先构建一个决策树模型，以帮助确定超参数的取值。
+本基因表达数据集outcome为二分类结果。两种结局结果较为均衡，一个50例一个52例。
+
 决策树模型的种类繁多，此处选择`rpart`包。
 
 ```{r}
@@ -66,20 +83,22 @@ class_tree_spec <- decision_tree() %>%
   set_engine('rpart') %>% 
   set_mode("classification")
 
-# 初步的模型, 进行模型的一些探索性分析
+# 初步模型, 进行模型的一些探索性分析，为最终模型确定一些参数
 class_tree_fit <- class_tree_spec %>% 
   fit(class ~ ., data = df_train)
 
 
+# 在训练集数据上的一些模型指标
 augment(class_tree_fit, new_data = df_train) %>%
-  accuracy(truth = High, estimate = .pred_class)
+  accuracy(truth = class, estimate = .pred_class)
 
 augment(class_tree_fit, new_data = df_train) %>%
-  conf_mat(truth = High, estimate = .pred_class)
+  conf_mat(truth = class, estimate = .pred_class)
 ```
 
 
 `rpart.plot` 可以对rpart数进行可视化，此处做一个展示:
+
 ```{r}
 class_tree_fit %>% 
   extract_fit_engine() %>% 
@@ -88,26 +107,65 @@ class_tree_fit %>%
 ```
 
 
-交叉验证和网格搜索确定最后的模型
+交叉验证和网格搜索确定最后的模型,
+决策树模型需要确认nsplit等参数，一般会通过CP值分析得到，不过在网格搜索中得到的nsplit值。
+
+在决策树模型中，超参数常见的设置为`cost_complexity` 和 `tree_depth`.
+
 ```{r}
 class_tree_wf <- workflow() %>%
   add_model(class_tree_spec %>% 
-              set_args(cost_complexity = tune())) %>% # 选择网格搜索的参数
+              set_args(cost_complexity = tune(),
+                       tree_depth = tune()
+                       )) %>% # 选择网格搜索的参数
   add_formula(class ~ .)
+
 # k-fold cross-validation
 set.seed(42)
 df_fold <- vfold_cv(df_train)
 
-param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
+
+# 利用dials包，进行超参数的设定
+param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), 
+                           tree_depth(),
+                           levels = 10)
+
+dials_para <- dials::grid_random(cost_complexity(),
+                                 tree_depth(),
+                                 size = 5
+                                 )
 
 # 运行时间也太长了。。
 tune_res <- tune_grid(
   class_tree_wf, 
   resamples = df_fold, 
-  grid = param_grid, 
+  grid = dials_para, 
   metrics = metric_set(accuracy)
 )
+
 autoplot(tune_res)
+
+```
+
+
+简单看下两个超参数在两个不同matrices的表现：
+```{r}
+tree_res %>% 
+  collect_metrics()
+
+tree_res %>%
+  collect_metrics() %>%
+  mutate(tree_depth = factor(tree_depth)) %>%
+  ggplot(aes(cost_complexity, mean, color = tree_depth)) +
+  geom_line(linewidth = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) +
+  scale_x_log10(labels = scales::label_number()) +
+  scale_color_viridis_d(option = "plasma", begin = .9, end = 0)
+```
+
+
+```{r}
 
 best_complexity <- select_best(tune_res)
 
@@ -115,9 +173,7 @@ class_tree_final <- finalize_workflow(class_tree_wf, best_complexity)
 
 class_tree_final_fit <- fit(class_tree_final, data = df_train)
 class_tree_final_fit
-
 ```
-
 
 
 ```{r}
@@ -125,12 +181,47 @@ class_tree_final_fit %>%
   extract_fit_engine() %>%
   rpart.plot()
 ```
+在调整完参数之后，图咋没啥改变呢。。
+
+
+```{r}
+class_tree_final_fit %>%
+  collect_predictions() %>% 
+  roc_curve(class, .pred_PS) %>% 
+  autoplot()
+```
+
+
+
+We can use the function last_fit() with our finalized model; this function fits the finalized model on the full training data set and evaluates the finalized model on the testing data.
+```{r}
+final_fit <- 
+  final_wf %>%
+  last_fit(df_split) 
+
+final_fit %>%
+  collect_metrics()
+```
+
+```{r}
+final_tree <- extract_workflow(final_fit)
+
+# 应该和class_tree_final_fit是一样的，不过跑的太慢了，没有测试
+final_tree
+
+final_tree %>% 
+  extract_fit_parsnip() %>% 
+  vip::vip()
+```
 
 
 
 #### Random Forests 分类问题
 
 随机森林的R包中常用的有`ranger`, `randomForest`包，在此选择用ranger包，其的速度似乎更快。
+Whereas the `randomForest` package provides forests based on traditional decision trees, the `cforest()` function in the `party` package can be used to generate random forests based on conditional inference trees. If predictor variables are highly correlated, a random forest using conditional inference trees may provide better predictions.
+
+不同于决策树、罗辑回归等模型，随机森林等一众模型，其在变量解释上有黑盒子模型之称。虽则随机森林也有提供变量重要性等指标，在构建完随机森林后，我们将采用XAI计划中的一些包进行模型解释上的一些示例。
 
 ```{r}
 rf_spec <- rand_forest(
@@ -138,44 +229,68 @@ rf_spec <- rand_forest(
   trees = 1000,
   min_n = tune()
 ) %>%
-  set_engine("ranger") %>%
+  set_engine("ranger", impotance = TRUE, 
+             # num.threads = 4
+             ) %>%
   set_mode("classification")
 
-# tune the hyperparameters
+
 class_rf_wf <- workflow() %>% 
   add_model(rf_spec) %>% 
   add_formula(class ~.)
 
+```
 
+
+`mtry`参数的设置？the number of predictors that are sampled at splits in a tree-based model.
+
+By default, randomForest() p / 3 variables when building a random forest of regression trees, and sqrt(p) variables when building a random forest of classification trees. 
+
+```{r}
+# 查看parsnip对象的所有参数
+args(rand_forest)
+
+extract_parameter_set_dials(class_rf_wf)
+```
+
+
+```{r}
+# tune the hyperparameters
 set.seed(42)
+
 trees_folds <- vfold_cv(df_train,
                         v = 10
                         )
 
-grid = expand.grid(
-      mtry = c(1, 3, 5), 
+# 在进行具体的模型构建过程中，超参数的范围选择是件需要参考的事情
+# dials 可以提供一些参考，是一个不错的设计
+grid <- expand.grid(
+      mtry = c(100, 30, 50), 
       trees = c(500, 1000, 2000)
     )
+
 # use dials to create grid
-dials_grid <- grid_random(
-  mtry(c(1, ncol(df_train) - 1)),
+dials_grid <- dials::grid_random(
+  finalize(mtry(), x = df_train),
   trees(),
   size = 6
 )
 
+
+# 网格搜索后的对象为
 tune_res <- tune_grid(
   class_rf_wf,
   resamples = trees_folds,
-  grid = 20
+  control = control_grid(save_pred = TRUE),
+  grid = 20 # 
 )
 
 # save(tune_res, file = './datasets/tune_res_rf.rda')
 ```
 
 
-AUC for `tune_res`: 
 在进行超参数网格搜索时可以先设置一些值进行，然后根据模型的表现多尝试几次tune, 再最终选择合适的超参数。
-以下探索在各个参数的情况下，以roc_auc matrics为标准的一些参数变化，为了演示grid设置较少。
+以下探索在各个参数的情况下，以`roc_auc` matrics为标准的一些参数变化，为了演示grid设置较少。
 ```{r}
 # load('./datasets/tune_res_rf.rda')
 
@@ -183,7 +298,7 @@ AUC for `tune_res`:
 tune_res %>%
   collect_metrics()
 
-show_best(tune_res)
+show_best(tune_res, metric = "roc_auc")
 
 tune_res %>%
   collect_metrics() %>%
@@ -200,9 +315,17 @@ tune_res %>%
 
 ```
 
+```{r}
+autoplot(tune_res)
+
+```
+
+
 
 *Choosing the best model*
-```{r}
+
+```{r, eval=FALSE}
+# 本cell可以不运行
 best_auc <- select_best(tune_res, "roc_auc")
 
 final_rf <- finalize_model(
@@ -216,61 +339,117 @@ final_rf
 # final_wf <- class_rf_wf %>% finalize_workflow(final_rf)
 final_wf <- workflow() %>% add_model(final_rf) %>% 
   add_formula(class ~ .)
+
 final_fit <- final_wf %>% fit(df_train)
+
+
+```
+
+```{r}
+rf_auc <- 
+  tune_res %>% 
+  collect_predictions(parameters = best_auc) %>% 
+  roc_curve(class, .pred_class) %>% 
+  mutate(model = "Random Forest")
+
+rf_auc %>% 
+  ggplot(aes(x = 1 - specificity, y = sensitivity, col = model)) + 
+  geom_path(linewidth = 1.5, alpha = 0.8) +
+  geom_abline(lty = 3) + 
+  coord_equal() + 
+  scale_color_viridis_d(option = "plasma", end = .6)
+```
+
+
+`final_res`便是在测试集数据上拟合过的模型，其应该包含最终模型吧
+和`final_fit`二者运行其一即可。
+
+```{r}
+best_auc <- select_best(tune_res, "roc_auc")
+
+final_rf <- finalize_model(
+  rf_spec,
+  best_auc
+) %>% 
+  update_engine_parameters(num.threads = cores, 
+                           importance = "impurity" # permutation
+                           )
+
+final_wf <- class_rf_wf %>% 
+  update_model(final_rf)
+
 
 # This function fits a final model on the entire training set and evaluates on the testing set
 final_res <- final_wf %>%
   last_fit(split = df_split)
+
 final_res %>% 
   collect_metrics()
 ```
 
-
-variable importance by package `vip`：
-变量重要性也是经常的目标。
 ```{r}
-final_rf %>%
-  set_engine("ranger", importance = "permutation") %>%
-  fit(class ~ .,
-    data = df_train
-  ) %>%
-  vip::vip(geom = "point")
+test_aug <- augment(final_fit, new_data = df_test) %>% 
+  select(class, starts_with('.'))
 ```
 
 
+
+variable importance by package `vip`：
+变量重要性也是经常需要去关注的指标。在随机森林模型中用以解释变量的重要性、贡献度。
+
+`vip` functions when we want to use model-based methods that take advantage of model structure (and are often faster);
+DALEX functions when we want to use model-agnostic methods that can be applied to any model
+
+```{r}
+# 此处之所以在重新跑一遍是为了演示，在模型构建中可以设置参数的
+vip_res <- final_rf %>%
+  set_engine("ranger", importance = "permutation") %>%
+  fit(class ~ .,
+    data = df_train
+  ) 
+
+vip_res %>%
+  vip::vip(geom = "bar", num_features = 20)
+
+
+final_res %>% 
+  extract_fit_parsnip() %>% 
+  vip(num_features = 20)
+```
+
+在测试集数据上对模型参数，
 ```{r}
 cancer_pred <- predict(final_fit, new_data = df_test) %>%
   bind_cols(predict(final_fit, df_test, type = "prob")) %>%
   bind_cols(df_test %>% select(class))
 
-cancer_pred %>%  roc_auc(truth = class, .pred_tumor, event_level="second")
+# 和上面 final_res的结果一致
+cancer_pred %>%  roc_auc(truth = class, .pred_1, event_level="second")
 
 cancer_pred %>% accuracy(truth = class, .pred_class)
 
-# confusion matrix
+# confusion matrix for test dataset
 final_res %>%
     collect_predictions() %>%
     conf_mat(class, .pred_class)
 ```
 
 
-绘制ROC曲线
+在测试集数据上绘制ROC曲线:
+
 ```{r}
 collect_predictions(final_res) %>%
-  roc_curve(class, .pred_normal) %>%
-  ggplot(aes(x = 1 - specificity, y = sensitivity)) +
-  geom_line(size = 1.5, color = "midnightblue") +
-  geom_abline(
-    lty = 2, alpha = 0.5,
-    color = "gray50",
-    size = 1.2
-  ) +
-  coord_equal()
+  roc_curve(class, .pred_0) %>%
+  autoplot()
 ```
+这曲线也太丑了，得优化一下呀。
 
 
-save model
+
+*save model*
+
 ```{r}
+# crash_wf_model 为最终的模型，不过奇怪的是和final_fit有些地方不一致？
 crash_wf_model <- final_res$.workflow[[1]]
 predict(crash_wf_model, df_test[10, ])
 
@@ -282,9 +461,7 @@ collect_metrics(crash_res) %>%
 ```
 
 
-```{r}
-tidypredict::tidypredict_fit(final_rf)[[1]]
-```
+
 
 
 
