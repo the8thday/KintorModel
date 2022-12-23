@@ -28,16 +28,87 @@ format: html
 
 
 
+```{r, include=FALSE}
+library(tidyverse)
+
+library(MatchIt)
+library(lmtest)
+library(sandwich)
+```
 
 
+```{r}
+
+currentDataset <- read_csv("./datasets/smoking_psyc_distress.csv")
+
+currentDataset |> head()
+```
 
 
+```{r}
+library(tableone)
+
+table2 <- CreateTableOne(vars = c('x.Age', 'x.Gender', 'CVD'),
+                         data = data,
+                         factorVars = c('x.Gender', 'CVD'),
+                         strata = 'Smoke',
+                         smd=TRUE)
+table2 <- print(table2,smd=TRUE,
+                showAllLevels = TRUE,
+                noSpaces = TRUE,
+                printToggle = FALSE)
+table2
+```
 
 
+```{r}
+# 这里为了方便演示直接删掉了缺失值
+data.complete <- na.omit(data)
+
+# 因变量是处理因素，自变量是需要平衡的协变量
+m.out <- matchit(Smoke~x.Age+x.Gender,
+                 data = data.complete,
+                 distance = "logit" # 选择logistic回归
+                 )
+
+m.out
+```
 
 
+可通过以下方法获得算法估计的PS值：
+```{r}
+eps <- m.out$distance
+length(eps)
+```
+
+一开始我们已经计算出了实际PS值（tps），所以我们可以画一个tps和估计ps的散点图，以tps为横坐标，以eps为纵坐标：
+
+```{r}
+# 去掉缺失值
+tps.comp <- tps[complete.cases(data)]
+Smoke.comp <- as.factor(Smoke[complete.cases(data)])
+df <- data.frame(True=tps.comp, Estimated=eps, Smoke=Smoke.comp)
+
+ggplot(df, aes(x=True, y=Estimated, colour=Smoke)) +
+geom_point() +
+geom_abline(intercept=0,slope=1, colour="#990000", linetype="dashed") +
+expand_limits(x=c(0,1),y=c(0,1))
 
 
+# 对x.Age平方
+m.out <- matchit(Smoke~I(x.Age^2)+x.Age +x.Gender,
+                 data=data.complete) 
+
+eps <- m.out$distance
+
+tps.comp <- tps[complete.cases(data)]
+Smoke.comp <- as.factor(Smoke[complete.cases(data)])
+df <- data.frame(True=tps.comp, Estimated=eps, Smoke=Smoke.comp)
+ggplot(df, aes(x=True, y=Estimated, colour=Smoke)) +
+geom_point() +
+geom_abline(intercept=0,slope=1, colour="#990000", linetype="dashed") +
+expand_limits(x=c(0,1),y=c(0,1))
+```
 
 
 
