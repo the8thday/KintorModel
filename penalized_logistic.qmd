@@ -1,0 +1,147 @@
+---
+title: "PENALIZED LOGISTIC REGRESSION"
+format: html
+---
+
+## PENALIZED LOGISTIC REGRESSION
+
+> https://www.tidymodels.org/start/case-study/
+
+Since our outcome variable children is categorical, logistic regression would be a good first model to start. Let’s use a model that can perform feature selection during training. The `glmnet` R package fits a generalized linear model via penalized maximum likelihood. 
+
+
+
+```{r}
+library(tidymodels)
+library(glmnet)
+```
+
+### 所使用数据集
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+hotels <- 
+  read_csv('./datasets/hotels.csv') %>%
+  mutate(across(where(is.character), as.factor))
+
+dim(hotels)
+
+set.seed(123)
+splits      <- initial_split(hotels, strata = children)
+
+hotel_other <- training(splits)
+hotel_test  <- testing(splits)
+
+val_set <- validation_split(hotel_other, 
+                            strata = children, 
+                            prop = 0.80)
+```
+
+
+建个模型：
+
+```{r}
+lr_mod <- 
+  logistic_reg(penalty = tune(), mixture = 1) %>% 
+  set_engine("glmnet")
+
+```
+
+
+recipe 变量,
+对于分类变量需要手工dummy？？
+
+```{r}
+holidays <- c("AllSouls", "AshWednesday", "ChristmasEve", "Easter", 
+              "ChristmasDay", "GoodFriday", "NewYearsDay", "PalmSunday")
+
+lr_recipe <- 
+  recipe(children ~ ., data = hotel_other) %>% 
+  step_date(arrival_date) %>% 
+  step_holiday(arrival_date, holidays = holidays) %>% 
+  step_rm(arrival_date) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+```
+
+
+```{r}
+lr_workflow <- 
+  workflow() %>% 
+  add_model(lr_mod) %>% 
+  add_recipe(lr_recipe)
+
+```
+
+
+```{r}
+lr_reg_grid <- tibble(penalty = 10^seq(-4, -1, length.out = 30))
+
+lr_res <- 
+  lr_workflow %>% 
+  tune_grid(val_set,
+            grid = lr_reg_grid,
+            control = control_grid(save_pred = TRUE),
+            metrics = metric_set(roc_auc))
+
+```
+
+```{r}
+lr_plot <- 
+  lr_res %>% 
+  collect_metrics() %>% 
+  ggplot(aes(x = penalty, y = mean)) + 
+  geom_point() + 
+  geom_line() + 
+  ylab("Area under the ROC Curve") +
+  scale_x_log10(labels = scales::label_number())
+
+lr_plot
+```
+
+
+
+```{r}
+top_models <-
+  lr_res %>% 
+  show_best("roc_auc", n = 15) %>% 
+  arrange(penalty) 
+
+top_models
+```
+
+```{r}
+lr_best <- 
+  lr_res %>% 
+  collect_metrics() %>% 
+  arrange(penalty) %>% 
+  slice(12)
+lr_best
+
+```
+
+```{r}
+lr_auc <- 
+  lr_res %>% 
+  collect_predictions(parameters = lr_best) %>% 
+  roc_curve(children, .pred_children) %>% 
+  mutate(model = "Logistic Regression")
+
+autoplot(lr_auc)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
