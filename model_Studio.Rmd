@@ -11,19 +11,22 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## modelStudio
 
-# everybody love modelStudio!!
+### everybody love modelStudio!!
 
 在诸多模型的构建中，对变量的解释，或者说变量对模型的贡献度需要清晰的解释。
+而本包可以对模型本身进行评估。
 
-```{r}
-library(tidymodels)
+`break_down`, `Shapley additive explanations`
+
+```{r, include=FALSE}
+
 library(DALEXtra)
 library("DALEX")
 library("modelStudio")
 
 ```
 
-explain model
+### 做一个测试样本。
 
 ```{r}
 # load packages and data
@@ -52,6 +55,15 @@ wflow <- workflow() %>%
 
 model <- wflow %>% fit(data = train)
 
+
+```
+
+
+### 对测试模型的使用
+
+Green bars represent positive contributions to the predicted outcome, while red bars represent negative contributions.
+
+```{r}
 # create an explainer for the model
 # 在测试集数据集测试
 explainer <- explain_tidymodels(model,
@@ -65,10 +77,53 @@ rownames(new_observation) <- c("id1", "id2")
 
 # make a studio for the model
 modelStudio(explainer, new_observation)
-
-
 ```
 
+
+
+### 对`random_forest_tidymodels.Rmd`文件中的final_fit模型进行解释
+
+
+通过对模型的探索我们知道其没有经过变量筛选的过程，含有9000多个变量。
+
+`explainer`是一个，
+
+```{r}
+# create an explainer for the model
+# 在测试集数据集测试
+explainer <- explain_tidymodels(final_fit,
+                                data = df_train,
+                                y = df_train$class,
+                                label = "tidymodels_RandomForest")
+
+# pick observations
+# 先以一个样本数据为例，
+new_observation <- df_test %>% 
+  head(n = 2) %>% 
+  mutate(class = as.numeric(class)) %>% 
+  as.data.frame()
+rownames(new_observation) <- c("id1", "id2")
+
+# make a studio for the model
+modelStudio(explainer, new_observation)
+```
+
+
+
+Break-down plots can be very helpful in understanding why an individual received a given prediction from a black box model. However, note that the `break-down` is order dependent. If there are interaction effects between two or more predictor variables, you will get different break-down results for different variable orders.
+Shapley additive explanations or `SHAP` values get around this reliance on order by calculating break-down contributions for many predictor variable orders and averaging the results for each variable.
+
+```{r}
+rf_pparts <- DALEX::predict_parts(explainer = explainer,
+                                  new_observation = new_observation,
+                                  type = 'break_down' # shap
+                                  )
+```
+
+
+```{r}
+plot(rf_pparts)
+```
 
 
 
