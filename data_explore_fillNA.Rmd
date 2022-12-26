@@ -194,7 +194,12 @@ MNAR: Missing Not at Random – the missing is not random, it correlates with un
 All multiple imputation techniques start with the MAR assumption. While MCAR is desirable, in general it is unrealistic for the data. Thus, researchers make the assumption that missing values can be replaced by predictions derived by the observable portion of the dataset. This is a fundamental assumption to make, otherwise we wouldn’t be able to predict plausible values of missing data points from the observed data.
 
 impute NA value.
-选择合适的impute NA的方法。
+对不同的数据集选择合适的impute NA的方法：
+1. 对于有逻辑在内的变量而言，可以依据具体情况进行填充；
+2. 对于NA值缺失很少，且对数据集有一定了解的情况下，简单填充也是可以的，但一般对于数据集的填充不考虑简单填充，其会引入诸多问题；
+3. 一般对于较小的数据集，比如观察数目小于500/1000的情况下，可以采用kNN impute方法，对于较大一些的数据集可以采用 随机森林填充的方法；
+4. 对于问题中涉及到统计推论的情况，采用多重插补的方法，似乎适用于一切情况。
+
 
 `Hmisc`有提供多个简单插补的方法；
 下面记录一下`mice`包用于多重插补。当你认为数据是MCAR或MAR，并且缺失数据问题非常复杂时，多重插补将是一个非常实用方法。
@@ -237,6 +242,23 @@ VIM::matrixplot(sleep)
 marginplot(sleep[c("Gest","Dream")], pch=c(20),
 col=c("darkgray", "red", "blue"))
 ```
+
+
+### kNN & missForest
+
+此处记录一下这两种较为常用的impute方法
+
+```{r}
+x_imputed <- VIM::kNN(sleep, imp_var=FALSE)
+
+marginplot(x_imputed, delimiter = "_imp")
+```
+
+```{r}
+missForest::missForest(sleep)$ximp
+```
+
+
 
 
 ### `mice`包提供多重插补方法
