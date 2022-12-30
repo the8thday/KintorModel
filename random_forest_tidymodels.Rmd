@@ -226,13 +226,17 @@ Whereas the `randomForest` package provides forests based on traditional decisio
 ```{r}
 rf_spec <- rand_forest(
   mtry = tune(),
-  trees = 1000,
+  trees = tune(),
   min_n = tune()
 ) %>%
-  set_engine("ranger", impotance = TRUE, 
+  set_engine("ranger", 
+             impotance = 'impurity', 
              # num.threads = 4
              ) %>%
   set_mode("classification")
+
+
+# 对于变量多达9000个，而样本数量只有100多个的样本，是否需要一些recipe的过程呢
 
 
 class_rf_wf <- workflow() %>% 
@@ -266,14 +270,16 @@ trees_folds <- vfold_cv(df_train,
 # dials 可以提供一些参考，是一个不错的设计
 grid <- expand.grid(
       mtry = c(100, 30, 50), 
+      min_n = c(),
       trees = c(500, 1000, 2000)
     )
 
 # use dials to create grid
 dials_grid <- dials::grid_random(
   finalize(mtry(), x = df_train),
+  min_n(),
   trees(),
-  size = 6
+  size = 10
 )
 
 
@@ -282,7 +288,7 @@ tune_res <- tune_grid(
   class_rf_wf,
   resamples = trees_folds,
   control = control_grid(save_pred = TRUE),
-  grid = 20 # 
+  grid = dials_grid
 )
 
 # save(tune_res, file = './datasets/tune_res_rf.rda')
@@ -291,6 +297,8 @@ tune_res <- tune_grid(
 
 在进行超参数网格搜索时可以先设置一些值进行，然后根据模型的表现多尝试几次tune, 再最终选择合适的超参数。
 以下探索在各个参数的情况下，以`roc_auc` matrics为标准的一些参数变化，为了演示grid设置较少。
+利用验证集数据进行自动的`hyperparameter`设置也是不错的选择。
+
 ```{r}
 # load('./datasets/tune_res_rf.rda')
 
@@ -324,6 +332,8 @@ autoplot(tune_res)
 
 *Choosing the best model*
 
+得到超参数后，对候选的模型进行拟合，注意目前得到的参数只是超参数，而机器学习里的参数是模型拟合的过程。
+
 ```{r, eval=FALSE}
 # 本cell可以不运行
 best_auc <- select_best(tune_res, "roc_auc")
@@ -349,7 +359,7 @@ final_fit <- final_wf %>% fit(df_train)
 rf_auc <- 
   tune_res %>% 
   collect_predictions(parameters = best_auc) %>% 
-  roc_curve(class, .pred_class) %>% 
+  roc_curve(., truth = class, .pred_0) %>% 
   mutate(model = "Random Forest")
 
 rf_auc %>% 
@@ -357,7 +367,8 @@ rf_auc %>%
   geom_path(linewidth = 1.5, alpha = 0.8) +
   geom_abline(lty = 3) + 
   coord_equal() + 
-  scale_color_viridis_d(option = "plasma", end = .6)
+  scale_color_viridis_d(option = "plasma", end = .6) +
+  theme_bw()
 ```
 
 
@@ -371,9 +382,9 @@ final_rf <- finalize_model(
   rf_spec,
   best_auc
 ) %>% 
-  update_engine_parameters(num.threads = cores, 
-                           importance = "impurity" # permutation
-                           )
+  set_engine("ranger", 
+             impotance = 'impurity' # 'permutation'
+             )
 
 final_wf <- class_rf_wf %>% 
   update_model(final_rf)
@@ -386,6 +397,8 @@ final_res <- final_wf %>%
 final_res %>% 
   collect_metrics()
 ```
+
+测试集数据
 
 ```{r}
 test_aug <- augment(final_fit, new_data = df_test) %>% 
@@ -409,15 +422,16 @@ vip_res <- final_rf %>%
   ) 
 
 vip_res %>%
-  vip::vip(geom = "bar", num_features = 20)
+  vip::vip(geom = "col", num_features = 20)
 
 
-final_res %>% 
-  extract_fit_parsnip() %>% 
-  vip(num_features = 20)
+# final_res %>% 
+#   extract_fit_parsnip() %>% 
+#   vip::vip(num_features = 20)
 ```
 
 在测试集数据上对模型参数，
+
 ```{r}
 cancer_pred <- predict(final_fit, new_data = df_test) %>%
   bind_cols(predict(final_fit, df_test, type = "prob")) %>%
