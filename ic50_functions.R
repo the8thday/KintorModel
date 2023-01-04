@@ -353,7 +353,20 @@ all_sheets <- readxl::excel_sheets(filepath1)
 conn_file <- readxl::read_excel("~/OneDrive/kintor/Daily_Work/IC50_xiaodan/concen_file2.xlsx")
 
 
-cal_ic50_3p <- function(drug_file, drug_name, outpath, cellname,
+#' Calculate dose curve IC50 value
+#'
+#' @param drug_file data
+#' @param drug_name target drug name
+#' @param outpath outpath
+#' @param cellname cell line name
+#' @param drug_columns which columns contain the value
+#'
+#' @return table and plot
+#' @export
+#'
+#' @examples
+cal_ic50_3p <- function(drug_file, drug_name,
+                        outpath, cellname,
                         drug_columns = x4:x11
                         ) {
 
@@ -410,6 +423,19 @@ cal_ic50_3p <- function(drug_file, drug_name, outpath, cellname,
 }
 
 
+#' Title
+#'
+#' @param fitted_curve
+#' @param d_long
+#' @param outpath
+#' @param drug_name
+#' @param efficacy_metrics
+#' @param cellname
+#'
+#' @return
+#' @export
+#'
+#' @examples
 plot_ic50_3p <- function(fitted_curve, d_long, outpath, drug_name, efficacy_metrics,
                          cellname) {
 
@@ -458,6 +484,18 @@ plot_ic50_3p <- function(fitted_curve, d_long, outpath, drug_name, efficacy_metr
 
 
 
+#' Title
+#'
+#' @param d_long
+#' @param efficacy_metrics
+#' @param drug_name
+#' @param cellname
+#' @param outpath
+#'
+#' @return
+#' @export
+#'
+#' @examples
 plot_ic50_errorbar <- function(d_long,efficacy_metrics,drug_name,cellname,outpath){
 
   data_1 <- aggregate(d_long["response"], list(conc = d_long$drug_con), FUN = mean)
@@ -507,6 +545,17 @@ plot_ic50_errorbar <- function(d_long,efficacy_metrics,drug_name,cellname,outpat
 
 
 
+#' Title
+#'
+#' @param index
+#' @param file
+#' @param outpath
+#' @param cellname
+#'
+#' @return
+#' @export
+#'
+#' @examples
 ic50_pipe_3p_1blank <- function(index,
                          file = filepath1,
                          outpath = outpath1,
@@ -587,6 +636,17 @@ ic50_pipe_3p_1blank <- function(index,
 }
 
 
+#' Title
+#'
+#' @param index
+#' @param file
+#' @param outpath
+#' @param cellname
+#'
+#' @return
+#' @export
+#'
+#' @examples
 ic50_pipe_3p_2blank <- function(index,
                                 file = filepath1,
                                 outpath = outpath1,
