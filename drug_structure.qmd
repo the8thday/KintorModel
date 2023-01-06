@@ -1,0 +1,45 @@
+---
+title: "drug structure"
+format: html
+---
+
+## Drug Structure
+
+
+此处记录一下R中用以处理和展现小分子结构数据、大分子抗体结构等的一些R包。
+
+目前感觉在R中相关的工作不是很多。
+
+
+```{r}
+# 目前收集到的一些相关的R包
+
+library(ChemmineR)
+library(bio3d)
+library(rcdk)
+library(DrugSim2DR)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
