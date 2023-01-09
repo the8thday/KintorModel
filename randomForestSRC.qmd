@@ -1,0 +1,84 @@
+---
+title: "randomForestSRC"
+format: html
+---
+
+## randomForestSRC 笔记
+
+此处记录一个较为详细的随机生存森林分析的流程。
+包括模型的构建结果解读，对应的KM曲线绘制，time-dependent ROC曲线，校准曲线，决策曲线等。
+
+
+### 首先是加载所需要的R包
+
+```{r, include=FALSE}
+library(randomForestSRC)
+library(vip)
+```
+
+
+2231个样本，41个变量的数据集。
+
+```{r}
+data(peakVO2)
+```
+
+```{r}
+set.seed(42)
+
+split_index <- caret::createDataPartition(peakVO2$ttodead,
+                                       p = 0.8,
+                                       list = FALSE
+                                       )
+
+df_train <- peakVO2[split_index, ]
+df_test <- peakVO2[-split_index, ]
+```
+
+*并行设置：*
+
+```{r}
+
+```
+
+### 模型构建和结果解读
+
+```{r}
+obj <- randomForestSRC::rfsrc(Surv(ttodead, died)~., df_train,
+             ntree = 1000, 
+             nodesize = 5, 
+             nsplit = 50, 
+             importance = TRUE)
+
+print(obj)
+```
+*interpret: *
+
+
+
+### 模型评价
+
+C-index
+
+```{r}
+get.cindex(obj$yvar[,1], obj$yvar[,2], obj$predicted.oob)
+```
+
+
+### 重要变量筛选
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
