@@ -551,7 +551,12 @@ p3 <- jskm(fit,
 
 ```
 
+
 ## Random Forests Model for survival
+
+随机森林生存分析。利用随机森林算法执行的生存分析方法，可用R包，包括`ranger`, `randomForestSRC`包等，以下列一个`ranger`的常规用法，关于`randomForestSRC`的用法见另一篇笔记。
+
+随机生存森林，和随机森林一致，可以筛选变量，包括变量重要性的排序等；以及构建预测模型。一般适用于右删失数据。
 
 ```{r}
 # ranger model
