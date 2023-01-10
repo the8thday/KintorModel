@@ -102,6 +102,10 @@ fit3 <- lm(weight ~ height + I(height^2) +I(height^3), data=women)
 
 ##### multiple regression
 
+多元回归，自变量不止一个的回归模型。
+
+自变量间的共线性问题需要时时关注，同时在实际应用中，各种协变量、混淆变量、调节变量等等的分析总是很重要的。
+
 ```{r}
 states <- as.data.frame(state.x77[,c("Murder", "Population", "Illiteracy", "Income", "Frost")])
 ```
@@ -132,16 +136,25 @@ summary(fit5)
 
 
 ```{r}
-
+# list里面需要指定具体的数值，不过对于分类变量该如何呢
 plot(effects::effect("hp:wt", fit5,, list(wt = c(2.2, 3.2, 4.2))),
   lines = c(1, 2, 3), multiline = TRUE
 )
 
 ```
 
-模型诊断（model diagnostics）
+*进一步的交互作用interpret的理清：*
+首先看待一个三个变量交互作用的情况。三个变量或多个变量间的交互在阐释时变的复杂，过多的交互作用，不论是从样本量还是实际意义来说都是要避免的，不过三个还算是常见的。
+三个分类变量交互作用的一大特点就是，谨记在dummy编码的情况下，模型的分类变量的系数是可以随着变量level的不同而不存在的，即为0时，此项系数就为0了。最为极端的例子就是所有的分类变量取intercept中的level值时，所有的回归系数在方程中都为0.
 
-模型诊断在`base`R中通过`plot`函数提供了常见的四幅图。不过更为常用的还是基于`car`包中所提供的函数，果然做回归相关的事情是离不开此包的。
+一个简单的理解就是在不同的level组合上数据具有不同的表现。
+
+
+
+
+##### 模型诊断（model diagnostics）
+
+模型诊断在`base`R中通过`plot`函数提供了常见的四幅图。不过更为常用的还是基于`car`包中所提供的函数，显然做回归相关的事情是离不开此包的。
 
 以下为`car`包中所提供的常用的模型诊断函数。
 
