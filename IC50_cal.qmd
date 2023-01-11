@@ -9,8 +9,10 @@ format: html
 > https://towardsdatascience.com/drug-dose-response-data-analysis-5d7d336ad8e9
 > https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_models_built-in_to_prism.htm
 > https://www.aatbio.com/tools/ic50-calculator
-> https://rstats4ag.org/dose-response-curves.html
+> https://rstats4ag.org/dose-response-curves.html 重要的基础知识内容，主要参考文件
 > http://www.darrenkoppel.com/2020/09/04/dose-response-modelling-and-model-selection-in-r/
+
+> https://demo.thunor.net/ 免费基于Python的dose-curve包
 
 
 
@@ -43,10 +45,21 @@ Kd
 *模型判断：*如何判断一个curve模型呢？`drc`包似乎没有提供类似Prism R2的结果。而且在非线性模型中，R2不再是线性模型中x对
 y的解释程度的那个数值，For nonlinear regression, the choice of a ‘null’ model is not as simple, and therefore the  
 R2 type measure will be different depending on the chosen reduced model.
+R2在线性模型中实际上是两个模型的对比，所拟合的模型以及null model。
+AIC是个不错的选择。
 
 
+*模型选择：*除了依据模型评价指标进行选择外，依据数据特点进行选择。比如最为常用到的log-logistic模型，三参数、二参数是把四参数某个参数设置为默认值实现的，Prism中把Hill系数设为1，`drc`包三参数将最小值fit到0、两参数模型还将最大值设为1，两参数模型对于survival数据较为常用。
 
-```{r}
+
+*symmetric log-logistic model: *
+
+$$y=c+(d-c)/(1+exp(b(log(x)-log(ED50))))$$
+
+
+## 示例演示
+
+```{r, include=FALSE}
 library(tidyverse)
 library(ggprism)
 library(pzfx) # read GraphPad data
@@ -61,12 +74,14 @@ registerS3method("bread", "drc", drc::bread.drc)
 ```
 
 
+### 单曲线分析绘制
+
+首先是和Prism软件数据的交互，由国人开发的这个包还是不错的。
 
 ```{r}
-pzfx_tables('~/OneDrive/kintor/Daily_Work/IC50_xiaodan/data.pzfx')
+pzfx::pzfx_tables('~/OneDrive/kintor/Daily_Work/IC50_xiaodan/data.pzfx')
 
 ```
-
 
 
 ```{r}
@@ -77,6 +92,8 @@ dd <- pzfx::read_pzfx('~/OneDrive/kintor/Daily_Work/IC50_xiaodan/data.pzfx',
 dd
 ```
 
+
+此处读取的是经过处理的数据，数据为宽数据，不过需要计算重复的均值，作为函数的因变量。
 
 ```{r}
 d_p <- dd %>% rename('drug_con' = 'Var.1','rep1' = '_1',
@@ -91,6 +108,8 @@ d_p <- dd %>% rename('drug_con' = 'Var.1','rep1' = '_1',
 d_p
 ```
 
+长数据类型。
+
 ```{r}
 d_long <- d_p %>% pivot_longer(cols = -c(id, drug_con, inhib_mean),
                                names_to = 'rep',
@@ -100,8 +119,18 @@ d_long <- d_p %>% pivot_longer(cols = -c(id, drug_con, inhib_mean),
 d_long
 ```
 
+```{r}
+ggplot(d_long, aes(x = drug_con, y = response)) +
+  geom_point()
+
+plot(response ~ log(drug_con+0.1), data = d_long, main="Logarithmic Dose Scale")
+```
+
+
 
 `drc` package 用来拟合`dose-response curve`，`drm` (which fits the regression model) and `LL.4` (which defines the structure of the regression model).
+
+`drc::drm`包有一个不错的地方在于，其对长宽数据都支持，不过肯定用长数据，所谓宽数据是需要计算均值的；而且后续绘图不友好，只是作为一个演示放在此笔记中。
 
 ```{r}
 fitted_curve <- drc::drm(
@@ -114,22 +143,29 @@ fitted_curve <- drc::drm(
 
 summary(fitted_curve)
 ```
+*interpret: *As a consequence estimated b values often lie in the range 0.5 to 20 in absolute value, regardless of the assay or experiment generating the data.
 
+
+可以看到，再手动计算均值后得到的结果和直接用长数据得到的结果是一致的。
 
 ```{r}
 fitted_curve2 <- drc::drm(
   formula = response ~ drug_con,
   data = d_long,
-  # fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
-  fct = drc::LL.4(fixed = c(1,NA,NA,NA))
+  # fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50")) # 四参数
+  fct = drc::LL.4(fixed = c(1,NA,NA,NA)) # 三参数
   )
 
 
 summary(fitted_curve2)
 
-lmtest::coeftest(fitted_curve2, vcov = sandwich)
-# summary(multcomp::glht(ryegrass.LL.4)) # same result as above
 
+# 此处所得到的结果和summary结果差异在于其计算方法的不同
+lmtest::coeftest(fitted_curve2, vcov = sandwich)
+# summary(multcomp::glht(ryegrass.LL.4)) # same result as summary
+
+
+# 三参数
 broom::tidy(fitted_curve2) %>% 
   bind_cols(tibble(rowname = c('E0', 'Einf', 'EC50'))) %>% 
   dplyr::relocate(rowname, everything()) %>% 
@@ -138,7 +174,10 @@ broom::tidy(fitted_curve2) %>%
 
 
 *模型验证*
+
+以下模型的lack-of-fit 的P值偏大，模型的整体表现似乎一般。
 ```{r}
+# 和ANOVA模型的差异，P值是越大越好呀
 modelFit(fitted_curve2)
 
 # the correlation of the adjuste of the curve plotted and the data
@@ -147,8 +186,33 @@ cor(d_long$response, fitted(fitted_curve2))
 
 对于连续变量结局模型的评价，lack-of-fit的P值大于0.05表明模型还不错，不过Prism有提供R2值，目前`drc`包还没有找到计算R2的方法。for lack-of-fit test (against a one-way ANOVA model): the larger (the p-value) the better. 
 
+_但是只利用lack-of-fit_还是不够的，The distribution of the residuals and the hopefully normal distribution of residuals are informative to make sure that the prerequisites for doing a regression in the first place are not violated. The assumptions we must consider include:
 
-计算ED值：
+Correct regression model
+Variance Homogeneity
+Normally distributed measurement errors
+Mutually independent measurement error  ε
+
+```{r}
+#Graphical analysis of residuals
+op <- par(mfrow = c(1, 2), mar=c(3.2,3.2,2,.5), mgp=c(2,.7,0)) #put two graphs together
+
+plot(residuals(fitted_curve2) ~ fitted(fitted_curve2), main="Residuals vs Fitted")
+abline(h=0)
+qqnorm(residuals(fitted_curve2))
+qqline(residuals(fitted_curve2))
+```
+*interpret: *Model esiduals diagnostic plots: Left: distribution of residuals against the fitted value (variance homogeneity); Right: normal q-q plot illustrating whether the residuals are normally distributed (normally distributed measurement errors).
+
+The residual plot indicates that the model was able to catch the variation in data. The distribution of residuals should look like a shotgun shot on a wall. Apparently, there are some systematic violations in the residual plot, At small fitted values the residuals are close to zero than at high fitted values the variation is much more pronounced. This is called a funnel type pattern. We also see it in the graphs with the fit and all the observations (Figure 11.4). The normal Q-Q plot looks all right, no serious deviation from the assumption of normal distribution of residuals. Later we will look at this problem, which is a statistical problem not a biological one.
+
+
+
+
+*计算ED值：*
+
+考虑到各种模型间的不同，用此函数得到ED值更为靠谱一些。*weibull等模型的ED50值需通过此函数得到！*
+
 Delta refers to the asymptotics-based method to calculate confident intervals. 
 
 ```{r}
@@ -158,7 +222,13 @@ ED(fitted_curve2, c(5, 10, 50, 80), interval = "delta")
 
 
 
-计算IC50值:
+*计算IC50值:*
+
+此处就有一个较为微妙的地方，Prism计算得到的值实验室一般直接采用，即EC50值，而对于不同的模型、不同的实验设计，似乎
+IC50的真正计算需要进一步的探讨。比如Weibull其EC50值就不是一个模型参数。
+
+注意Hill系数的值在抑制剂中，应该为一个负值。
+
 ```{r}
 coefs <- setNames(
   fitted_curve$coefficients,
@@ -180,20 +250,52 @@ ic_50
 
 我们所使用的数据是和control组进行对比所得到的比值，是具有浓度为0的数据点，应该在计算IC50时带入，不过并没有必要对此要设置最大最小值的默认值，自己去计算E0，Einf是完全可行的。依据不同的实验设计选择不同的参数。
 
-```{r}
+*因为数据为比例，有理由考虑模型最大设置为100等*
 
-mselect(fitted_curve, fctList = list(W1.3(fixed=c(NA, 100, NA)),
+```{r, warning=FALSE}
+# 演示一个模型选择的过程
+# 依据IC值的大小可以明显的看到4参数是个好模型。
+drc::mselect(fitted_curve, fctList = list(W1.3(fixed=c(NA, 100, NA)),
                                      W1.4(), 
                                      W2.3(fixed=c(NA, 100, NA)), 
-                                     W2.4(),
-                                     LL.4()),
-        linreg=TRUE) 
+                                     LL.3(),
+                                     LL.4(fixed = c(1,NA,NA,NA)),
+                                     LL.4(fixed = c(NA,0,100,NA))
+                                     ),
+        linreg=TRUE
+        ) 
+
+
+```
+*interpret: *For Akaike’s information criterion and the residual standard error: the smaller the better and for lack-of-fit test (against a one-way ANOVA model): the larger (the p-value) the better. Note that the residual standard error is only available for continuous dose-response data. Log likelihood values cannot be used for comparison unless the models are nested.
+The rule of AIC is that the smaller the better and differences of *more than 10* indicates “significantly” better model fits. 
+
+
+奇怪，AIC的值怎么和上面的不太一致。
+```{r}
+AIC(fitted_curve, fitted_curve2)
 ```
 
 
 
 
-### 利用ggplot2绘制漂亮的图片：
+*drc包还有提供综合几个模型结果的函数*
+
+就个人而言，期望其的使用，在于多个模型的AIC差别不大的情况下，虽则其会给予比重。
+```{r}
+drc::maED(fitted_curve,
+          fctList = list(LL.3(), LL.4(fixed = c(1,NA,NA,NA))),
+          c(10, 50, 80),
+          interval="kang"
+          )
+```
+
+
+
+
+#### 利用ggplot2绘制漂亮的图片：
+
+下面这两段摘抄的代码效果一般，不考虑。
 
 ```{r}
 # new dose levels as support for the line
@@ -243,7 +345,9 @@ ggplot(d_long, aes(x = conc0, y = response)) +
 plot(fitted_curve, 
      log='x', 
      xlab = 'Drug concentration (microM)', 
-     ylab= 'Inhibition')
+     ylab= 'Inhibition',
+     type = 'all'
+     )
 ```
 
 此为另一篇推文计算的IC50和上述有所不同。
@@ -311,7 +415,7 @@ d_p %>%
   labs(x = "[Agonist], M")
 ```
 
-绘制基于`ggplot2`的漂亮图片：
+*绘制基于`ggplot2`的漂亮图片：*
 
 ```{r}
 #plot_2
@@ -377,5 +481,53 @@ p2 <- ggplot(
 
 p2
 ```
+
+
+### 多曲线对比
+
+除计算单个化合物的IC50值外，两条或多条曲线间的对比也是经常要用到的功能，现记录一下。
+
+
+首先绘制两条或多条不同的曲线。
+
+```{r}
+plot(fitted_curve, 
+     log='x', 
+     xlab = 'Drug concentration (microM)', 
+     ylab= 'Inhibition',
+     type = 'all',
+     broken = TRUE
+     )
+
+plot(fitted_curve2, add = TRUE, col="orange")
+```
+
+```{r}
+pp1 <- ggplot(data = d_long,
+       aes(x = drug_con, y = response)) + 
+  geom_point(col = "yellowgreen", size = 4) + 
+  geom_smooth(method = drm,col = "skyblue", method.args = list(fct = L.4()), se = F) +
+  geom_smooth(method = drm,col = "red4", 
+              method.args = list(fct = L.4(fixed = c(1,NA,NA,NA))), 
+              se = F) +
+  scale_x_log10() +
+  labs(title= "GT19637", 
+       x = "Dose (mM)",  y = "Inhibition") + 
+  ggprism::theme_prism()
+
+
+pp1
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
