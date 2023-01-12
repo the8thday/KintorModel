@@ -520,6 +520,77 @@ pp1
 ```
 
 
+*多曲线绘制示例：*
+
+```{r}
+
+fit_two <- drc::drm(formula = DryMatter ~ Dose,
+                    curveid = Herbicide,
+                    data = S.alba,
+                    fct = LL.4()
+                    )
+
+```
+
+*在多条曲线进行拟合时有什么是需要注意到嚒*
+
+示例中考虑了设置一样的最大最小值。
+
+```{r}
+summary(fit_two)
+```
+
+
+```{r}
+
+modelFit(fit_two)
+```
+
+```{r}
+plot(fit_two, broken = T, col = c('red', 'blue'), )
+```
+
+```{r}
+
+EDcomp(fit_two, percVec = c(50, 50))
+```
+
+```{r}
+EDcomp(fit_two, percVec = c(50, 50), interval="delta", reverse=TRUE)
+```
+
+
+```{r}
+par(mfrow=c(1,1), mar=c(3.2,3.2,.5,.5), mgp=c(2,.7,0))
+
+drc::relpot(fit_two, interval = "delta", bty="l")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
