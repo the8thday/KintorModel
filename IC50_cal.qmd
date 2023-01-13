@@ -130,14 +130,21 @@ plot(response ~ log(drug_con+0.1), data = d_long, main="Logarithmic Dose Scale")
 
 `drc` package 用来拟合`dose-response curve`，`drm` (which fits the regression model) and `LL.4` (which defines the structure of the regression model).
 
-`drc::drm`包有一个不错的地方在于，其对长宽数据都支持，不过肯定用长数据，所谓宽数据是需要计算均值的；而且后续绘图不友好，只是作为一个演示放在此笔记中。
+`drc::drm`包有一个不错的地方在于，其对长宽数据都支持，不过*肯定用长数据*，所谓宽数据是需要计算均值的；而且后续绘图不友好，只是作为一个演示放在此笔记中。
 
 ```{r}
+# fitted_curve <- drc::drm(
+#   formula = inhib_mean ~ drug_con,
+#   data = d_p,
+#   fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
+#   # fct = LL.3()
+#   )
+
 fitted_curve <- drc::drm(
-  formula = inhib_mean ~ drug_con,
-  data = d_p,
-  fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50"))
-  # fct = LL.3()
+  formula = response ~ drug_con,
+  data = d_long,
+  fct = LL.4(names = c("hill", "min_value", "max_value", "ec_50")) # 四参数
+  # fct = drc::LL.4(fixed = c(1,NA,NA,NA)) # 三参数
   )
 
 
@@ -178,6 +185,7 @@ broom::tidy(fitted_curve2) %>%
 以下模型的lack-of-fit 的P值偏大，模型的整体表现似乎一般。
 ```{r}
 # 和ANOVA模型的差异，P值是越大越好呀
+modelFit(fitted_curve)
 modelFit(fitted_curve2)
 
 # the correlation of the adjuste of the curve plotted and the data
@@ -257,6 +265,7 @@ ic_50
 # 依据IC值的大小可以明显的看到4参数是个好模型。
 drc::mselect(fitted_curve, fctList = list(W1.3(fixed=c(NA, 100, NA)),
                                      W1.4(), 
+                                     W2.4(),
                                      W2.3(fixed=c(NA, 100, NA)), 
                                      LL.3(),
                                      LL.4(fixed = c(1,NA,NA,NA)),
@@ -271,9 +280,25 @@ drc::mselect(fitted_curve, fctList = list(W1.3(fixed=c(NA, 100, NA)),
 The rule of AIC is that the smaller the better and differences of *more than 10* indicates “significantly” better model fits. 
 
 
-奇怪，AIC的值怎么和上面的不太一致。
+
 ```{r}
 AIC(fitted_curve, fitted_curve2)
+```
+
+*考虑到上述模型中4参数模型其log-of-fit*也小于0.05，再看待一下Weibull模型。
+```{r}
+fit_weibull <- drc::drm(
+  formula = response ~ drug_con,
+  data = d_long,
+  fct = W1.4()
+  )
+
+
+modelFit(fit_weibull)
+```
+```{r}
+# ?plot.drc
+plot(fit_weibull)
 ```
 
 
@@ -367,6 +392,7 @@ efficacy_metrics
 
 
 ```{r}
+# 不是很合适
 dose_resp <- y ~ min + ((max - min) / (1 + exp(hill_coefficient * (ec50 - x))))
 
 d_p %>%
@@ -487,6 +513,7 @@ p2
 
 除计算单个化合物的IC50值外，两条或多条曲线间的对比也是经常要用到的功能，现记录一下。
 
+两条曲线的对比，通常是满足一定条件的，即是可比的，比如同样实验设计的不同化合物之类的。
 
 首先绘制两条或多条不同的曲线。
 
@@ -522,6 +549,10 @@ pp1
 
 *多曲线绘制示例：*
 
+输入数据中加上对应的分组信息即可。
+
+当然需要选择特定的对比。
+
 ```{r}
 
 fit_two <- drc::drm(formula = DryMatter ~ Dose,
@@ -550,6 +581,10 @@ modelFit(fit_two)
 plot(fit_two, broken = T, col = c('red', 'blue'), )
 ```
 
+`EDcomp` Comparison of relative potencies between dose-response curves
+
+estimate值是 relative potency
+
 ```{r}
 
 EDcomp(fit_two, percVec = c(50, 50))
@@ -568,6 +603,13 @@ drc::relpot(fit_two, interval = "delta", bty="l")
 
 
 
+## 拟合log-logistic模型
+
+log-logsitic 是指数据经过log后具有logistic分布的数据。
+
+```{r}
+library(glogis)
+```
 
 
 
