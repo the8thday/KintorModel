@@ -25,7 +25,9 @@ library(usemodels)
 
 
 tidymodels_prefer()
-cl <- makePSOCKcluster(4)
+
+# for clustrer
+cl <- parallel::makePSOCKcluster(4)
 doParallel::registerDoParallel(cl)
 ```
 
@@ -69,6 +71,90 @@ df_train <- training(df_split)
 df_test <- testing(df_split)
 
 ```
+
+##### 一个网上的小例子
+
+```{r}
+# 一个网上的小例子
+# https://juliasilge.com/blog/ikea-prices/
+
+ikea <- read_csv("~/Downloads/ikea.csv")
+
+ikea_df <- ikea %>%
+  select(price, name, category, depth, height, width) %>%
+  mutate(price = log10(price)) %>%
+  mutate_if(is.character, factor)
+
+ikea_df
+
+```
+
+```{r}
+set.seed(123)
+df_split <- initial_split(ikea_df, strata = price)
+df_train <- training(df_split)
+df_test <- testing(df_split)
+
+set.seed(234)
+dials_grid <- bootstraps(df_train, strata = price, times = 10)
+
+
+dials_grid
+```
+
+```{r}
+library(textrecipes)
+ranger_recipe <-
+  recipe(formula = price ~ ., data = df_train) %>%
+  step_other(name, category, threshold = 0.01) %>%
+  step_clean_levels(name, category) %>%
+  step_impute_knn(depth, height, width)
+
+ranger_spec <-
+  rand_forest(mtry = tune(), min_n = tune(), trees = 1000) %>%
+  set_mode("regression") %>%
+  set_engine("ranger")
+
+ranger_workflow <-
+  workflow() %>%
+  add_recipe(ranger_recipe) %>%
+  add_model(ranger_spec)
+
+```
+
+```{r}
+set.seed(8577)
+# doParallel::registerDoParallel()
+
+ranger_tune <-
+  tune_grid(ranger_workflow,
+    resamples = dials_grid,
+    grid = 11
+  )
+```
+
+
+```{r}
+show_best(ranger_tune, metric = "rmse")
+```
+```{r}
+final_rf <- ranger_workflow %>%
+  finalize_workflow(select_best(ranger_tune, metric = 'rmse'))
+
+final_rf
+```
+
+```{r}
+final_fit <- last_fit(final_rf, df_split)
+
+final_fit
+```
+
+```{r}
+attributes(final_fit)
+```
+
+
 
 
 #### tidymodels做决策树分类问题
