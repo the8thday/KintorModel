@@ -14,9 +14,12 @@ knitr::opts_chunk$set(echo = TRUE)
 > https://m-clark.github.io/mixed-models-with-R/random_intercepts.html
 > https://poissonisfish.com/2017/12/11/linear-mixed-effect-models-in-r/
 > https://bbolker.github.io/mixedmodels-misc/
+> https://journals.sagepub.com/doi/full/10.1177/2515245920960351
 
 
 对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
+
+mixed effects model average trends, random effects model the extent to which these trends vary across levels of some grouping factor.
 
 混合模型的优点之一就是可以处理不等距时间数据，这对于分析临床回顾性研究中收集的患者不等距时间点上的重复测量数据是非常合适的。
 
@@ -30,6 +33,7 @@ library(lme4)
 library(lmerTest)
 library(ggeffects)
 library(emmeans)
+library(mmrm) # 一个针对临床重复资料设计的R包
 
 # data(package = 'lme4')
 ```
@@ -49,7 +53,7 @@ the Laplace approximation is a special case of a parameter estimation method cal
 
 不过通过performance::check_models似乎更安全 ，不确定此处的正态性检验是对因变量还是残差。   
 
-除此之外，对于outlier等数据的处理，NA值的处理等。
+除此之外，对于outlier等数据的处理、NA值的处理等，此处所使用的数据暂不考虑这些，只是主要结果的笔记。
 
 ```{r}
 df2 <- readRDS('./datasets/df2.rds')
@@ -129,7 +133,7 @@ gtsummary::tbl_regression(lme_model,
 
 
 ```{r}
-VarCorr(lme_model)
+lme4::VarCorr(lme_model)
 
 # 可重复性
 # 如果你得到的重复性小于1.0，那么个体内测量结果之间的变化来源是什么。仅是测量误差吗？
