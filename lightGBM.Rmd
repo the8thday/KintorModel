@@ -15,9 +15,11 @@ https://www.kaggle.com/code/athosdamiani/lightgbm-with-tidymodels/notebook
 
 以一个分类问题进行示例。
 
+`randomforest` & `xgboost`都可以确定特征重要性，so？SHAPLEY?
 
 
-```{r}
+
+```{r, include=FALSE}
 library(doParallel)
 library(tidyverse)
 library(tidymodels)
@@ -32,20 +34,28 @@ registerDoParallel(cores = all_cores)
 ```
 
 
-理解数据
+### 理解数据
+
 ```{r}
 adult <- read_csv("./datasets/adult.csv")
 adult <- adult %>% 
     janitor::clean_names() 
+
 glimpse(adult)
 ```
 
+```{r}
+paint::paint(adult)
+```
 
 
-Step 1: train/test split ----------------------------------------
+### Step 1: train/test split ----------------------------------------
+
+测试数据，暂不考虑数据整理的部分。谈论起数据整理，Pandas/Numpy生态提供的数据格式和工具都是属于数据整理应用的范畴。
 
 ```{r}
-set.seed(2)
+set.seed(42)
+
 adult_initial_split <- initial_split(adult, strata = "income", prop = 0.75)
 
 adult_train <- training(adult_initial_split)
@@ -56,11 +66,15 @@ adult_initial_split
 ```
 
 
-Step 3: dataprep --------------------------------------------------------
+### Step 3: dataprep --------------------------------------------------------
+
+数据输入前的处理。此处因为摘抄的流程，故不涉及详细的整理过程。
+
+`step_dummy`是有必要的吗？
 
 ```{r}
 adult_recipe <- recipe(income ~ ., data = adult_train) %>%
-  step_modeimpute(workclass, occupation, native_country) %>%
+  step_impute_mode(workclass, occupation, native_country) %>%
   step_zv(all_predictors()) %>%
   step_novel(all_nominal(), -all_outcomes()) %>%
   step_dummy(all_nominal(), -all_outcomes())
@@ -69,9 +83,9 @@ head(juice(prep(adult_recipe)))
 ```
 
 
+### Step 4: model definiton -----------------------------------
 
-
-Step 4: model definiton -----------------------------------
+超参数还是最为需要关注的地方，每个参数设置的范围和是否需要设置等。
 
 ```{r}
 adult_model <- 
@@ -96,21 +110,22 @@ adult_wf
 ```
 
 
-Step 5: hiperparameter tunning ------------------------------------------
+### Step 5: hiperparameter tunning ------------------------------------------
 
 ```{r}
 # resamples
-adult_resamples <- vfold_cv(adult_train, v = 4)
+adult_resamples <- vfold_cv(adult_train, v = 5)
 
 # grid
-adult_grid <- parameters(adult_model) %>% 
+# 构建一个grid参数表
+adult_grid <- hardhat::extract_parameter_set_dials(adult_model) %>% 
     finalize(adult_train) %>% 
     grid_random(size = 200)
 head(adult_grid)
 ```
 ```{r}
 # grid search
-# 相比xgboost之下lightgbm快不少
+# 相比xgboost，lightgbm快不少，大概十几分钟的样子
 adult_tune_grid <- adult_wf %>%
     tune_grid(
         resamples = adult_resamples,
@@ -121,15 +136,20 @@ adult_tune_grid <- adult_wf %>%
 
 autoplot(adult_tune_grid)
 ```
+*interpret: *图中的结果为四个tune的参数。learning rate似乎越大模型表现越好，minimal node size/loss reduction取值影响不大；tree depth在达到8之后影响便几乎不在变化。
+
 
 ```{r}
 # top 5 hiperparams set
 show_best(adult_tune_grid, "roc_auc")
 ```
+把通过grid search得到的参数带入到模型中便是选择好超参数需要用训练集数据训练的模型。
 
 
 
-Step 6: last fit performance ------------------------------------------
+### Step 6: last fit performance ------------------------------------------
+
+开始模型的训练。
 
 ```{r}
 # select best hiperparameter found
@@ -137,6 +157,7 @@ adult_best_params <- select_best(adult_tune_grid, "roc_auc")
 adult_wf <- adult_wf %>% finalize_workflow(adult_best_params)
 
 # last fit
+# 在训练集上训练，并在测试集上evaluate
 adult_last_fit <- last_fit(
   adult_wf,
   adult_initial_split
@@ -145,6 +166,13 @@ adult_last_fit <- last_fit(
 # metrics
 collect_metrics(adult_last_fit)
 ```
+
+一个插曲，不使用`last_fit`函数，而是用模型直接拟合训练集数据：
+```{r, eval=FALSE}
+# 不需要运行
+
+```
+
 
 ```{r}
 # roc curve
@@ -159,4 +187,44 @@ adult_test_preds %>%
   ) %>%
   conf_mat(income, income_class)
 ```
+```{r}
+yardstick::roc_auc()
+```
+
+
+### SHAP
+
+```{r}
+library(shapr)
+```
+
+
+### 模型保存
+
+得到的模型在经过验证后才是所需要的最后的结果，需要保存并部署。
+
+```{r}
+adult_wf_model <- adult_last_fit$.workflow[[1]]
+predict(adult_wf_model, adult_test[10, ])
+
+
+saveRDS(adult_wf_model, here::here("final_model.rds"))
+
+```
+
+
+读入保存的模型，并做预测：
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
 
