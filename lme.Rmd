@@ -15,6 +15,11 @@ knitr::opts_chunk$set(echo = TRUE)
 > https://poissonisfish.com/2017/12/11/linear-mixed-effect-models-in-r/
 > https://bbolker.github.io/mixedmodels-misc/
 > https://journals.sagepub.com/doi/full/10.1177/2515245920960351
+> https://stats.stackexchange.com/questions/13166/rs-lmer-cheat-sheet/13173#13173
+> https://stackoverflow.com/questions/26465215/random-slope-for-time-in-subject-not-working-in-lme4
+> https://stats.stackexchange.com/questions/58745/using-lmer-for-repeated-measures-linear-mixed-effect-model?rq=1
+> https://stats.stackexchange.com/questions/65371/mixed-model-with-1-observation-per-level
+> https://stats.stackexchange.com/questions/488428/how-do-you-know-the-number-of-random-effects-in-a-mixed-effects-model
 
 
 对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
@@ -25,7 +30,8 @@ mixed effects model average trends, random effects model the extent to which the
 
 线性混合模型的应用较多，此处只针对医学研究中常见的重复测量数据分析。
 
-*一个需要注意点在于怎么引入交互作用：*下面这段摘抄是一个不错的建议，For the so called ‘fixed effects’, one typically specifies effects of time (as a categorical or factor variable), randomised treatment group, and their interaction. This implies a saturated model for the mean, or put another way, there is a separate mean parameter for each time point in each treatment group. Often there are baseline covariates to be adjusted for. One can adjust for these as simple main effects, or additionally with an interaction with time, in order to allow for the association between the baseline variable(s) and outcome to potential vary over time. For a more in depth discussion of the model, see for example Molenberghs et al 2004 (open access). 一般来说需要考虑时间和group的交互，以及时间和base line间的交互。过多的需要考虑的分组信息是一个需要小心的事情。
+*一个需要注意点在于怎么引入交互作用：*下面这段摘抄是一个不错的建议，For the so called ‘fixed effects’, one typically specifies effects of time (as a categorical or factor variable), randomised treatment group, and their interaction. This implies a saturated model for the mean, or put another way, there is a separate mean parameter for each time point in each treatment group. Often there are baseline covariates to be adjusted for. One can adjust for these as simple main effects, or additionally with an interaction with time, in order to allow for the association between the baseline variable(s) and outcome to potential vary over time. For a more in depth discussion of the model, see for example Molenberghs et al 2004 (open access). 一般来说需要考虑时间和group的交互，以及时间和base line间的交互。随机项的话，或者一个随机截距，或者随机time系数。过多的需要考虑的分组信息是一个需要小心的事情。
+`m2 <- lmer(Obs ~ Treatment * Day + (1+Day|Subject), mydata)`
 
 
 ```{r, include=FALSE}
@@ -77,12 +83,51 @@ REML estimation is unbiased but does not allow for comparing models with differe
 
 *随机效应的选择*
 ```{r}
+
 nullmodel1 <- lme4::lmer(score ~ 1 + (1|PatientID), data = df2, REML=FALSE)
-nullmodel2 <- lme4::lmer( score ~ 1 + (1 + class |PatientID), data = df2, REML=FALSE)
-nullmodel3 <- lme4::lmer( score ~ 1 + (1 + time |PatientID), data = df2, REML=FALSE)
+nullmodel2 <- lme4::lmer(score ~ 1 + (1 + class |PatientID), data = df2, REML=FALSE)
+
+# 一个常见的报错，即随机效应的数目大于等于观察数目
+# 比如以下这个公式，其time|PatientID的数目和观察的数目相等，即是考虑了随机截距和随机slope后，随机效应的
+# 数目为231, 不过这个问题很神奇，因为同一患者在不同时间点测多次，必然是和观察数目相等的。
+# sleepstudy这个测试数据集却是没有问题的，不过如果将Days变成factor，同样的问题依旧会出现
+# lmer(Reaction ~ Days + (Days | Subject), data = sleepstudy) 没有任何问题, str(sleepstudy)
+# 目前来看应该就是样本数目不够的缘故
+# 随机效应的数目计算为77+77？，这里应该考虑不同的分类因子变量来计算不同的随机效应的数目,所以是3*77，也就是刚才提到的，不论怎样，观察和随机效应值都会是一样的，报错总会有！！
+# time |PatientID的写法中，除了会计算其他的效应，还会计算time在每一个PatientID的效应。
+# The | symbol indicates a grouping factor in mixed methods.
+# 所以在time combine PatientID时，只有一个观察值的情况下，这种纳入是不正确的。不要纳入time的随机slope。
+nullmodel3 <- lme4::lmer(score ~ 1 + (1 + time |PatientID), data = df2, REML=FALSE,
+                         control=lmerControl(check.nobs.vs.nRE="ignore") # wouldn't recommend it.
+                         )
+
+# 以下没有任何问题
+nlme_m <- nlme::lme(score ~ time, random = ~ 1 + time | PatientID, 
+               method = "REML", data = df2)
+intervals(nlme_m)
+# 有问题
+nlme_m2 <- nlme::gls(
+  score ~ time,
+  # Specify a general correlation structure
+  correlation = corSymm(form = ~ time | PatientID),
+  # Specify constant variance for all Days
+  # weights = varIdent(form = ~1),
+
+  # Or let the variance vary by Day
+  # weights = varIdent(form = ~ 1 | time),
+  data = df2
+)
+
+summary(nlme_m)
 
 anova (nullmodel1, nullmodel2) #  基于LRT比的模型间的对比，同时还考虑模型的AIC/BIC/
 ```
+
+*报错问题的解决：*首先是考虑随机效应的数目，随机效应数目的计算方式为，1|PatientID，其随机效应值为77，time | PatientID, 因为time是一个分类变量，则其在计算时time*77便是随机效应值，在这个意义上来讲，数据在time上不是repeated measures，不能将time视为随机效应。
+This is because the levels of a categorical variable are represented by dummy variables - essentially they are treated as different variables. So in your case, when you fit random slopes only you are asking the software to estimate 5 random slopes for each group. When you fit random intercepts and random slopes there will be 407 random intercepts, but only 4 random slopes for each group (since one level will be treated as a reference group and included in the intercept), so either way you will have 5 x 407 random effects.
+
+The only way to solve this is by either coding the variable as numeric, if that is plausible in your study/data, or not fitting random slopes, or having more than 1 observation per treatment per group.
+
 
 ```{r}
 test_performance(nullmodel1, nullmodel2)
@@ -93,7 +138,7 @@ compare_performance(nullmodel1, nullmodel2) |> plot()
 
 上面的结果可以看到，nullmodel1有较好的指标，所以只选择随机intersect即可，不用考虑其他变量的随机slope。
 
-固定效应的纳入，一般结合具体问题和样本量进行取舍。变量的纳入参考10人1⃣️变量。
+固定效应的纳入，一般结合具体问题和样本量进行取舍。变量的纳入参考10人1️变量。
 
 ```{r}
 # https://rpubs.com/rslbliss/r_mlm_ws#:~:text=To%20run%20a%20multilevel%20linear,we%20have%20used%20thus%20far.&text=Note%20that%20R%20uses%20restricted%20maximum%20likelihood%20to%20fit%20the%20model.
@@ -101,7 +146,7 @@ compare_performance(nullmodel1, nullmodel2) |> plot()
 
 # 以入组后的2次测量值为因变量， 以处理效应、时间效应等为固定效应， 以不同病人作为随机效
 lme_model <- 
-  lmerTest::lmer(score ~ time + class + AGE + (1|`PatientID`),
+  lmerTest::lmer(score ~ time + class + AGE + (1 | PatientID),
              data = df2
              )
 summary(lme_model)
@@ -348,7 +393,7 @@ car::qqPlot(df$LOGCHG, 'lnorm')
 ```
 
 
-GEE模型
+*GEE模型*
 ```{r}
 gee_spec <- 
   linear_reg() %>% 
@@ -356,7 +401,7 @@ gee_spec <-
 ```
 
 
-MME模型
+*MME模型*
 ```{r}
 lmer_spec <- 
   linear_reg() %>% 
@@ -416,6 +461,68 @@ plot(fitted(lme_model), residuals(lme_model), xlab = "Fitted Values", ylab = "Re
 abline(h = 0, lty = 2)
 lines(smooth.spline(fitted(lme_model), residuals(lme_model)))
 ```
+
+
+
+## MMRM包的使用
+
+最近发现了一个新包`MMRM`，记录下其的应用。
+
+```{r}
+library(mmrm)
+
+```
+
+
+以下公式是错误的，其公式的用法和`lme4`不同。
+```{r}
+# specifying an unstructured covariance matrix. 
+
+# 此公式错误
+# mmrm_res <- mmrm(formula = score ~ time + class + AGE + us(1|`PatientID`),
+#                  data = df2,
+#                  reml = TRUE
+#                  )
+
+# 只考虑随机截距的模型
+mmrm_res <- mmrm(formula = score ~ time + class + AGE + us(1|`PatientID`),
+                 data = df2,
+                 reml = TRUE
+                 )
+```
+
+```{r}
+mmrm_res
+```
+
+The summary() method then provides the coefficients table with Satterthwaite degrees of freedom as well as the covariance matrix estimate:
+```{r}
+summary(mmrm_res)
+```
+
+
+
+*此处有个问题需要重视：*
+在以前的分析中，我们知道，time，这一变量是不适合纳入到随机截距里的，
+
+```{r}
+# ?mmrm_control
+mmrm_res2 <- mmrm(formula = score ~ time * class + AGE + us(time |`PatientID`),
+                 data = df2,
+                 method = 'Satterthwaite'
+                 )
+```
+
+```{r}
+summary(mmrm_res2)
+```
+
+
+
+
+
+
+
 
 
 
