@@ -1,0 +1,602 @@
+---
+title: "extract PDF file"
+format: html
+---
+
+## extract PDF
+
+从PDF里面提取出数据
+
+
+```{r, include=FALSE}
+library(tidyverse)
+library(tabulizer) # 
+# library(PDE)
+library(pdftools)
+```
+
+
+### tabulizer 包 的测试
+
+```{r}
+f <- '/Users/congliu/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/01北大人民受试者毛发镜显微照片和报告/01005/W1D1/01005毛发镜W1D1.pdf'
+
+# 交互式提取不适合批量。
+# extract_areas(f, pages = 1, output = "data.frame") -> df1
+
+# out1 <- extract_tables(f, pages = 1, output = "data.frame")
+
+out2 <- extract_text(f, page = 1)
+
+out3 <- str_split(out2, '\n') |> unlist()
+
+out3
+```
+
+
+```{r}
+f <- pdfs[14]
+
+out2 <- extract_text(f, page = 1)
+out3 <- str_split(out2, '\n') |> unlist()
+
+out3
+```
+
+```{r}
+out3[[5]] |> str_split(' ')  |> unlist() -> a
+b <- out3[[7]] |> str_split(' ') |> unlist()
+
+bind_cols(as.data.frame(a), as.data.frame(b))
+
+
+f1 <- function(i, l=out3){
+  a <- l[[i]] |> str_split(' ') |> unlist()
+}
+
+```
+
+
+```{r}
+ll1 <- list()
+all_three <- c(5,7,9,10,11,14:17,23,39,40)
+
+for(i in seq_along(all_three)){
+  print(all_three[[i]])
+  x <- f1(all_three[[i]])
+  ll1[[i]] <- x
+}
+
+df3 <- as.data.frame(ll1)
+df3[1,2] <- '总体毛发密度'
+names(df3) <- df3[1, ]
+df3 <- df3[-1, ]
+df3
+```
+```{r}
+ll2 <- list()
+all_two <- c(6,8,12,13,18,24,25)
+
+for(i in seq_along(all_two)){
+  x <- f1(all_two[[i]])
+  ll2[[i]] <- x
+}
+
+df2 <- as.data.frame(ll2)
+df2[1,2] <- '总体毛发数量'
+names(df2) <- df2[1, ]
+df2 <- df2[-1, ]
+df2[2,] <- NA
+df2
+```
+
+```{r}
+ll3 <- list()
+all_four <- c(19:22)
+
+for(i in seq_along(all_four)){
+  x <- f1(all_four[[i]])
+  ll3[[i]] <- x
+}
+
+df4 <- as.data.frame(ll3)
+names(df4) <- c('1根毛发', '1根毛发', '1根毛发', '4根毛发')
+df4
+```
+
+
+### 批量脚本
+
+start here!
+
+```{r}
+f1 <- function(i, l=out3){
+  a <- l[[i]] |> str_split(' ') |> unlist()
+}
+
+
+extract_pdf2 <- function(f,
+                         all_three = c(5,7,9,10,11,14:17,23,39,40),
+                         all_two = c(6, 8, 12, 13, 18, 24, 25)
+                         ) {
+  f <- f
+  out2 <- extract_text(f, page = 1)
+  out3 <- str_split(out2, "\n") |> unlist()
+  
+  # 提取字符串长度为3的
+  ll1 <- list()
+  all_three <- all_three
+
+  for (i in seq_along(all_three)) {
+    x <- f1(all_three[[i]],out3)
+    ll1[[i]] <- x
+  }
+
+  df3 <- as.data.frame(ll1)
+  df3[1, 2] <- "总体毛发密度"
+  names(df3) <- df3[1, ]
+  df3 <- df3[-1, ]
+  
+  # 提取字符串长度为2的
+  ll2 <- list()
+  all_two <- all_two
+
+  for (i in seq_along(all_two)) {
+    x <- f1(all_two[[i]],out3)
+    ll2[[i]] <- x
+  }
+
+  df2 <- as.data.frame(ll2)
+  df2[1, 2] <- "总体毛发数量"
+  names(df2) <- df2[1, ]
+  df2 <- df2[-1, ]
+  df2[2, ] <- NA
+  
+  final_df <- bind_cols(df3, df2) %>% as_tibble()
+  
+  final_df
+}
+
+
+extract_pdf <- function(f,
+                        use_outlength = FALSE,
+                        all_three = c(5,7,9,10,11,14:17,23,39,40),
+                        all_two = c(6, 8, 12, 13, 18, 24, 25)
+                        ) {
+  f <- f
+  out2 <- extract_text(f, page = 1)
+  out3 <- str_split(out2, "\n") |> unlist()
+  
+  out3l <- length(out3)
+  
+  # 提取字符串长度为3的
+  ll1 <- list()
+  
+  if(use_outlength){
+    all_three <- c(5,7,9,10,11,14:17,23)
+    all_three <- c(all_three, out3l-3, out3l-2)
+  } else {
+    all_three <- all_three
+  }
+  
+
+  for (i in seq_along(all_three)) {
+    x <- f1(all_three[[i]],out3)
+    ll1[[i]] <- x
+  }
+
+  df3 <- as.data.frame(ll1)
+  df3[1, 2] <- "总体毛发密度"
+  names(df3) <- df3[1, ]
+  df3 <- df3[-c(1,3), ]
+  
+  # 提取字符串长度为2的
+  ll2 <- list()
+  all_two <- all_two
+
+  for (i in seq_along(all_two)) {
+    x <- f1(all_two[[i]],out3)
+    ll2[[i]] <- x
+  }
+
+  df2 <- as.data.frame(ll2)
+  df2[1, 2] <- "总体毛发数量"
+  names(df2) <- df2[1, ]
+  df2 <- df2[-1, ]
+  # df2[2, ] <- NA
+  
+  final_df <- bind_cols(df3, df2) %>% as_tibble()
+  
+  final_df
+}
+```
+
+
+##### 对于01文件夹
+
+```{r}
+pdfs <- list.files(path = '~/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/01北大人民受试者毛发镜显微照片和报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- s[[1]][[11]]
+df1 <- extract_pdf(pdfs[[1]], use_outlength = FALSE)
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- s[[1]][[11]]
+
+  df <- extract_pdf(i, use_outlength = FALSE)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_01.csv')
+```
+
+```{r}
+s <- str_split(pdfs[[14]], '/')
+patientID <- s[[1]][[10]]
+visit <- s[[1]][[11]]
+df1 <- extract_pdf(pdfs[[14]], use_outlength = FALSE, 
+                   all_three = c(5,7,9,10,11,14:17,23,36)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+```
+
+
+##### 对于03文件夹
+
+`all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 35, 36)`
+
+```{r}
+pdfs <- list.files(path = '~/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/03中心毛发评估报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+pdfs[1:3]
+```
+```{r}
+all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 35, 36)
+
+
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- s[[1]][[11]]
+df1 <- extract_pdf(pdfs[[1]], all_three = all_three)
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+```
+
+```{r}
+for(i in pdfs[c(2,4,6,11,14,17)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- s[[1]][[11]]
+
+  df <- extract_pdf(i, all_three = all_three)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_03_1.csv')
+```
+
+```{r}
+all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 39, 40)
+
+
+s <- str_split(pdfs[[3]], '/')
+patientID <- s[[1]][[10]]
+visit <- s[[1]][[11]]
+df1 <- extract_pdf(pdfs[[3]], all_three = all_three)
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+```
+
+```{r}
+for(i in pdfs[c(5,7:10,12,13)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- s[[1]][[11]]
+
+  df <- extract_pdf(i, all_three = all_three)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_03_2.csv')
+```
+
+
+`all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 31, 32)`
+
+```{r}
+s <- str_split(pdfs[[18]], '/')
+patientID <- s[[1]][[10]]
+visit <- s[[1]][[11]]
+df1 <- extract_pdf(pdfs[[18]], use_outlength = TRUE)
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+for(i in pdfs[c(15, 16, 19:length(pdfs))]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- s[[1]][[11]]
+
+  df <- extract_pdf(i, use_outlength = TRUE)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_03_3.csv')
+
+```
+
+
+*新函数的测试*
+
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- s[[1]][[11]]
+df1 <- extract_pdf(pdfs[[1]], use_outlength = TRUE)
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- s[[1]][[11]]
+
+  df <- extract_pdf(i, use_outlength = TRUE)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+
+
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_03.csv')
+```
+
+
+##### 对于05文件夹
+
+```{r}
+all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 36, 37)
+
+
+pdfs <- list.files(path = '~/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/05中心毛发评估报告/05中心毛发评估报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+
+
+```
+
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[11]]
+visit <- str_split(s[[1]][[12]], '-')[[1]][[5]]
+df1 <- extract_pdf(pdfs[[1]])
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[11]]
+  visit <- str_split(s[[1]][[12]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_05.csv')
+```
+
+
+##### 08文件夹
+
+`all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 39, 40)`
+
+```{r}
+pdfs <- list.files(path = '~/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/08毛发报告/毛发报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+
+pdfs[1:5]
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[11]]
+visit <- str_split(s[[1]][[12]], '-')[[1]][[5]]
+df1 <- extract_pdf(pdfs[[1]])
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[11]]
+  visit <- str_split(s[[1]][[12]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_08.csv')
+```
+
+
+##### 09文件夹
+
+`all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 36, 37)`
+
+```{r}
+pdfs <- list.files(path = '~/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/09中心毛发报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+
+pdfs[1:5]
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- str_split(s[[1]][[11]], '_')[[1]][[2]]
+# visit <- str_split(s[[1]][[12]], '-')[[1]][[5]]
+df1 <- extract_pdf(pdfs[[1]])
+df1[['patientID']] <- patientID
+# df1[['visit']] <- visit
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- str_split(s[[1]][[11]], '_')[[1]][[2]]
+
+  df <- extract_pdf(i)
+  df[['patientID']] <- patientID
+  # df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>%  
+  mutate(visit = row_number()) %>% 
+  select(patientID, visit, everything()) %>%
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_09.csv')
+```
+
+
+##### 06文件夹
+
+`all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 33, 34)`
+
+```{r}
+pdfs <- list.files(path = '~/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/06中心微观照片及报告/06中心微观照片及报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+
+pdfs[1:5]
+```
+
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[11]]
+# visit <- str_split(s[[1]][[12]], '-')[[1]][[5]]
+df1 <- extract_pdf(pdfs[[1]])
+df1[['patientID']] <- patientID
+# df1[['visit']] <- visit
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[11]]
+
+  df <- extract_pdf(i)
+  df[['patientID']] <- patientID
+  # df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% 
+  mutate(visit = row_number()) %>% 
+  select(patientID, visit, everything()) %>%
+  write_excel_csv('~/OneDrive/kintor/Daily_Work/extract_PDF/results_06.csv')
+```
+
+
+
+### pdftools
+
+```{r}
+pdf.text <- pdftools::pdf_text(f)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
