@@ -1,0 +1,100 @@
+---
+title: "pharm in R"
+author: "liuc"
+date: '2022-07-07'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## pharm in R
+
+
+R语言应用范围中，Pharma相关的应用是一个很大很重要的领域，考虑到`Rstudio`, `Shiny`在工作中的方便性，R语言和SAS在临床 药物研发等领域还是有的一比的，当然简单易用同时兼顾强大还需要很多优秀的开发人员。
+
+在几家药企的努力下，基于R平台的分析在药企中使用会愈发频繁，此处几个不错的R包的使用，并和SAS进行一些对比。
+
+
+```{r}
+library(pharmverse)
+
+library(mmrm)
+```
+
+
+
+## 下面以mmrm包为例
+
+此包是用来做重复测量资料的混合效应模型的。在SAS和Stata的混合效应模型中，可以选择covariance matrix，KR(Kenward & Roger) style ajustment fit an unstructured covariance matrix MMRM model. 
+`lme4`似乎不是很方便，而此包较为方便得到和SAS一致的结果。
+
+其有多种covariance可供选择，以及Satterthwaite adjusted degrees of freedom，Kenward-Roger adjusted degrees of freedom and coefficients covariance matrix 等。详细可参见其官方文档。
+
+
+此包最为重要的部分私以为在于其control部分的应用:
+```{r}
+# ?mmrm_control
+mmrm_control(
+  method = "Kenward-Roger",
+  optimizer = c("L-BFGS-B", "BFGS"),
+  n_cores = 2,
+  start = c(0, 1, 1, 0, 1, 0),
+  accept_singular = FALSE,
+  drop_visit_levels = FALSE
+)
+```
+
+
+
+```{r}
+fit <- mmrm(formula = score ~ time + class + AGE + us(1|`PatientID`),
+                 data = df2,
+                 reml = TRUE,
+                 method = "Kenward-Roger"
+                 )
+```
+
+
+Note that if you would like to match SAS results for an unstructured covariance model, you can use the linear Kenward-Roger approximation:
+
+```{r}
+fit2 <- mmrm(formula = score ~ time * class + AGE + us(time|`PatientID`),
+                 data = df2,
+                 reml = TRUE,
+                 method = "Kenward-Roger-Linear"
+                 )
+```
+
+```{r}
+summary(fit2)
+```
+
+*Hypothesis testing:*
+
+一维contrast的两种算法在freedom等的结果是一致的。此处所讨论到的contrast，在应用到`emmeans`包的时候需要考虑些啥么。
+
+```{r}
+contrast <- numeric(length(component(fit, "beta_est")))
+
+df_1d(fit, contrast)
+```
+
+
+Multi-dimensional contrasts:
+```{r}
+
+```
+
+
+```{r}
+emmeans::emmeans(fit, ~ ARMCD | AVISIT)
+```
+
+
+
+
+
+
+
