@@ -344,3 +344,46 @@ forester(left_side_data = demo_data[,1:2],
 ```
 
 
+R里面合适的森林图包还是需要一个的呀。
+
+```{r}
+library(forestploter)
+
+
+f <- data.frame(aa)
+
+# Add blank column for the forest plot to display CI.
+# Adjust the column width with space. 
+# 这里用空白行放在画图部分的前面
+f$` ` <- paste(rep(" ", 20), collapse = " ")
+
+# Create confidence interval column to display
+f$`Diff (95% CI)` <- ifelse(is.na(f$SE), "",
+                             sprintf("%.2f (%.2f to %.2f)",
+                                     f$estimate, f$lower.CL, f$upper.CL))
+
+# Define theme
+tm <- forest_theme(base_size = 10,
+                   refline_col = "red",
+                   arrow_type = "closed",
+                   footnote_col = "blue")
+
+p <- forest(f[,c(1:2, 10:11)],
+            est = f$estimate,
+            lower = f$lower.CL, 
+            upper = f$upper.CL,
+            sizes = f$SE,
+            ci_column = 3, # 即是画出来的CI放在第几列，要和空白行连在一起
+            ref_line = 0,
+            arrow_lab = c("Placebo Better", "Treatment Better"),
+            # xlim = c(0, 4),
+            # ticks_at = c(0.5, 1, 2, 3),
+            footnote = "This is the demo data. Please feel free to change\nanything you want.",
+            # theme = tm
+            )
+
+# Print plot
+plot(p)
+```
+
+
