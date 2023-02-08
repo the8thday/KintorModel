@@ -194,7 +194,7 @@ Estimates of Covariance Parameters:
 ```{r}
 lmerTest::ranova(lme_model)
 ```
-
+*interpret result: *如果P值小于0.05，可以理解成有必要考虑随机效应。
 
 
 ```{r}
@@ -474,7 +474,7 @@ library(mmrm)
 ```
 
 
-以下公式是错误的，其公式的用法和`lme4`不同。
+以下公式是错误的，其公式的用法和`lme4`不同。正如其文档所说，其不支持个体间随机效应的应用。。
 ```{r}
 # specifying an unstructured covariance matrix. 
 
@@ -485,7 +485,7 @@ library(mmrm)
 #                  )
 
 # 只考虑随机截距的模型
-mmrm_res <- mmrm(formula = score ~ time + class + AGE + us(1|`PatientID`),
+mmrm_res <- mmrm(formula = score ~ time + class + AGE + us(time|`PatientID`),
                  data = df2,
                  reml = TRUE
                  )
@@ -517,7 +517,33 @@ mmrm_res2 <- mmrm(formula = score ~ time * class + AGE + us(time |`PatientID`),
 summary(mmrm_res2)
 ```
 
+```{r}
+emm_res <- emmeans::emmeans(mmrm_res2, ~ class | time)
 
+bb <- contrast(emm_res, method = 'trt.vs.ctrl',
+         type = 'response', adjust = 'fdr',
+         by = 'time', 
+         infer = c(TRUE, TRUE))
+
+
+plot(bb) +
+  theme_bw() +
+  geom_vline(xintercept = 0, linetype = 2, color = 'red4')
+```
+
+```{r}
+emm_res <- emmeans::emmeans(mmrm_res2, ~ class)
+
+bb <- contrast(emm_res, method = 'trt.vs.ctrl',
+         type = 'response', adjust = 'fdr',
+         # by = 'time', 
+         infer = c(TRUE, TRUE))
+
+
+plot(bb) +
+  theme_bw() +
+  geom_vline(xintercept = 0, linetype = 2, color = 'red4')
+```
 
 
 
