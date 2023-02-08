@@ -32,6 +32,10 @@ library(mmrm)
 
 其有多种covariance可供选择，以及Satterthwaite adjusted degrees of freedom，Kenward-Roger adjusted degrees of freedom and coefficients covariance matrix 等。详细可参见其官方文档。
 
+其文档所说的scope为：
+1，response 残差为正态分布
+2，Marginal linear models (no individual-level random effects). 这个就不是很懂了，不应该主要关注个体间的随机效应吗？
+
 
 此包最为重要的部分私以为在于其control部分的应用:
 ```{r}
@@ -47,7 +51,7 @@ mmrm_control(
 ```
 
 
-
+下面只考虑个体检的随机效应，报错。
 ```{r}
 fit <- mmrm(formula = score ~ time + class + AGE + us(1|`PatientID`),
                  data = df2,
@@ -73,10 +77,13 @@ summary(fit2)
 
 *Hypothesis testing:*
 
-一维contrast的两种算法在freedom等的结果是一致的。此处所讨论到的contrast，在应用到`emmeans`包的时候需要考虑些啥么。
+一维contrast的两种算法在freedom上的结果是一致的，但标准误等不一致。此处所讨论到的contrast，在应用到`emmeans`包的时候需要考虑些啥么。
+
+一维和多维linear 是啥意思。。
 
 ```{r}
 contrast <- numeric(length(component(fit, "beta_est")))
+contrast[3] <- 1
 
 df_1d(fit, contrast)
 ```
@@ -84,7 +91,10 @@ df_1d(fit, contrast)
 
 Multi-dimensional contrasts:
 ```{r}
+contrast <- matrix(data = 0, nrow = 2, ncol = length(component(fit, "beta_est")))
+contrast[1, 2] <- contrast[2, 3] <- 1
 
+df_md(fit, contrast)
 ```
 
 
@@ -92,6 +102,20 @@ Multi-dimensional contrasts:
 emmeans::emmeans(fit, ~ ARMCD | AVISIT)
 ```
 
+
+```{r}
+emm_res <- emmeans::emmeans(fit, ~ ARMCD | AVISIT)
+
+bb <- contrast(emm_res, method = 'trt.vs.ctrl',
+         type = 'response', adjust = 'fdr',
+         by = 'ARMCD',
+         infer = c(TRUE, TRUE))
+
+
+plot(bb) +
+  theme_bw() +
+  geom_vline(xintercept = 0, linetype = 2, color = 'red4')
+```
 
 
 
