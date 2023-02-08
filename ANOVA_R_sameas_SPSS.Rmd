@@ -84,6 +84,35 @@ car::Anova(aov.res.two, type = 'III')
 ```
 
 
+*post-hoc analysis *
+
+```{r}
+library(multcomp)
+library(multcompView)
+library(FSA)
+```
+
+the Tukey HSD test allows to compares all groups but at the cost of less power
+```{r}
+TukeyHSD(res_aov)
+```
+the Dunnett’s test allows to only make comparisons with a reference group, but with the benefit of more power
+```{r}
+# Dunnett's test:
+post_test <- glht(res_aov,
+  linfct = mcp(species = "Dunnett")
+)
+```
+
+```{r}
+FSA::dunnTest(flipper_length_mm ~ species,
+  data = dat,
+  method = "holm"
+)
+```
+
+
+
 ## MANOVA 多元方差分析
 多元方差分析是指有多个结局变量outcome的ANOVA模型。
 多个结局变量的情况如，ABC三组小鼠分别经受DEF两种药物不同的处理，研究者想要同时观察小鼠身高和体重的变化，NULL假设为药物处理对身高体重皆有影响，此种情况下适合用MANOVA。
