@@ -18,15 +18,18 @@ library(pdftools)
 
 ### tabulizer 包 的测试
 
+all_three = c(5,7,9,10,11,14:17,23,39,40),
+all_two = c(6, 8, 12, 13, 18, 24, 25)
+
 ```{r}
-f <- '/Users/congliu/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/01北大人民受试者毛发镜显微照片和报告/01005/W1D1/01005毛发镜W1D1.pdf'
+f <- pdfs[1]
 
 # 交互式提取不适合批量。
 # extract_areas(f, pages = 1, output = "data.frame") -> df1
 
 # out1 <- extract_tables(f, pages = 1, output = "data.frame")
 
-out2 <- extract_text(f, page = 1)
+out2 <- tabulizer::extract_text(f, page = 1)
 
 out3 <- str_split(out2, '\n') |> unlist()
 
@@ -35,7 +38,7 @@ out3
 
 
 ```{r}
-f <- pdfs[14]
+f <- pdfs[10]
 
 out2 <- extract_text(f, page = 1)
 out3 <- str_split(out2, '\n') |> unlist()
@@ -215,7 +218,7 @@ extract_pdf <- function(f,
 ##### 对于01文件夹
 
 ```{r}
-pdfs <- list.files(path = '~/OneDrive/kintor/Daily_Work/extract_PDF/KX0826-CN-1002项目毛发评估报告/01北大人民受试者毛发镜显微照片和报告', recursive = TRUE, 
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告1/KX-0826-CN-1004毛发镜分析', recursive = TRUE, 
            pattern = '.pdf',
            full.names = TRUE
            )
@@ -585,14 +588,665 @@ pdf.text <- pdftools::pdf_text(f)
 ```
 
 
+# 女性
+
+## 对于01 site
+
+all_three <- c(5, 7, 9, 10, 11, 14:17, 23, 39, 40)
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告1/KX-0826-CN-1004毛发镜分析', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
 
 
+```
+
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]])
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i)
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_01.csv')
+```
+
+## 对于02site
+
+all_three = c(5,7,9,10,11,14:17,23,40,41)
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告1/KX0826-02中心毛发报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,40,41)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,40,41)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
 
 
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_02.csv')
+```
 
 
+## 03 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告1/KX-0826-CN-1004 -03中心-北大一', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+
+```{r}
+s <- str_split(pdfs[[2]], '/')
+patientID <- s[[1]][[10]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[2]],
+                   all_three = c(5,7,9,10,11,14:17,23,40,41)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[3:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,40,41)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
 
 
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_03.csv')
+```
+
+## 04
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告1/KX0826-CN-1004-04中心-毛发评估报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- str_split(s[[1]][[11]], '-')[[1]][[4]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- str_split(s[[1]][[11]], '-')[[1]][[4]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_04.csv')
+```
+
+## 05
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告1/KX-0826-CN-1004 -05中心-重庆附一', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_05.csv')
+```
+
+## 06 site
+
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/女秃报告南方皮肤病医院', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- str_split(s[[1]][[10]], '-')[[1]][[4]]
+visit <- str_split(s[[1]][[10]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- str_split(s[[1]][[10]], '-')[[1]][[4]]
+  visit <- str_split(s[[1]][[10]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_06.csv')
+```
+
+## 07 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX-0826-CN-1004 -07中心-中日友好', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- str_split(s[[1]][[10]], '-')[[1]][[2]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- str_split(s[[1]][[10]], '-')[[1]][[2]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_07.csv')
+```
+
+
+## 08 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX0826-CN-1004-08中心毛发分析报告', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- str_split(s[[1]][[10]], '-')[[1]][[5]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- str_split(s[[1]][[10]], '-')[[1]][[5]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_08.csv')
+```
+
+
+## 09 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX-0826-CN-1004 -09中心-浙一', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+
+## 10 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX-0826-CN-1004 -10中心-北京友谊', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_10.csv')
+```
+
+
+## 11 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/11中心毛发镜照片', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- str_split(s[[1]][[10]], '-')[[1]][[4]]
+visit <- str_split(s[[1]][[10]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- str_split(s[[1]][[10]], '-')[[1]][[4]]
+  visit <- str_split(s[[1]][[10]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_11.csv')
+```
+
+## 13 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX-0826-CN-1004 -13中心-河北一', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_13.csv')
+```
+
+## 14 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX-0826-CN-1004 -14中心-深圳人民', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- str_split(s[[1]][[11]], '-')[[1]][[4]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- str_split(s[[1]][[11]], '-')[[1]][[4]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_14.csv')
+```
+
+## 15 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX-0826-CN-1004 -15中心-西安交大二', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+s <- str_split(pdfs[[1]], '/')
+patientID <- s[[1]][[10]]
+visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+df1 <- extract_pdf(pdfs[[1]],
+                   all_three = c(5,7,9,10,11,14:17,23,39,40)
+                   )
+df1[['patientID']] <- patientID
+df1[['visit']] <- visit
+
+View(df1)
+```
+
+```{r}
+for(i in pdfs[2:length(pdfs)]){
+  print(i)
+  s <- str_split(i, '/')
+  patientID <- s[[1]][[10]]
+  visit <- str_split(s[[1]][[11]], '-')[[1]][[5]]
+
+  df <- extract_pdf(i,
+                    all_three = c(5,7,9,10,11,14:17,23,39,40)
+                    )
+  df[['patientID']] <- patientID
+  df[['visit']] <- visit
+  # print(df)
+  
+  df1 <- bind_rows(df1, df)
+}
+```
+
+```{r}
+df1 %>% select(patientID, visit, everything()) %>% 
+  write_excel_csv('/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/site_15.csv')
+```
+
+## 16 site
+
+```{r}
+pdfs <- list.files(path = '/Users/congliu/OneDrive/kintor/Daily_Work/KX826_CN1004/苏州开拓KX0826-CN-1004-女性雄秃项目-毛发镜报告2/KX0826-CN-1004毛发评估表', recursive = TRUE, 
+           pattern = '.pdf',
+           full.names = TRUE
+           )
+print(length(pdfs))
+
+head(pdfs)
+```
+```{r}
+
+```
 
 
 
