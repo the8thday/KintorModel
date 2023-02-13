@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 2.  验证模型,包括区别度分析（discrimination）、校准曲线（calibration）、决策曲线（DCA）、NRI/IDI等
 3.  列线图等
 
-模型的区分度指标是指对于一个模型本身区分或者说预测outcome的准确度，混淆矩阵/AUC/NRI/IDI等就是常用的指标，但是校准曲线是看待结局实际发生的概率和预测的概率的一致性，其calibration refers to the agreement between the estimated and the "true" risk of an outcome关注点在于每一个预测，在回归模型中容易理解，现举一个在分类问题中的例子：比如在逻辑回归中通过0.5来判断二分类的是与否，但每一个样本其实是有对应分类发生的概率的，而这些个体实际上发生的概率（比如10个人中有几个人是患病的）这样的的一个散点图就是校准曲线，看待的是二者的一致性，自然图的解读就是对角线为好。这的重点在于某种风险发生的具体的概率，可以通过Hosmer-Lemeshow检验得到统计检验。
+模型的区分度指标是指对于一个模型本身区分或者说预测outcome的准确度，混淆矩阵/AUC/NRI/IDI等就是常用的指标，但是校准曲线是看待结局实际发生的概率和预测的概率的一致性，其calibration refers to the agreement between the estimated and the "true" risk of an outcome关注点在于每一个预测，在回归模型中容易理解，现举一个在分类问题中的例子：比如在逻辑回归中通过0.5来判断二分类的是与否，但每一个样本其实是有对应分类发生的概率的，而这些个体实际上发生的概率（比如10个人中有几个人是患病的）这样的的一个散点图就是校准曲线，看待的是二者的一致性，自然图的解读就是越靠近对角线越好。这的重点在于某种风险发生的具体的概率，可以通过Hosmer-Lemeshow检验得到统计检验。
 
 决策曲线关注的是净收益和阈概率（Threshold Probability）之间的关系，比如说我们在预测一个阳性患者后还需要考虑假如 我们预测的是假阳性可能对患者的损害，我们希望自己做出来的预测模型在临床使用中，在任何时候依照模型结果进行干预净受益都比默认的好（最常见的默认情况就是全干预和全不干预）。`In brief, decision curve analysis calculates a clinical “net benefit” for one or more prediction models or diagnostic tests in comparison to default strategies of treating all or no patients.`阈概率（Threshold Probability），表示的是只有病人的预测概率超过这个阈概率，干预才有受益， 才值得干预。
 
