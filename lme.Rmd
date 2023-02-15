@@ -20,6 +20,8 @@ knitr::opts_chunk$set(echo = TRUE)
 > https://stats.stackexchange.com/questions/58745/using-lmer-for-repeated-measures-linear-mixed-effect-model?rq=1
 > https://stats.stackexchange.com/questions/65371/mixed-model-with-1-observation-per-level
 > https://stats.stackexchange.com/questions/488428/how-do-you-know-the-number-of-random-effects-in-a-mixed-effects-model
+> https://cran.r-project.org/web/packages/glmmTMB/vignettes/covstruct.html
+> https://drive.google.com/file/d/1sOZUAFOc004H4jO8vuUc_4HyYHEgu45b/view
 
 
 对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
@@ -469,6 +471,77 @@ lines(smooth.spline(fitted(lme_model), residuals(lme_model)))
 ## MMRM包的使用
 
 最近发现了一个新包`MMRM`，记录下其的应用。
+
+
+医学研究中的重复测量数据有其对应的考量之处：
+```{r}
+#   MMRM 
+  mod.gls1 <- nlme::gls(Y_comp ~ Group + Time + Group*Time,
+                  data = dat,
+                  correlation = corSymm(form = ~ 1 | USUBJID),    #  unstructured correlation
+                  weights = varIdent(form = ~ 1 | Time),          #  freely estimate variance at subsequent timepoints
+                  na.action = na.exclude)
+
+
+  mod.gls2 <- nlme::gls(Y_mar ~ Group + Time + Group*Time,
+                  data = dat,
+                  correlation = corSymm(form = ~ 1 | USUBJID),    #  unstructured correlation
+                  weights = varIdent(form = ~ 1 | Time),          #  freely estimate variance at subsequent timepoints
+                  na.action = na.exclude)
+  
+  
+# MMRM - 
+  mod.us1 <- glmmTMB::glmmTMB(Y_comp ~ Group + Time + Group*Time + us(Time + 0 | USUBJID), 
+                  data=dat, 
+                  REML = T,
+                  dispformula=~0)
+  
+  mod.us2 <- glmmTMB::glmmTMB(Y_mar ~ Group + Time + Group*Time + us(Time + 0 | USUBJID),
+                  data=dat,
+                  REML = T,
+                  dispformula=~0)
+  
+  
+  mod.lmer1 <- lme4::lmer(Y_comp ~ Group + Time + Group*Time + ( -1 + Time | USUBJID), 
+                    data = dat, 
+                    control = lmerControl(check.nobs.vs.nRE = 'ignore')) 
+  
+  
+  mod.lmer2 <- lme4::lmer(Y_mar ~ Group + Time + Group*Time + (0 + Time | USUBJID), 
+                    data = dat, 
+                    control = lmerControl(check.nobs.vs.nRE = 'ignore')) 
+  
+  
+  #  OLS Regression Model 
+  mod.ols1 <- lm(Y_comp ~ Time + Group + Time*Group, 
+                 data = dat)
+
+  mod.ols2 <- lm(Y_mar ~ Group + Time + Group*Time, 
+                            data = dat)
+  
+  
+  # Compute marginal means
+  library(emmeans)
+  mod.emms.ols1 <- emmeans(mod.ols1, pairwise ~ Group | Time, adjust = 'none',  mode = 'df.error')
+  mod.emms.ols2 <- emmeans(mod.ols2, pairwise ~ Group | Time, adjust = 'none',  mode = 'df.error')
+
+  mod.emms.gls1 <- emmeans(mod.gls1, pairwise ~ Group | Time, adjust = 'none',  mode = 'satterthwaite')
+  mod.emms.gls2 <- emmeans(mod.gls2, pairwise ~ Group | Time, adjust = 'none',  mode = 'satterthwaite')
+
+  mod.emms.us1 <- emmeans(mod.us1, pairwise ~ Group | Time, adjust = 'none',  mode = 'df.error')
+  mod.emms.us2 <- emmeans(mod.us2, pairwise ~ Group | Time, adjust = 'none',  mode = 'df.error')
+
+
+  # Kenward Rogers Degrees of Freedom
+  mod.emms.lmer1.kr <- emmeans(mod.lmer1, pairwise ~ Group | Time, adjust = 'none', mode = "kenward" )
+  mod.emms.lmer2.kr <- emmeans(mod.lmer2, pairwise ~ Group | Time, adjust = 'none', mode = "kenward" )
+# Does not align with SAS output
+  
+  # Satterthwaite Degrees of Freedom:
+  mod.emms.lmer1.sat <- emmeans(mod.lmer1, pairwise ~ Group | Time, adjust = 'none', mode = 'satterthwaite' )
+  mod.emms.lmer2.sat <- emmeans(mod.lmer2, pairwise ~ Group | Time, adjust = 'none', mode = 'satterthwaite' )
+```
+
 
 ```{r}
 library(mmrm)
