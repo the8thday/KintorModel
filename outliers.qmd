@@ -1,0 +1,85 @@
+---
+title: "outliers"
+format: html
+---
+
+## Outlier Analysis
+
+
+```{r}
+library(outliers)
+library(mvoutlier)
+
+```
+
+
+关于Outlier的定义是一个需要值得注意的地方。第一，在探索Outlier时，需要考虑变量自身的特性、分析所用的方法等因素来确定是否是Outlier值。第二，Outlier并非没有价值的数据，在某些时候其反而具有额外的信息，是否需要删除Outlier是首先需要考虑的事情，当然可以选择删除与否各做一份。
+
+
+```{r}
+boxplot.stats(dat$hwy)$out
+```
+
+With the percentiles method, all observations that lie outside the interval formed by the 2.5 and 97.5 percentiles will be considered as potential outliers. Other percentiles such as the 1 and 99, or the 5 and 95 percentiles can also be considered to construct the interval.
+
+```{r}
+lower_bound <- quantile(dat$hwy, 0.025)
+upper_bound <- quantile(dat$hwy, 0.975)
+
+outlier_ind <- which(dat$hwy < lower_bound | dat$hwy > upper_bound)
+outlier_ind
+```
+
+
+If your data come from a normal distribution, you can use the z-scores, below -2 or above 2 is considered as rare
+below -3 or above 3 is considered as extremely rare
+Others also use a z-score below -3.29 or above 3.29 to detect outliers. This value of 3.29 comes from the fact that 1 observation out of 1000 is out of this interval if the data follow a normal distribution.
+
+```{r}
+dat$z_hwy <- scale(dat$hwy)
+
+which(dat$z_hwy > 3.29)
+```
+
+
+Hampel filter
+```{r}
+lower_bound <- median(dat$hwy) - 3 * mad(dat$hwy, constant = 1)
+lower_bound
+upper_bound <- median(dat$hwy) + 3 * mad(dat$hwy, constant = 1)
+upper_bound
+outlier_ind <- which(dat$hwy < lower_bound | dat$hwy > upper_bound)
+outlier_ind
+```
+
+
+Statistical tests
+In this section, we present 3 more formal techniques to detect outliers:
+
+Grubbs’s test
+Dixon’s test
+Rosner’s test
+These 3 statistical tests are part of more formal techniques of outliers detection as they all involve the computation of a test statistic that is compared to tabulated critical values (that are based on the sample size and the desired confidence level).
+
+Note that the 3 tests are appropriate only when the data (without any outliers) are approximately normally distributed. The normality assumption must thus be verified before applying these tests for outliers (see how to test the normality assumption in R).
+
+As for any statistical test, if the p-value is less than the chosen significance threshold (generally 
+α=0.05) then the null hypothesis is rejected and we will conclude that the lowest/highest value is an outlier.
+
+Note that the Grubbs test is not appropriate for sample size of 6 or less (n≤6).
+
+```{r}
+test <- outliers::grubbs.test(dat$hwy)
+test
+
+test <- outliers::dixon.test(subdat$hwy)
+test
+```
+
+
+
+
+
+
+
+
