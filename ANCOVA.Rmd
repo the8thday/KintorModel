@@ -14,7 +14,15 @@ knitr::opts_chunk$set(echo = TRUE)
 此文通过一个小示例记录协方差分析以及计算 emmeans时的应用。 比如在具有主要结局指标的重复测量数据分析中， 以baseline作为协变量，以某一时期的结果作为主要结局变量，则通常会采用协变量的方法进行分析。
 协变量分析的效应值就是矫正过的在各个分组中的均值，协方差分析的自变量至少包括一个分类变量和一个数值型变量。
 
-emmenas为在各个分组中outcome的均值；contrasts为不同分组间的差异，汇报的结果一般还需要包括Pvalue和95%CI。
+emmeans为在各个分组中outcome的均值；contrasts为不同分组间的差异，汇报的结果一般还需要包括Pvalue和95%CI。
+
+*对于如何纳入交互作用的一些记录：*主要指two-way分析中两分组变量间的交互。
+虽则一般在主要研究终点上不会引入交互作用，但后续的次要终点研究是可以考虑交互作用的。
+When using frequentist methods, it is invalid to remove the interaction from a linear model just because of a hypothesis test, because that invalidates the estimate of residual variance, i.e., it results in an underestimation of 𝜎2. This is a form of model uncertainty discussed at more length in RMS.
+
+In a confirmatory randomized experiment it is commonplace to have a "no interaction" model for the primary analysis and a pre-specified secondary analysis using an interaction model. The most cohesive approach IMHO is a Bayesian analysis in which the prior distribution for the interaction effect is elicited before data analysis. This allows interactions to be "half in" and "half out" of the model.
+
+对于交互作用主要如此考虑：如果研究目的有必要去考虑交互作用，则不论是否P<0.05，都按照分组间做分析。如果只是探索性的分析，则在<0.05的时候，按照一个分组去分析另一个分组的亚组分析；如果>0.05，则可以观察具体有意义的分组变量或者直接就做两个单独的ANCOVA。
 
 
 ```{r, include=FALSE}
