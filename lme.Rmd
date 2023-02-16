@@ -488,6 +488,18 @@ lines(smooth.spline(fitted(lme_model), residuals(lme_model)))
                   correlation = corSymm(form = ~ 1 | USUBJID),    #  unstructured correlation
                   weights = varIdent(form = ~ 1 | Time),          #  freely estimate variance at subsequent timepoints
                   na.action = na.exclude)
+
+# 倾向于这种用法
+mmrm <- gls(y~y0*factor(time)+trt*factor(time),
+          na.action=na.omit, 
+          data=longData,
+          correlation=nlme::corSymm(form=~time | id),
+          weights=nlme::varIdent(form=~1|time))
+summary(mmrm)
+library(multcomp)
+confint(glht(mmrm, linfct = matrix(c(0,0,0,0,1,0,0,0,0), nrow=1)))
+confint(glht(mmrm, linfct = matrix(c(0,0,0,0,1,0,0,1,0), nrow=1)))
+confint(glht(mmrm, linfct = matrix(c(0,0,0,0,1,0,0,0,1), nrow=1)))
   
   
 # MMRM - 
