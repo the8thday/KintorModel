@@ -57,6 +57,17 @@ car::Anova(crf.lm)
 
 ```
 
+
+*aov* 和 `stats::oneway.test`的异同：
+主要是var.equal的差别。aov is designed for balanced designs, and the results can be hard to interpret without balance: beware that missing values in the response(s) will likely lose the balance.
+```{r}
+stats::oneway.test(dW24 ~ tvRatio_group, data = df, var.equal = T)
+
+aov(dW24 ~ tvRatio_group, data = df) %>% summary()
+```
+
+
+
 一个较为完善的方差分析，post-hoc
 
 ```{r}
