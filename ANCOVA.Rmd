@@ -48,7 +48,7 @@ skimr::skim(df)
 首先是否满足的分析条件，和一般线性回归一样，需要满足LINE，同时还需要协变量和因变量之间不存在交互效应。
 以下分步骤所做的检测，亦可在模型建立后performance::check_model进行（推荐）。
 
-*对于不满足条件的，可以用sm包的非参数检验方法的sm.ancova()函数进行分析。*
+*对于不满足条件的，可以用sm包的非参数检验方法的sm.ancova()函数进行分析, 或者robust ANCOVA using the WRS2 package.*
 
 ```{r}
 # raw means
@@ -63,6 +63,7 @@ df %>% group_by(`研究项目分组`) %>% shapiro_test(diffW24)
 df %>% levene_test(diffW24 ~ `研究项目分组`)
 
 # 线性，不同分组
+# 不同的线之间最好平行
 ggpubr::ggscatter(
   df, x = "W1D1", y = "diffW24",
   color = "研究项目分组", add = "reg.line"
@@ -71,12 +72,24 @@ ggpubr::ggscatter(
     aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = `研究项目分组`)
   )
 
-# 因变量和协变量的交互效应, 如果有交互效应应该怎么处理呢
+# 分组变量和协变量的交互效应，最好是没有交互作用，即P>0.05
 anova_test(data = df,
        formula = diffW24 ~ `研究项目分组`* W1D1
        )
 
+# 除了上述检验外还需要检查各种残差的分布，详见
+# https://www.datanovia.com/en/lessons/ancova-in-r/#:~:text=The%20Analysis%20of%20Covariance%20(ANCOVA,two%20or%20more%20independent%20groups.
 ```
+```{r}
+# fit two nested models (equal and varying slopes across groups)
+aov0 <- aov(diffW24 ~ W1D1 + `研究项目分组`, data=df) # ≈ lm(Postwt ~ Prewt + Treat + offset(Prewt), data=anorexia)
+aov1 <- aov(diffW24 ~ W1D1 + `研究项目分组`, data=df) 
+# check if we need the interaction term
+anova(aov0, aov1)
+summary.lm(aov1)
+```
+
+
 
 当以上条件基本满足后就可以展开协方差分析。作为其实本质是线性分析的方法，其可以纳入的协变量的个数不应该只有一个。。
 
@@ -126,6 +139,17 @@ plot(emm_res, comparisons = TRUE) + theme_bw() +
   labs(x = "Estimated Marginal Mean")
 
 ```
+
+### sm 包所提供的非参数模型
+
+各参数定义：
+`model`指的是，
+
+```{r}
+sm_res <- with(df_wider_fill, sm::sm.ancova(W1D1, dW24, ARM, model="equal"))
+```
+
+
 
 ### 和线性模型的对比
 
