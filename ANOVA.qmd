@@ -32,7 +32,7 @@ One-way ANCOVA with 1 covariate: $y ~ x + A$ 注意顺序
 two-way factorial ANOVA: $y ~ A * B$
 Randomized block: $y ~ B + A$(B is a blocking factor) 注意顺序
 
-For example, in a two-way ANOVA with unequal numbers of observations in the treatment combinations, the model `y ~ A*B` will not produce the same results as the model `y ~ B*A`. R默认采用TypeI（sequential），还有Type II (hierarchical)、Type III (marginal)，SAS and SPSS employ the Type III approach by default. 如果是均衡设计，3种类型的方差分析没有差别
+For example, in a two-way ANOVA with unequal numbers of observations in the treatment combinations, the model `y ~ A*B` will not produce the same results as the model `y ~ B*A`. R默认采用TypeI（sequential），还有Type II (hierarchical)、Type III (marginal)，SAS and SPSS employ the Type III approach by default. 如果是均衡设计，3种类型的方差分析没有差别。所以很多时候会选择typeIII的结果。
 
 
 在本笔记中，重点关注医学统计中的一些用法示例，其中会涉及到医学统计中常用到的概念，不过多也是以上描述的一些不同命名方式罢了。比如随机区组设计资料的方差分析，就是指的two-way ANOVA中的Randomized block。
@@ -49,7 +49,7 @@ library(PMCMRplus)
 ```
 
 
-### stats 包 aov函数
+### stats 包 aov, oneway.test函数
 
 如上文所述，`aov`函数提供TypeI for partitioning the variance in y among the effects on the right side of this equation.
 其是包装的lm函数，不过其的输出更符合常规ANOVA的结构。
@@ -137,7 +137,7 @@ labels1 <- cld(tuk, level=.05)$mcletters$Letters
 
 #### One-way ANCOVA
 
-在ANOVA的基础上加一个定量的协变量。协变量在`aov`函数中放在公式的前面。不过在`car::Anova`直接包裹时是不用考虑顺序的，因为其所提供的是typeII和typeIII。
+在ANOVA的基础上加一个定量的协变量。协变量在`aov`函数中放在公式的前面。不过在`car::Anova`直接包裹时是不用考虑顺序的，因为其所提供的是typeII和typeIII anova。
 
 ```{r}
 # gesttime 是连续性变量

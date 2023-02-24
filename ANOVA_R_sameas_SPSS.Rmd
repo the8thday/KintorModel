@@ -27,7 +27,7 @@ There are three things you need to do to ensure ANOVA F-values in R match those 
 3. Conduct analysis using Type III Sums of Squares
 
 
-```{r}
+```{r,include=FALSE}
 library(tidyverse)
 library(easystats)
 library(ggeffects)
