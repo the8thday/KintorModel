@@ -46,7 +46,7 @@ skimr::skim(df)
 ```
 
 首先是否满足的分析条件，和一般线性回归一样，需要满足LINE，同时还需要协变量和因变量之间不存在交互效应。
-以下分步骤所做的检测，亦可在模型建立后performance::check_model进行（推荐）。
+以下分步骤所做的检测，亦可在模型建立后performance::check_model进行（推荐，针对残差的部分较为方便）。
 
 *对于不满足条件的，可以用sm包的非参数检验方法的sm.ancova()函数进行分析, 或者robust ANCOVA using the WRS2 package.*
 
@@ -83,7 +83,7 @@ anova_test(data = df,
 ```{r}
 # fit two nested models (equal and varying slopes across groups)
 aov0 <- aov(diffW24 ~ W1D1 + `研究项目分组`, data=df) # ≈ lm(Postwt ~ Prewt + Treat + offset(Prewt), data=anorexia)
-aov1 <- aov(diffW24 ~ W1D1 + `研究项目分组`, data=df) 
+aov1 <- aov(diffW24 ~ W1D1 * `研究项目分组`, data=df) 
 # check if we need the interaction term
 anova(aov0, aov1)
 summary.lm(aov1)
@@ -146,7 +146,7 @@ plot(emm_res, comparisons = TRUE) + theme_bw() +
 `model`指的是，
 
 ```{r}
-sm_res <- with(df_wider_fill, sm::sm.ancova(W1D1, dW24, ARM, model="equal"))
+sm_res <- with(df, sm::sm.ancova(W1D1, dW24, ARM, model="equal"))
 ```
 
 
@@ -238,7 +238,7 @@ con <- modelbased::estimate_contrasts(model = aov_res,
                                method = 'revpairwise'
                                )
 # 二者的结果不一样，是因为上面好像有bug
-contrast(emm_res, method = 'revpairwise', adjust = 'holm', infer = c(T, T))
+# contrast(emm_res, method = 'revpairwise', p_adjust = 'holm', infer = c(T, T))
 
 plot(con, emm)
 
