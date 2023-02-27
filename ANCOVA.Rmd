@@ -32,6 +32,7 @@ library(rstatix)
 library(grafify)
 library(emmeans)
 library(marginaleffects)
+library(multcomp)
 ```
 
 
@@ -49,6 +50,15 @@ skimr::skim(df)
 以下分步骤所做的检测，亦可在模型建立后performance::check_model进行（推荐，针对残差的部分较为方便）。
 
 *对于不满足条件的，可以用sm包的非参数检验方法的sm.ancova()函数进行分析, 或者robust ANCOVA using the WRS2 package.*
+
+ANCOVA分析需要数据满足一定的假设：
+
+1. Linearity between the covariate and the outcome variable
+2. Homogeneity of regression slopes
+3. The outcome variable should be approximately normally distributed
+4. Homoscedasticity
+5. No significant outliers
+
 
 ```{r}
 # raw means
@@ -139,6 +149,15 @@ plot(emm_res, comparisons = TRUE) + theme_bw() +
   labs(x = "Estimated Marginal Mean")
 
 ```
+
+
+`multcomp`包的事后分析：
+```{r}
+postHocs <- multcomp::glht(aov_res, linfct = multcomp::mcp(`研究项目分组` = "Tukey"))
+
+summary(postHocs)
+```
+
 
 ### sm 包所提供的非参数模型
 
