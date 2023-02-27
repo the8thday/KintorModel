@@ -33,8 +33,16 @@ $g(ui)=A_{i} + f_{1}(x_{1}) + f_{2}(x_{2i}) + ...$
 
 在广义线性模型的计算中，g() 和 link()都是对于respose变量而言的。link function maps a nonlinear relationship to a linear one so that a linear model can be fit (and then mapped to the original form).
 
+而在广义加性模型中，增加了对自变量进行转换。
 
-```{r}
+
+总之，GAM是一种
+
+`assumption: `
+1. Y的分布属于指数家族
+
+
+```{r, include=FALSE}
 library(tidyverse)
 library(easystats) # every model need it !
 library(mgcv) # 首选R包
@@ -42,20 +50,22 @@ library(mgcv) # 首选R包
 library(gratia)
 # library(GAMLSS)
 library(scam)
+library(marginaleffects)
 ```
 
 
 
 ### 用mgcv model一个线性关系
 
-GAM 模型亦可用于一般线性模型之中
+GAM 模型亦可用于一般线性模型之中。在`modelbased`的文档中，可以看到GAM的多才多艺。
 
 ```{r}
-# Generate data
+# Generate data，一个线性关系的数据集
 data <- bayestestR::simulate_correlation(r = 0.85, n = 1000, names = c("y", "x"), 
                                          mean = c(100, 0), sd = c(15, 1))
 
 # we need to specify a smooth term (s()) for the variable for which we want to estimate the (non-necessarily linear) relationship.
+# 对自变量展开
 model_gam <- mgcv::gam(y ~ s(x), data = data)
 
 plot(modelbased::estimate_relation(model_gam), line = list(color = "blue"))
@@ -71,6 +81,8 @@ Check your model:
 ```{r}
 mgcv::gam.check(model_gam)
 ```
+*interpret the result: *第一幅图为残差的分布QQ图，本数据集符合正态分布，可以考虑线性模型；第二幅图为残差和预测变量 的散点图，越散乱则越更为接近线性关系；第三图为残差分布；第四幅图模型拟合值和Response值，二者呈现明显的线性。
+
 
 
 #### 用lm model 线性模型
@@ -90,12 +102,11 @@ parameters::parameters(model_lm)
 
 #### effect derivative
 
-在前面的两个模型示例中，lm model给出了x变量的slope，也即x每改变一个单位y所改变的值。然而gam model确无法给出这样的一个
-coefficient。其实有一个更为通用的方法，即效应求导可以帮组得到对应的系数值。
+在前面的两个模型示例中，lm model给出了x变量的slope值，也即x每改变一个单位y所改变的值。然而gam model却无法给出这样的一个coefficient。其实有一个更为通用的方法，即效应求导可以得到对应的系数值。
 
-而且其可以用于任何模型。方便于interpret GAM模型的结果。
+而且其可以用于任何模型。此处方便于interpret GAM模型的结果。
 
-*求导是个好东西*
+*求导是个好东西*，那么这个简单例子的effect derivative指的是，非线性关系曲线上斜率最大的点为一阶求导后的最高点， 而导数在0上下为原曲线斜率正负值变化的地方，即trend发生变化的地方。
 
 ```{r}
 deriv <- modelbased::estimate_slopes(model_gam, trend = "x", at = "x")
@@ -103,15 +114,15 @@ deriv <- modelbased::estimate_slopes(model_gam, trend = "x", at = "x")
 plot(deriv, line = list(color = "blue")) +
   geom_hline(yintercept = 0, linetype = "dashed")
 
-# 可以看到coefficient的结果和lm model的结果很是类似
+# 可以看到coefficient的结果和lm model的结果很是接近
 summary(deriv)
 ```
-上述结果可以看到coefficient的结果和lm model的结果很是类似.
+上述结果可以看到coefficient的结果和lm model的结果很是类似，都是12.75. 在进行GAM建模时不妨都加上此分析。
 
 
 #### GAM 用于多项式线性模型的对比
 
-
+摘抄自上述链接。
 ```{r}
 dd = readr::read_csv('datasets/pisasci2006.csv')
 
@@ -121,7 +132,7 @@ plotly::ggplotly(p)
 ```
 
 
-
+分别拟合两个模型，二者一致。
 ```{r}
 summary(mgcv::gam(Overall ~ Income, data = dd))
 
@@ -129,11 +140,13 @@ summary(stats::lm(Overall ~ Income, data = dd))
 ```
 
 
+增加一个smoother, cubic regerssion spline
 ```{r}
 # ?s
 # ?summary.gam
 
 mod_gam1 = mgcv::gam(Overall ~ s(Income, bs = "cr"), data = dd)
+
 summary(mod_gam1)
 ```
 
@@ -143,19 +156,39 @@ summary(mod_gam1)
 
 GAM的一些特征和一些机器学习的建模方法倒是挺像的。
 
-*可以看到mod_gam1 比lm的结果好*
+*通过R2等指标，可以看到mod_gam1 比lm对数据拟合更好一些*
+
+
+拟合一个三次方多项式模型：
+```{r}
+cm <- lm(Overall ~ Income + I(Income ^ 2) + I(Income ^ 3), data = dd |> na.omit())
+
+# 通过正交多项式来消除多重共线性问题
+# poly函数不允许有NA值
+cm2 <- lm(Overall ~ poly(Income, degree = 3, raw = TRUE), data = dd |> na.omit())
+
+summary(cm)
+```
+```{r}
+plot(effects::Effect("Income",cm))
+```
 
 
 
 
 ### 一个完备切实可行的GAM建模分析过程
 
-在拿到数据和对应的实验设计之后，首要的是确定数据适合用什么样子的模型。
+在拿到数据和对应的实验设计之后，首要的是确定数据适合用什么样子的模型。当然在实验设计之初一般便会理清所需要的统计方法。
 
 对于`mgcv`包，记得分类变量变成factor。一般的，分类变量在gam模型中以linear处理。
+
 `model4b <- gam(hw.mpg ~ s(weight, by = fuel) + fuel, data = mpg,method = "REML")`
 
-```{r}
+比如by参数所对应的fuel分类变量，fual变量为分类变量，不进行smooth处理，对weight数字型变量进行spline处理。
+
+
+生成一些测试数据。
+```{r, include=FALSE}
 # 一些测试数据
 library(gamair)
 data("mpg", package="gamair")
@@ -167,7 +200,7 @@ set.seed(0)
 dat <- mgcv::gamSim(1,n=600, scale=0.6, verbose=FALSE)
 ```
 
-散点图查看数据的分布:
+*在选择模型之前，首先通过散点图等查看数据的分布:*
 
 一些变量的分布呈现曲线分布的情况。
 
@@ -194,6 +227,7 @@ dlookr::eda_report(categ)
 # In practice, we rarely make continuous variables linear in GAMs. This is because, if the relationship is really linear, or there is not enough data to show otherwise, automatic smoothing will force a linear shape.
 
 mod_gam <- gam(Overall ~ s(Income) + s(Edu) + s(Health), data = dd,
+               family=gaussian(),
                 method = "REML")
 
 # mod_gam <- gam()
@@ -211,7 +245,7 @@ mod_gam2B <- update(mod_gam, . ~ . - s(Health) + Health)
 Parametric means models that have a pre-determined form. In this context, it refers to the linear terms in the model.
 For smooths coefficients are not printed. This is because each smooth has several coefficients - one for each basis function. Instead, the first column reads edf, which stands for effective degrees of freedom. This value represents the complexity of the smooth. An edf of 1 is equivalent to a straight line. An edf of 2 is equivalent to a quadratic curve, and so on, with higher edfs describing more wiggly curves.
 
-A good way to interpret significance for smooth terms in GAMs is this: a significant smooth term is one where you can not draw a horizontal line through the 95% confidence interval.
+A good way to interpret significance for smooth terms in GAMs is this: a significant smooth term is one where you can not draw a horizontal line through the 95% confidence interval. 对于edf值接近1的，
 
 
 
@@ -221,12 +255,13 @@ __模型诊断：__如果gam.check结果偏离较高，可以通过调整basis f
 # partial effect plots
 # they show the component effect of each of the smooth or linear terms in the model, which add up to the overall prediction.
 # by default we only see the smooth plots, but by setting all.terms = TRUE, we can display partial effects of linear or categorical terms, as well.
+# 第一幅图的结果显示，edf接近1其几乎是线性关系。
 plot(mod_gam, page = 1, all.terms = TRUE, residuals = TRUE, shade = TRUE,
      shade.col = "lightblue"
      )
 
 # p-value 小于0.05indicate that residuals are not randomly distributed. This often means there are not enough basis functions.
-# 四幅图都是对残差的绘图,第三幅最好在0附近
+# 后四幅图都是对残差的绘图,第三幅最好在0附近
 gam.check(mod_gam, k.rep = 1000)
 
 
@@ -236,8 +271,11 @@ concurvity(mod_gam)
 # pairwise
 concurvity(mod_gam, full = FALSE)
 ```
+*interpret the Results: *图一为
 
-`gratia`包提供的一些功能很方便进行美化：
+
+
+#### `gratia`包提供的一些功能很方便进行美化：
 
 `smooth_estimates`等函数可以帮助提取绘图数据，其是提取图一的结果。文档中的示例展示了如何绘制个性化的基于ggplot2的图。
 
@@ -247,14 +285,37 @@ gratia::draw(mod_gam, residuals = TRUE)
 gratia::appraise(mod_gam) # Model diagnostics
 ```
 
+如上所述，通过求导得到自变量的系数。
+`Income`变量为一个edf为6.7的变量，其不像线性模型具有一个slope。
+以下分析也可以观察两个连续变量或一个连续变量和一个分类变量间的斜率变化。
+```{r}
+deriv <- modelbased::estimate_slopes(mod_gam, 
+                                     trend = "Income", 
+                                     at = "Income"
+                                     )
 
-`easystats`包的一些应用
+plot(deriv, line = list(color = "blue")) +
+  geom_hline(yintercept = 0, linetype = "dashed")
+
+# 可以看到coefficient的结果和lm model的结果很是接近
+summary(deriv)
+```
+*interpret the Result: *上图可以理解为随着Income值的变化，不同的10个点的9个区间的Income的effect。在Income收入较高和较低的两头Income对因变量有有意义的影响。
+
+
+#### `easystats`包的一些应用:
+
+似乎还没有支持。
 
 ```{r}
 # check_model(mod_gam) # not supported yet!
 
 parameters(mod_gam) # 同summary
 ```
+
+#### 模型2:
+
+`s(x,y)`的意思是，
 
 ```{r}
 data(meuse, package="sp")
@@ -291,7 +352,8 @@ qlogis(0.25) == log(1/3) # ....
 ```{r}
 csale <- readRDS('./datasets/csale.rds')
 
-log_mod <- gam(purchase ~ s(n_acts) + s(bal_crdt_ratio) + s(mortgage_age) + s(avg_fin_balance) + s(retail_crdt_ratio) + s(cred_limit) + s(avg_prem_balance),
+log_mod <- gam(purchase ~ s(n_acts) + s(bal_crdt_ratio) + s(mortgage_age) + 
+                 s(avg_fin_balance) + s(retail_crdt_ratio) + s(cred_limit) + s(avg_prem_balance),
                 data = csale,
                 family = binomial,
                 method = "REML")
