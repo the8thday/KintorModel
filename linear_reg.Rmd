@@ -88,6 +88,8 @@ abline(fit1)
 
 ##### 多项式回归
 
+Fitting Polynomial Regression
+
 多项式回归或者通过log等对自变量进行转化后的模型依旧是线性模型，似乎对非线性模型有所误解呀我。。
 
 ```{r}
@@ -98,6 +100,42 @@ summary(fit2)
 # an nth-degree polynomial produces a curve with n-1 bends
 fit3 <- lm(weight ~ height + I(height^2) +I(height^3), data=women)
 ```
+
+对于多项式回归，同时要考虑到变量间的共线性问题，所以一般采用`poly`函数的结果更为可靠，因其提供了正交多项式以消除共线性问题。
+
+> https://stats.stackexchange.com/questions/95939/how-to-interpret-coefficients-from-a-polynomial-model-fit
+
+对于临床上应用的多项式回归在进行线性检验时，有额外的考量，临床标准的线性检验中使用了两个统计量，ADL（偏离直线平均差异，average deviation from linearity）与PctBnd（百分区界 ，percent bound） ，对于大多数分析物PctBnd取5%。如ADL小于所要求的临界判断值，则可认为数据组具有临床可接受的线性，所拟合出的最适非线性多项式无临床意义。
+
+```{r}
+fit3_2 <- lm(weight ~ poly(height, degree = 3), data=women)
+
+summary(fit3_2)
+```
+
+```{r}
+sjPlot::tab_model(fit3_2, show.se = T, show.stat = T, show.df = T, 
+                  show.fstat = T, show.dev = T)
+```
+
+```{r}
+modelsummary::modelsummary(fit3_2)
+
+modelsummary::modelplot(fit3_2)
+```
+
+*interpret the Result: *
+We can conclude from this plot that the slope is (significantly, because the confidence interval does not cover 0) negative until 0, and then becomes positive. 0 corresponds indeed to the point of inversion of the curve.
+```{r}
+deriv <- modelbased::estimate_slopes(fit3_2, trend = "x", at = "x")
+
+plot(deriv) +
+  geom_hline(yintercept = 0, linetype = "dashed")
+
+summary(deriv)
+```
+
+
 
 
 ##### multiple regression
