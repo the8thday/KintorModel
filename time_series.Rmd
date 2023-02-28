@@ -15,6 +15,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 > https://otexts.com/fpp3/
 > https://fable.tidyverts.org/
+> https://bookdown.org/singh_pratap_tejendra/intro_time_series_r/
+> R in action, 3rd
 
 
 
@@ -32,7 +34,7 @@ knitr::opts_chunk$set(echo = TRUE)
 常见的时序数据模型包括，Arma及其衍生模型，Garch簇模型，滤波技术，傅里叶和小波分析等，下面会择机对每一个算法的应用进行一些粗略的讲解。
 
 - `fable::ETS()` & `forecast::ets()` 用来拟合指数预测模型，短期预测能力较好。
-- `fable::ARIMA()` & `forecast::auto.arima()`用来拟合Box-Jenkins法，也称作ARIMA模型，在ARIMA预测模型中，预测值表示为由最近的真实值和最近的预测误差组成的线性函数。主要用于拟合具有平稳性(stationarity)(或可以被转换为平稳序列)的时间序列。
+- `fable::ARIMA()` & `forecast::auto.arima()`用来拟合Box-Jenkins法，也称作ARIMA(autoregressive integrated moving averages model)模型，在ARIMA预测模型中，预测值表示为由最近的真实值和最近的预测误差组成的线性函数。主要用于拟合具有平稳性(stationarity)(或可以被转换为平稳序列)的时间序列。
 
 
 
@@ -55,6 +57,7 @@ library(fable)
 
 ```{r}
 # 一个简单的示例
+# 从数据creation，到modeling，到forecast
 
 x <- c(580, 7813, 28266, 59287, 75700,
        87820, 95314, 126214, 218843, 
@@ -129,11 +132,11 @@ fit <- arima(Nile, order=c(0,1,1))
 
 
 
-### 时序数据的*平滑化*和*季节性*分解
+### 时序数据的*平滑化*和*季节性分解*
 
 
 
-### use modeltime进行forecast
+### use modeltime进行建模和forecast
 
 `modeltime`包是一个
 
@@ -180,7 +183,7 @@ models_tbl %>%
 
 ### tidyverts
 
-tidyverts是一个类似tidyverse整合一系列时间序列分析的R包集合.
+tidyverts是一个类似tidyverse整合一系列时间序列分析的R包集合. `forcast`包、`fpp3`的作者所写的系列包。
 
 系列包基本可以处理时序数据的一切。
 首先看待一下，其对时序数据所定义的`tsibble`数据格式，此格式
@@ -201,5 +204,93 @@ library(TSstudio)
 
 
 
+## multivariate time series forecasting
+
+简单的时序数据分析想不到会有什么价值。。
+多变量时序数据，其他的自变量也应该是随着时间采集的，也是时序类型的数据。
+
+下面演示一个
+
+```{r}
+class(EuStockMarkets)
+
+
+# Load libraries
+library(h2o)        # Awesome ML Library
+library(timetk)     # Toolkit for working with time series in R
+library(tidyquant)  # Loads tidyverse, financial pkgs, used to get data
+
+
+# Beer, Wine, Distilled Alcoholic Beverages, in Millions USD
+# beer_sales_tbl <- tq_get("S4248SM144NCEN", get = "economic.data", from = "2010-01-01", to = "2017-10-27")
+# 
+# beer_sales_tbl
+```
+
+
+use H2o
+
+```{r}
+# Convert to H2OFrame objects
+train_h2o <- as.h2o(train_tbl)
+valid_h2o <- as.h2o(valid_tbl)
+test_h2o  <- as.h2o(test_tbl)
+
+# Set names for h2o
+y <- "price"
+x <- setdiff(names(train_h2o), y)
+```
+
+
+```{r}
+# linear regression model used, but can use any model
+automl_models_h2o <- h2o.automl(
+    x = x, 
+    y = y, 
+    training_frame = train_h2o, 
+    validation_frame = valid_h2o, 
+    leaderboard_frame = test_h2o, 
+    max_runtime_secs = 60, 
+    stopping_metric = "deviance")
+```
+
+
+```{r}
+# Extract leader model
+automl_leader <- automl_models_h2o@leader
+```
+
+
+Generate predictions using h2o.predict() on the test data.
+```{r}
+pred_h2o <- h2o.predict(automl_leader, newdata = test_h2o)
+```
+
+Evaluate Performance:
+
+```{r}
+h2o.performance(automl_leader, newdata = test_h2o)
+```
+
+
+
+
+### 对金融数据的一个完整的应用
+
+```{r}
+library(pedquant)
+# library(tidyquant)
+```
+
+获得某一股票的数据
+```{r}
+mt <- md_stock(symbol = "600519.SH",
+               from = "2019-01-01",
+               to = "2021-09-30",
+               source = "163")
+
+mt[[1]] %>% 
+  as_tibble()
+```
 
 
