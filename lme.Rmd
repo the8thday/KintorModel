@@ -65,7 +65,15 @@ the Laplace approximation is a special case of a parameter estimation method cal
 
 不过通过performance::check_models似乎更安全 ，不确定此处的正态性检验是对因变量还是残差。   
 
-除此之外，对于outlier等数据的处理、NA值的处理等，此处所使用的数据暂不考虑这些，只是主要结果的笔记。
+除此之外，*对于outlier等数据的处理、NA值的处理*等，此处所使用的数据暂不考虑这些，只是主要结果的笔记。
+
+
+*总结一下，线性混合效应模型的假设assumption：*
+
+1. 解释变量和相应变量间线性相关
+2. 残差独立、正态分布、并have constant variance
+3. 
+
 
 ```{r}
 df2 <- readRDS('./datasets/df2.rds')
@@ -212,7 +220,7 @@ check_model(lme_model)
 ```
 
 
-Group-level Effects
+*Group-level Effects*
 
 此处的group为患者，注意患者数目对绘图的影响。
 
@@ -243,6 +251,42 @@ plot(ggemmeans(lme_model, terms = c("time", "class"))) +
 *结果interpre* 在模型构建完成后，应该如何展示分析的结果呢？typeIII结果可以表明变量对模型的贡献度。
 同时还可以汇报emmeans，以及不同分组中的emmeans的差值以及对应的95%CI。
 
+
+
+*Unit-level predictions*
+
+```{r, include=FALSE}
+require(marginaleffects)
+```
+
+此图对连续变量更为适用，以下不适用。
+```{r}
+pred1 <- predictions(lme_model,
+                     newdata = datagrid(PatientID = df2$PatientID,
+                                        time = c('Day 0','Day 1','Day 7'),
+                                        AGE = 30:40,
+                                        class = 1
+                                        )
+                     )
+
+p1 <- ggplot(pred1, aes(AGE, estimate, level = PatientID)) +
+      geom_line() +
+      labs(y = "Predicted weight", x = "Time", title = "Linear growth model")
+
+p1
+```
+
+*Population-level predictions*
+
+To make population-level predictions, we set the PatientID variable to NA, and set re.form=NA. This last argument is offered by the `lme4::predict` function which is used behind the scenes to compute predictions:
+```{r}
+
+```
+
+
+
+
+计算emmeans，以及contrasts:
 ```{r}
 # 计算emmeans，以及contrasts
 (emm_res <- emmeans(lme_model, specs = c('time', 'class')))
