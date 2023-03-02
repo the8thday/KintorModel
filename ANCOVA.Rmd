@@ -24,6 +24,9 @@ In a confirmatory randomized experiment it is commonplace to have a "no interact
 
 对于交互作用主要如此考虑：如果研究目的有必要去考虑交互作用，则不论是否P<0.05，都按照分组间做分析。如果只是探索性的分析，则在<0.05的时候，按照一个分组去分析另一个分组的亚组分析；如果>0.05，则可以观察具体有意义的分组变量或者直接就做两个单独的ANCOVA。
 
+*顺便理清一下EMMs：*Estimated marginal means (EMMs)是一个由模型估算出来的值，其are defined as equally weighted means of these predictions at specified margins。In models with covariates, EMMs are often called adjusted means.
+同时和模型自身的特征有关。
+
 
 ```{r, include=FALSE}
 library(tidyverse)
@@ -57,7 +60,7 @@ ANCOVA分析需要数据满足一定的假设：
 2. Homogeneity of regression slopes
 3. The outcome variable should be approximately normally distributed
 4. Homoscedasticity
-5. No significant outliers
+5. No significant outliers，经验表明Outlier对协方差的影响还是蛮大的，尤其在一些临床指标中，Outlier出现的频次还是很高的。
 
 
 ```{r}
