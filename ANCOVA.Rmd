@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 emmeans为在各个分组中outcome的均值；contrasts为不同分组间的差异，汇报的结果一般还需要包括Pvalue和95%CI。
 
+
 *对于如何纳入交互作用的一些记录：*主要指two-way分析中两分组变量间的交互。
 虽则一般在主要研究终点上不会引入交互作用，但后续的次要终点研究是可以考虑交互作用的。
 When using frequentist methods, it is invalid to remove the interaction from a linear model just because of a hypothesis test, because that invalidates the estimate of residual variance, i.e., it results in an underestimation of 𝜎2. This is a form of model uncertainty discussed at more length in RMS.
@@ -24,8 +25,14 @@ In a confirmatory randomized experiment it is commonplace to have a "no interact
 
 对于交互作用主要如此考虑：如果研究目的有必要去考虑交互作用，则不论是否P<0.05，都按照分组间做分析。如果只是探索性的分析，则在<0.05的时候，按照一个分组去分析另一个分组的亚组分析；如果>0.05，则可以观察具体有意义的分组变量或者直接就做两个单独的ANCOVA。
 
+
 *顺便理清一下EMMs：*Estimated marginal means (EMMs)是一个由模型估算出来的值，其are defined as equally weighted means of these predictions at specified margins。In models with covariates, EMMs are often called adjusted means.
-同时和模型自身的特征有关。
+同时和模型自身的特征有关，不同模型需要不同的EMM估算方法。
+在计算各种EMMs时，模型的正确构建是最为重要的，对分组变量间求contrast往往是最终目的，在设计碰到interaction时往往不易解释结果，此处做一个总结。首先是，`Interaction contrasts`，其是contrasts的contrast，比如在一个双factor交互作用的简单
+模型中`ll <- lm(y ~ a * b)`，其的contrasts为`c <- contrast(ll, pairwise ~ a | b)`，
+而在得到的此contrasts的基础上再进一步得到contrast`IC_res <- contrast(c, interaction = c("poly", "consec"), by = NULL)`，即是a分组之间的差和b分组间的差的组合，`emmeans::test(IC_res, joint = T)`提供整体的TypeIII检验。 函数`joint_tests(aov_res2)`obtains and tests the interaction contrasts for all effects in the model and compiles them in one Type-III-ANOVA-like table.
+对于一个covariate和factor的交互，一般计算covariate在factor每一个水平上的slope.
+
 
 
 ```{r, include=FALSE}
@@ -169,6 +176,17 @@ summary(postHocs)
 
 ```{r}
 sm_res <- with(df, sm::sm.ancova(W1D1, dW24, ARM, model="equal"))
+```
+
+
+*除了上述非参数模型外，在临床应用中，因为aov的假设，比如每个分组中的error SD is the same:*
+但是gls函数would be a much better model to use when you have wildly different sample SDs. 
+The standard errors of the EMMs will depend on the individual sample variances, and the t tests of the comparisons will be in essence the Welch t statistics with Satterthwaite degrees of freedom.
+```{r}
+mod2 = nlme::gls(response ~ treat, data = mydata,
+                 weights = varIdent(form = ~1 | treat))
+
+emmeans(mod2, pairwise ~ treat)
 ```
 
 
