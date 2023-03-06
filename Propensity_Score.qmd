@@ -6,6 +6,8 @@ format: html
 ## Propensity Score
 
 > 参考自一篇公众号：https://mp.weixin.qq.com/s/nfHSlr1TZrPzU8U8wu76aQ
+> https://statsnotebook.io/blog/analysis/matching/
+> https://sejdemyr.github.io/r-tutorials/statistics/
 
 
 倾向性评分（Propensity Score, PS）是一种控制混杂因素的统计学方法，通过倾向性评分的方法，可以把基线控制在可比的水平，这样就可以比较处理因素带来的差异了。
@@ -14,7 +16,7 @@ format: html
 
 利用倾向性评分就可以控制这些混杂，但是控制混杂因素的方法非常多，不要拘泥于此。对于类似上面这种情况，你还可以用协方差分析、多因素分析（统计学中的3大回归！线性回归、逻辑回归、Cox回归）、分层分析等，也可以起到控制混杂因素的效果，这些在之前的推文中全都有涉及，大家可以自行查看。
 
-倾向性评分最大的优势是将多个混杂因素的影响用一个综合的值来表示，即倾向性评分值（Propensity Score, PS），从而降低协变量的维度，因此该方法尤其适用于协变量较多的情况。
+倾向性评分最大的*优势是将多个混杂因素的影响用一个综合的值来表示*，即倾向性评分值（Propensity Score, PS），从而降低协变量的维度，因此该方法尤其适用于协变量较多的情况。
 
 倾向性评分的一般步骤为：
 
@@ -22,9 +24,11 @@ format: html
 利用 PS 值均衡协变量分布；
 均衡性检验及模型评价；
 处理效应估计。
-其中，PS 值的估计是以处理因素作为因变量，其他混杂因素作为自变量，通过建立一个模型（可以是传统的回归模型，也可以是机器学习方法）来估计每个研究对象接受处理因素的可能性。
+其中，*PS 值的估计是以处理因素作为因变量，其他混杂因素作为自变量*，通过建立一个模型（可以是传统的回归模型，也可以是机器学习方法）来估计每个研究对象接受处理因素的可能性。
 
 目前用于估计 PS 值的方法有 logistic 回归，Probit 回归、神经网络、支持向量机、分类与回归数、Boosting 算法、SuperLearner 等。其中 logistic 回归是目前最常用的方法。
+
+倾向性评分是一个分数（P值），自己并没有均衡协变量（混杂因素）的能力，利用 PS 值均衡组间协变量分布的方法有匹配（matching）、分层（stratification）、协变量调整（covariate adjustment）和加权（weighting）等。其中协变量调整又可以称为倾向性评分回归、倾向性评分矫正等。
 
 
 
@@ -34,24 +38,48 @@ library(tidyverse)
 library(MatchIt)
 library(lmtest)
 library(sandwich)
+library(cobalt)
 ```
 
+
+### matching 匹配
+
+After matching, the treatment group and the control group should have very similar characteristics. A simple regression model can be used to estimate the treatment effect on the outcome. Cluster-robust standard errors are required for correct inference.
+
+
+Propensity score matching analysis involves two steps.
+
+1. Match each smoker to a non-smoker based on propensity score, which is calculated based on a range of covariates.
+2. Check if balance between smokers (treatment/exposure group) and non-smokers (control group) is achieved (i.e., both groups having similar characteristics). If balance is achieved, a simple regression analysis with cluster-robust standard error can be used to estimate the effect of smoking on psychological distress.
 
 ```{r}
 
 currentDataset <- read_csv("./datasets/smoking_psyc_distress.csv")
+currentDataset$remoteness <- factor(currentDataset$remoteness, exclude = c("", NA))
 
 currentDataset |> head()
+
+# Sex (0: Female; 1: Male)
+# indigenous - Ingigenous status (0: Non-indigenous; 1: indigenous)
+# high_school - Education level (0: not finished high school; 1: finished high school)
+# partnered - Marital status (0: not partnered; 1: partnered)
+# remoteness - region of residence (0: major cities; 1: inner regional; 2: outer regional)
+# language - Language background (0: non-English speaking; 1: English speaking)
+# Smoker - Smoking status (0: non-smoker; 1: smoker)
+# risky_alcohol - Risky alcohol use (0: not risky; 1: risky)
+# psyc_distress - Psychological distress. Measure ranges from 10 to 50.
+# age - Age of the participants
 ```
 
-
+原始数据基线资料表，首先检查一下入组数据的均衡与否，示例数据中sex、age为混杂因素，目的在于探讨smoke与否是否影响psyc_distress.
+从下表中可以看到，
 ```{r}
 library(tableone)
 
-table2 <- CreateTableOne(vars = c('x.Age', 'x.Gender', 'CVD'),
-                         data = data,
-                         factorVars = c('x.Gender', 'CVD'),
-                         strata = 'Smoke',
+table2 <- CreateTableOne(vars = c('age', 'sex', 'psyc_distress'),
+                         data = currentDataset,
+                         factorVars = c('sex'),
+                         strata = 'smoker',
                          smd=TRUE)
 table2 <- print(table2,smd=TRUE,
                 showAllLevels = TRUE,
@@ -60,55 +88,126 @@ table2 <- print(table2,smd=TRUE,
 table2
 ```
 
-
+模型中因变量为研究中主要关注的处理因素，
 ```{r}
 # 这里为了方便演示直接删掉了缺失值
-data.complete <- na.omit(data)
+data.complete <- na.omit(currentDataset)
 
 # 因变量是处理因素，自变量是需要平衡的协变量
-m.out <- matchit(Smoke~x.Age+x.Gender,
+# distance参数为用logit方法计算PS值，based on纳入的变量
+# method参数，match方法用的nearest
+# The ratio parameter specifies that one to one matching is used (ratio = 1). A higher ratio will increase the number of samples from the control group that will be included. Therefore, less observations will be discarded. However a higher matching ratio by definition will produce worse matches.
+match_obj <- matchit(smoker~age+sex+remoteness,
                  data = data.complete,
-                 distance = "logit" # 选择logistic回归
+                 method = "nearest",
+                 replace = FALSE,
+                 distance = "logit" # 选择logistic回归 or glm
                  )
 
-m.out
+match_obj
 ```
+```{r}
+summary(match_obj)
+
+summary(match_obj, standardize = TRUE)
+```
+*interpret：*`Std. Mean Diff.`大于0.1认为为substantial difference，`All Data`为smoker与否两组的所有观察，`Matched Data`为match之后的数据，`Std. Mean Diff.`的值在match之后都接近于0，表明a good balance is achieved.
+sample size部分为，原始数据中样本的分布，以及match的样本数量，其中没有match的6052 non-smoker在后续的分析中可以discarded。Applied researchers sometimes are concerned about discarding a large number of unmatched participants. However, this is usually not an issue if all treated participants are matched, and good balance is archived.
+关于这个倾向性评分匹配后数据的平衡性检验，文献中比较推荐使用SMD和VR(variance ratio)，SMD<0.25说明均衡了，
+VR>2.0或者VR<0.5说明很不均衡（越接近1越均衡）！
+
+
+```{r}
+#plotting the balance between smokers and non-smokers
+plot(match_obj, type = "jitter", interactive = FALSE)
+plot(summary(match_obj), abs = FALSE)
+```
+*interpret: *第一图为，PS值在四个分组中的分布，Propensity score matching will not be appropriate if there is not a satisfactory overlap in the propensity score distribution between the matched treated group and the matched untreated group.
+第二幅图，match前后，`Std. Mean Diff.`的分布。可以看到match之后的黑点在0附近。
+
 
 
 可通过以下方法获得算法估计的PS值：
 ```{r}
-eps <- m.out$distance
+eps <- match_obj$distance
 length(eps)
 ```
 
-一开始我们已经计算出了实际PS值（tps），所以我们可以画一个tps和估计ps的散点图，以tps为横坐标，以eps为纵坐标：
+参考文档中计算了实际PS值（tps），所以我们可以画一个tps和估计ps的散点图，以tps为横坐标，以eps为纵坐标：
 
-```{r}
+```{r, eval=FALSE}
+# 摘抄自文档，此处仅作记录
 # 去掉缺失值
 tps.comp <- tps[complete.cases(data)]
 Smoke.comp <- as.factor(Smoke[complete.cases(data)])
-df <- data.frame(True=tps.comp, Estimated=eps, Smoke=Smoke.comp)
+df <- data.frame(True = tps.comp, Estimated = eps, Smoke = Smoke.comp)
 
-ggplot(df, aes(x=True, y=Estimated, colour=Smoke)) +
-geom_point() +
-geom_abline(intercept=0,slope=1, colour="#990000", linetype="dashed") +
-expand_limits(x=c(0,1),y=c(0,1))
+ggplot(df, aes(x = True, y = Estimated, colour = Smoke)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, colour = "#990000", linetype = "dashed") +
+  expand_limits(x = c(0, 1), y = c(0, 1))
 
 
 # 对x.Age平方
-m.out <- matchit(Smoke~I(x.Age^2)+x.Age +x.Gender,
-                 data=data.complete) 
+m.out <- matchit(Smoke ~ I(x.Age^2) + x.Age + x.Gender,
+  data = data.complete
+)
 
 eps <- m.out$distance
 
 tps.comp <- tps[complete.cases(data)]
 Smoke.comp <- as.factor(Smoke[complete.cases(data)])
-df <- data.frame(True=tps.comp, Estimated=eps, Smoke=Smoke.comp)
-ggplot(df, aes(x=True, y=Estimated, colour=Smoke)) +
-geom_point() +
-geom_abline(intercept=0,slope=1, colour="#990000", linetype="dashed") +
-expand_limits(x=c(0,1),y=c(0,1))
+df <- data.frame(True = tps.comp, Estimated = eps, Smoke = Smoke.comp)
+ggplot(df, aes(x = True, y = Estimated, colour = Smoke)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, colour = "#990000", linetype = "dashed") +
+  expand_limits(x = c(0, 1), y = c(0, 1))
 ```
+
+
+#### 匹配后数据的平衡性检验
+
+除了上述依据STM等值进行平衡性好坏与否的判断外，还可以利用`cobalt`包进行检验。
+
+
+```{r}
+cobalt::bal.tab(match_obj, m.threshold = 0.1, un = TRUE)
+```
+
+
+#### 匹配后的数据的后续分析
+
+首先提取match后的数据,
+
+```{r}
+matched_data <- match.data(match_obj)
+
+matched_data
+```
+
+However, for correct inference, *cluster-robust standard error* is needed.
+```{r}
+#Run regression model with psychological distress as the outcome, and smoker as the only predictor
+#We need to specify the weights - Matched participants have a weight of 1, unmatched participants 
+res <- lm(psyc_distress ~ smoker, data = matched_data, weights = weights)
+
+#Test the coefficient using cluster robust standard error
+coeftest(res, vcov. = vcovCL, cluster = ~subclass)
+#Calculate the confidence intervals based on cluster robust standard error
+coefci(res, vcov. = vcovCL, cluster = ~subclass, level = 0.95)
+```
+
+
+### stratification
+
+
+
+```{r}
+
+```
+
+
+
 
 
 
