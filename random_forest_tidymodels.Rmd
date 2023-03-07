@@ -11,10 +11,49 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## random forest by tidymodels
 
-Random forest model by tidymodels.
+> http://www.ehbio.com/ML/randomForest.html
+> https://towardsdatascience.com/understanding-random-forest-58381e0602d2
 
-随机森林，采用随机抽样的ensembled决策树构建的模型。
+
+随机森林，采用随机抽样的ensembled决策树构建的模型。其属于集成学习中的bagging(Bootstrap AGgregation 的简称).
 A `bagging model` is the same as a random forest where mtry is equal to the number of predictors.
+
+随机森林是，集成学习方法的一种，首先其将数据随机重采样，在生成多个数据样本后，对这些数据进行决策树建模，同时子集数据集的特征也具有随机性，这是随机森林和决策树之间的关键区别。对于回归问题，所有树的输出值是取的平均值；对于分类问题，投票次数最多的类别（即最常见的类别变量）将确定为最终类别。在该训练样本中，有三分之一被留作测试数据，称为袋外 (oob) 样本，将 oob 样本用于交叉验证，最终确定预测结果。
+大概的过程如下：对于一个`n x p`的矩阵，首先从数据集中有放回的随机选取n个样本为一数据集，训练一颗决策树，每棵决策树随机选择m个(m<<p)特征进行每个决策变量的选择，决策树野蛮生长、不剪枝，重复此过程至t颗决策树，最后聚合t颗数的结果做出最后的决策。
+
+*oob* error rate，随机森林中每一颗决策树在构建时因为有放回的采样缘故，约有1/3的样本不会被用到，这些没有被用到的样本会用来测试该决策树的分类能力。随机森林与其他机器学习方法不同的是存在OOB，相当于自带多套训练集和测试集，自己内部就可以通过OOB值评估模型的准确度 (Bootstrap方式)。其他一些机器学习方法却没有这一优势。
+
+
+*常适用的数据*，随机森林对于维度很高的数据（特征很多的数据）比如微生物组数据，不用特征工程也可以直接使用。对于连续数据和分类数据混合的数据集，
+
+
+*重要的超参数*，随机森林算法有三个主要的超参数，需要在训练之前进行设置。 其中包括节点大小(min_n)、树的数量(ntree)和 采样的特征数量(mtry)。
+其中采样的特征数量通常randomForest() `p / 3` variables when building a random forest of regression trees, and `sqrt(p)` variables when building a random forest of classification trees. 
+树的数量一般会控制在500以下，but one should never use over 500 trees because it is a waste of time.虽然有人这么说， 但还是会用到很多的trees的。
+当然具体还要依据数据的情况而定，`dials`包所提供的一些列的函数值得参考。
+
+其他的可以tune的超参数，Criterion(gini or mse, et.), 
+
+
+*随机森林对于特征重要性的评估*，基尼重要性和平均不纯度减少 (MDI) 常用于衡量排除给定变量时模型准确度的降低程度。 此外，排列重要性（又称 MDA，平均精度下降）也是一种衡量重要性的方法。 MDA 通过随机排列 oob 样本中的特征值来识别准确性的平均降低程度。 
+
+
+*优缺点：*
+
+1. 它可以出来很高维度（特征很多）的数据，并且不用降维，无需做特征选择
+2. 它可以判断特征的重要程度
+3. 可以判断出不同特征之间的相互影响
+4. 不容易过拟合
+5. 训练速度比较快，容易做成并行方法
+6. 实现起来比较简单
+7. 对于不平衡的数据集来说，它可以平衡误差。
+8. 如果有很大一部分的特征遗失，仍可以维持准确度。
+
+缺点
+
+1. 随机森林已经被证明在某些噪音较大的分类或回归问题上会过拟合。
+2. 对于有不同取值的属性的数据，取值划分较多的属性会对随机森林产生更大的影响，所以随机森林在这种数据上产出的属性权值是不可信的
+
 
 ```{r, include=FALSE}
 
@@ -72,7 +111,7 @@ df_test <- testing(df_split)
 
 ```
 
-##### 一个网上的小例子
+##### 一个网上的RF小例子
 
 ```{r}
 # 一个网上的小例子
@@ -310,6 +349,9 @@ Whereas the `randomForest` package provides forests based on traditional decisio
 不同于决策树、罗辑回归等模型，随机森林等一众模型，其在变量解释上有黑盒子模型之称。虽则随机森林也有提供变量重要性等指标，在构建完随机森林后，我们将采用XAI计划中的一些包进行模型解释上的一些示例。
 
 ```{r}
+show_engines('rand_forest')
+
+
 rf_spec <- rand_forest(
   mtry = tune(),
   trees = tune(),
@@ -323,7 +365,7 @@ rf_spec <- rand_forest(
 
 
 # 对于变量多达9000个，而样本数量只有100多个的样本，是否需要一些recipe的过程呢
-
+# 随机森林似乎不需要
 
 class_rf_wf <- workflow() %>% 
   add_model(rf_spec) %>% 
@@ -354,10 +396,11 @@ trees_folds <- vfold_cv(df_train,
 
 # 在进行具体的模型构建过程中，超参数的范围选择是件需要参考的事情
 # dials 可以提供一些参考，是一个不错的设计
+# 比如在本示例种，数据集大小为76x9022，问题为分类，则约95个mtry
 grid <- expand.grid(
-      mtry = c(100, 30, 50), 
+      mtry = c(50, 100, 200), 
       min_n = c(),
-      trees = c(500, 1000, 2000)
+      trees = c(100, 300, 500)
     )
 
 # use dials to create grid
@@ -408,6 +451,8 @@ tune_res %>%
   labs(x = NULL, y = "AUC")
 
 ```
+*interpret the result: *
+
 
 ```{r}
 autoplot(tune_res)
