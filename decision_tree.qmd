@@ -8,9 +8,16 @@ format: html
 一个不错的数据集搜集的网站。
 > https://archive-beta.ics.uci.edu/
 
+> https://scikit-learn.org/stable/modules/tree.html
 
-决策树，
-classical trees & conditional inference trees.
+
+决策树，classical trees & conditional inference trees.
+决策树的一般逻辑过程为，首先是特征选择，选择和分类结果相关性较高的特征，一般通过信息增益等；然后，选择好特征后从根节点出发，对节点计算所有的信息增益,选择信息增益最大的特征作为节点特征，根据该特征的不同取值建立子节点；对每个子节点使用相同的方式生成新的子节点，直到信息增益很小或者没有特征可以选择为止。
+
+根节点如何选择呢？选择信息增益最大或Gini系数最小的分类特征作为根节点以及后续的子节点。还需要确定最优的分类变量和分类阈值等。
+在数据集中随机选择一个数据点，并随机分配给它一个数据集中存在的标签，分配错误的概率即为Gini impurity。
+
+*3种典型的决策树算法为*，ID3、C4.5、CART, CART 算法使用了基尼系数取代了信息熵模型。
 
 
 ```{r, include=FALSE}
