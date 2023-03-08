@@ -11,21 +11,56 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## xgboost
 
-https://juliasilge.com/blog/board-games/
+> https://juliasilge.com/blog/board-games/
+> https://juliasilge.com/blog/xgboost-tune-volleyball/
+> https://machinelearningmastery.com/gentle-introduction-xgboost-applied-machine-learning/
+> http://fancyerii.github.io/books/xgboost/
+> https://www.quora.com/What-is-the-difference-between-the-R-gbm-gradient-boosting-machine-and-xgboost-extreme-gradient-boosting
+> https://xgboost.readthedocs.io/en/latest/tutorials/model.html 重要的资料
+> https://cran.r-project.org/web/packages/xgboost/vignettes/discoverYourData.html
 
-xgboost对于样本量多，变量没那么多的数据挺合适？This is a pretty sizeable rectangular dataset so let’s use an xgboost model; xgboost is a good fit for that type of dataset.
-应该是对于长方形数据比较合适。
 
-```{r}
+xgboost(Extreme gradient boosting)是tree-based模型中的boosted tree model，随机森林属于bagging。xgboost是Gradient Boosting的一种高效系统实现，并不是一种单一算法。xgboost里面的基学习器除了用tree(gbtree)，也可用线性分类器(gblinear)。而GBDT则特指梯度提升决策树算法。 传统GBDT以CART作为基分类器，xgboost还支持线性分类器，这个时候xgboost相当于带L1和L2正则化项的逻辑斯蒂回归（分类问题）或者线性回归（回归问题）。
+
+It works by building an ensemble of decision trees, so that each tree is trained on a subset of the data and predicts the outcome of the target variable. Then, the predictions from all the trees are combined to make a final prediction. The algorithm works by iteratively building the trees and minimizing a loss function - usually the sum of squared errors - to optimize the model. In each iteration, the algorithm looks for the best feature and the best split value for that feature, and then builds a tree based on those values. As the model trains, the parameters used to create the trees are optimized to minimize the loss function.
+
+XGBoost库高度专注于计算速度和模型表现, XGboost支持三种主要的梯度提升形式：
+1, Gradient Boosting 算法，也称为具有学习率的梯度提升机。
+2, 对行、列以及分割列进行子采样的随机梯度提升。
+3, L1 和 L2 正则化的正则化梯度提升。
+
+
+*XGBoost 和 RandomForest：*The main difference is that in Random Forests, trees are independent and in boosting, the tree N+1 focus its learning on the loss (<=> what has not been well modeled by the tree N). This difference have an impact on a corner case in feature importance analysis: the correlated features.
+
+
+*xgboost适合的数据：*xgboost对于样本量多，变量没那么多的数据挺合适？This is a pretty sizeable rectangular dataset so let’s use an xgboost model; xgboost is a good fit for that type of dataset. 不是的，这句话只是说明
+
+XGBoost manages only `numeric` vectors.
+What to do when you have categorical data?
+To answer the question above we will convert categorical variables to numeric one.Next step, we will transform the categorical data to dummy variables. Several encoding methods exist, e.g., one-hot encoding is a common approach. We will use the dummy contrast coding which is popular because it produces “full rank” encoding (also see this blog post by Max Kuhn).
+
+
+*xgboost重要的超参数：*mtry(Randomly Selected Predictors), trees, min_n(Minimal Node Size), learn_rate(Learning Rate), loss_reduction(Minimum Loss Reduction), tree_depth, stop_iter, sample_size(Proportion Observations Sampled)
+
+
+
+
+```{r, echo=FALSE, include=FALSE}
+library(tidyverse)
 library(tidymodels)
 library(xgboost)
 library(SHAPforxgboost)
 library(textrecipes)
 library(finetune)
 library(vip)
+
+tidymodels_prefer()
 ```
 
 
+### 回归问题
+
+示例数据来自上述链接1，数据为预测rating。
 ```{r}
 # df <- read_delim('./datasets/prostata.tab', delim = '\t') %>% 
 #   select(-t) %>% 
@@ -41,10 +76,11 @@ ratings_joined <-
   ratings %>%
   left_join(details, by = "id")
 
+# average的分布
 ggplot(ratings_joined, aes(average)) +
   geom_histogram(alpha = 0.8)
 
-
+# 随意minimum recommended age和rating的关系
 ratings_joined %>%
   filter(!is.na(minage)) %>%
   mutate(minage = cut_number(minage, 4)) %>%
@@ -55,11 +91,14 @@ ratings_joined %>%
 start our modeling
 ```{r}
 set.seed(123)
+
+# 选择部分特征建模
 game_split <-
   ratings_joined %>%
   select(name, average, matches("min|max"), boardgamecategory) %>%
   na.omit() %>%
   initial_split(strata = average)
+
 game_train <- training(game_split)
 game_test <- testing(game_split)
 
@@ -69,7 +108,9 @@ game_folds
 ```
 
 
-set up our feature engineering
+*set up our feature engineering:*
+Sometimes a dataset requires more care and custom feature engineering; the tidymodels ecosystem provides lots of fluent options for common use cases and then the ability to extend our framework for more specific needs while maintaining good statistical practice.
+
 ```{r}
 split_category <- function(x) {
   x %>%
@@ -105,6 +146,18 @@ xgb_spec <-
   set_engine("xgboost") %>%
   set_mode("regression")
 
+# xgb_spec <- boost_tree(
+#   trees = 1000,
+#   tree_depth = tune(), 
+#   min_n = tune(),
+#   loss_reduction = tune(),## first three: model complexity
+#   sample_size = tune(), 
+#   mtry = tune(),
+#   learn_rate = tune()
+# ) %>%
+#   set_engine("xgboost") %>%
+#   set_mode("classification")
+
 xgb_wf <- workflow(game_rec, xgb_spec)
 xgb_wf
 ```
@@ -112,9 +165,36 @@ xgb_wf
 
 
 use tune_race_anova() to eliminate parameter combinations that are not doing well.
+
 ```{r}
 doParallel::registerDoParallel()
 
+# Space-filling parameter grids
+xgb_grid <- grid_latin_hypercube(
+  tree_depth(),
+  min_n(),
+  loss_reduction(),
+  sample_size = sample_prop(),
+  finalize(mtry(), vb_train),
+  learn_rate(),
+  size = 30
+)
+
+xgb_grid
+# IT’S TIME TO TUNE. 
+set.seed(234)
+# xgb_res <- tune_grid(
+#   xgb_wf,
+#   resamples = game_folds,
+#   grid = xgb_grid,
+#   control = control_grid(save_pred = TRUE)
+# )
+# 
+# xgb_res
+
+
+# tune_race_anova
+# 其和tune_grid的区别在于
 set.seed(234)
 xgb_game_rs <-
   tune_race_anova(
@@ -125,6 +205,22 @@ xgb_game_rs <-
   )
 
 xgb_game_rs
+```
+```{r}
+# load('./datasets/xgb_game_rs.rda')
+
+xgb_res %>%
+  collect_metrics() %>%
+  filter(.metric == "roc_auc") %>%
+  select(mean, mtry:sample_size) %>%
+  pivot_longer(mtry:sample_size,
+               values_to = "value",
+               names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "AUC")
 ```
 
 
@@ -137,6 +233,7 @@ plot_race(xgb_game_rs)
 show_best(xgb_game_rs)
 
 
+# last_fit() to fit one final time to the training data and evaluate one final time on the testing data.
 xgb_last <-
   xgb_wf %>%
   finalize_workflow(select_best(xgb_game_rs, "rmse")) %>%
@@ -146,13 +243,27 @@ xgb_last
 ```
 
 
-Let’s start with model-based variable importance using the vip package.
+Let’s start with model-based variable importance using the `vip` package.
+
+xgboost不可以直接进行变量解释，但是可以通过一些方法得到prediction的重要性。
+
 ```{r}
+# ?xgb.importance
+
 xgb_fit <- extract_fit_parsnip(xgb_last)
+
+
 vip::vip(xgb_fit, geom = "point", num_features = 12)
 ```
+*interpret: *上图中可以看到maximum playing time and minimum age are the most important predictors driving the predicted game rating.
 
-use Shapley Additive Explanations 确定特征重要性
+
+```{r}
+xgb_last %>% collect_metrics()
+
+```
+
+*use Shapley Additive Explanations 确定特征重要性*
 Why SHAP values
 SHAP’s main advantages are local explanation and consistency in global model structure.
 
@@ -187,38 +298,192 @@ shap.plot.dependence(
 
 # SHAP force plot
 ```
+*解释：*SHAP
 
 
+### 分类问题
 
+这是一个分类问题的数据集，来自上面链接第2条：
 
-
-
-构建`xgboost`模型：不过此处用的还是隔壁SVM里的数据集。
 ```{r}
-xgboost_recipe <- 
-  recipe(formula = class ~ ., data = prostat_train) %>% 
-  step_zv(all_predictors()) 
+vb_matches <- readr::read_csv('./datasets/vb_matches.csv', guess_max = 76000)
 
-xgboost_spec <- 
-  boost_tree(trees = tune(), min_n = tune(), tree_depth = tune(), learn_rate = tune(), 
-    loss_reduction = tune(), sample_size = tune()) %>% 
-  set_mode("classification") %>% 
-  set_engine("xgboost") 
+vb_matches
 
-xgboost_workflow <- 
-  workflow() %>% 
-  add_recipe(xgboost_recipe) %>% 
-  add_model(xgboost_spec) 
+vb_parsed <- vb_matches %>%
+  transmute(
+    circuit,
+    gender,
+    year,
+    w_attacks = w_p1_tot_attacks + w_p2_tot_attacks,
+    w_kills = w_p1_tot_kills + w_p2_tot_kills,
+    w_errors = w_p1_tot_errors + w_p2_tot_errors,
+    w_aces = w_p1_tot_aces + w_p2_tot_aces,
+    w_serve_errors = w_p1_tot_serve_errors + w_p2_tot_serve_errors,
+    w_blocks = w_p1_tot_blocks + w_p2_tot_blocks,
+    w_digs = w_p1_tot_digs + w_p2_tot_digs,
+    l_attacks = l_p1_tot_attacks + l_p2_tot_attacks,
+    l_kills = l_p1_tot_kills + l_p2_tot_kills,
+    l_errors = l_p1_tot_errors + l_p2_tot_errors,
+    l_aces = l_p1_tot_aces + l_p2_tot_aces,
+    l_serve_errors = l_p1_tot_serve_errors + l_p2_tot_serve_errors,
+    l_blocks = l_p1_tot_blocks + l_p2_tot_blocks,
+    l_digs = l_p1_tot_digs + l_p2_tot_digs
+  ) %>%
+  na.omit()
+
+winners <- vb_parsed %>%
+  select(circuit, gender, year,
+         w_attacks:w_digs) %>%
+  rename_with(~ str_remove_all(., "w_"), w_attacks:w_digs) %>%
+  mutate(win = "win")
+
+losers <- vb_parsed %>%
+  select(circuit, gender, year,
+         l_attacks:l_digs) %>%
+  rename_with(~ str_remove_all(., "l_"), l_attacks:l_digs) %>%
+  mutate(win = "lose")
+
+vb_df <- bind_rows(winners, losers) %>%
+  mutate_if(is.character, factor)
+```
+
+An XGBoost model is based on trees, so we don’t need to do much preprocessing for our data; we don’t need to worry about the factors or centering or scaling our data. 
+
+```{r}
+set.seed(123)
+vb_split <- initial_split(vb_df, strata = win)
+vb_train <- training(vb_split)
+vb_test <- testing(vb_split)
 
 
-prostat_folds <- vfold_cv(prostat_train, strata = class)
+xgb_spec <- boost_tree(
+  trees = 1000,
+  tree_depth = tune(), min_n = tune(),
+  loss_reduction = tune(),                     ## first three: model complexity
+  sample_size = tune(), mtry = tune(),         ## randomness
+  learn_rate = tune()                          ## step size
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
 
-set.seed(42)
-xgboost_tune <-
-  tune_grid(xgboost_workflow, resamples = prostat_folds, 
-            grid = 20
-            )
-
+xgb_spec
 
 ```
+
+```{r}
+xgb_grid <- grid_latin_hypercube(
+  tree_depth(),
+  min_n(),
+  loss_reduction(),
+  sample_size = sample_prop(),
+  finalize(mtry(), vb_train),
+  learn_rate(),
+  size = 30
+)
+
+xgb_grid
+
+xgb_wf <- workflow() %>%
+  add_formula(win ~ .) %>%
+  add_model(xgb_spec)
+
+xgb_wf
+
+set.seed(123)
+vb_folds <- vfold_cv(vb_train, strata = win)
+
+vb_folds
+```
+
+
+```{r}
+doParallel::registerDoParallel()
+
+set.seed(234)
+xgb_res <- tune_grid(
+  xgb_wf,
+  resamples = vb_folds,
+  grid = xgb_grid,
+  control = control_grid(save_pred = TRUE)
+)
+
+xgb_res
+```
+
+
+```{r}
+collect_metrics(xgb_res)
+
+xgb_res %>%
+  collect_metrics() %>%
+  filter(.metric == "roc_auc") %>%
+  select(mean, mtry:sample_size) %>%
+  pivot_longer(mtry:sample_size,
+               values_to = "value",
+               names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "AUC")
+```
+
+
+```{r}
+best_auc <- select_best(xgb_res, "roc_auc")
+best_auc
+```
+
+```{r}
+final_xgb <- finalize_workflow(
+  xgb_wf,
+  best_auc
+)
+
+final_xgb
+```
+
+
+```{r}
+library(vip)
+
+final_xgb %>%
+  fit(data = vb_train) %>%
+  pull_workflow_fit() %>%
+  vip(geom = "point")
+```
+
+
+```{r}
+final_res <- last_fit(final_xgb, vb_split)
+
+collect_metrics(final_res)
+```
+
+```{r}
+final_res %>%
+  collect_predictions() %>%
+  roc_curve(win, .pred_win) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity)) +
+  geom_line(size = 1.5, color = "midnightblue") +
+  geom_abline(
+    lty = 2, alpha = 0.5,
+    color = "gray50",
+    size = 1.2
+  )
+```
+
+
+### use xgboost package
+
+```{r}
+xgboost::xgb.train()
+```
+
+
+
+
+
+
 
