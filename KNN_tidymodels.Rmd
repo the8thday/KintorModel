@@ -11,9 +11,29 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## KNN
 
+> https://mp.weixin.qq.com/s/Qqal3Afl8AoY_yxT8V8VOw
+
+
 依旧使用隔壁prostat的数据集，可以看出大部分`tidymodels`的操作逻辑和`scikit-learn`一样具有模式化，这也是其的主要目的，虽然具体模型在matric等方面不同，不过大部分还是一致的，建模、模型评估、在测试集的评估参数等总是需要的。
 
-KNN是，k-近邻算法（k-Nearest Neighbour algorithm）的工作原理：给定一个已知标签类别的训练数据集， 输入没有标签的新数据后，在训练数据集中找到与新数据最邻近的 k 个实例，如果这k 个实例的多数属于某个类别， 那么新数据就属于这个类别。即由那些离新数据最近的 k 个实例来投票决定新数据归为哪一类。
+k-近邻算法（k-Nearest Neighbour algorithm）的工作原理：给定一个已知标签类别的训练数据集， 输入没有标签的新数据后，在训练数据集中找到与新数据最邻近的 k 个实例，如果这k 个实例的多数属于某个类别， 那么新数据就属于这个类别。即由那些离新数据最近的 k 个实例来投票决定新数据归为哪一类。
+
+1. 计算已知类别数据集中的点与当前点之间的距离；
+2. 按照距离递增次序排序；
+3. 选取与当前点距离最小的 k 个点；
+4. 确定前 k 个点所在类别的出现频率；
+5. 返回前 k 个点出现频率最高的类别作为当前点的预测类别。
+
+
+从其的定义中似乎可以看到模型中包含训练数据集？还有两个需要注意的点，最近邻是如何定义计算的？K值如何确定？如果K值等于训练集中所有点，那么模型就极端的简化为只有一种结果了，不论输入什么数据，其的分类都是训练集中点最多的那个分类。定义中所说的最近邻又是如何度量的呢？几种常见的距离度量的方法：欧式距离、Minkowski距离、曼哈顿距离。
+
+kd树的结构.
+
+
+*knn中数据的输入和处理：*特征归一化的必要性。归一化的目的在于让每一个变量具有同等的重要性，不过还是赋予权重更合理。
+
+
+*knn的超参数：*neighbors(K的数目)，weight_func(), dist_power(在kknn包中似乎只提供了Minkowski distance)
 
 
 #### 1. 加载需要的包
@@ -28,6 +48,8 @@ library(usemodels)
 
 ```{r}
 # 参考SVM数据集
+
+usemodels::use_kknn(formula = class ~ ., data = prostat_train)
 ```
 
 
@@ -57,19 +79,24 @@ doParallel::registerDoParallel()
 prostat_folds <- vfold_cv(prostat_train, strata = class)
 metrics = metric_set(accuracy, roc_auc, sens, spec)
 
+
+```
+
+```{r, eval=FALSE}
+# 已经运行结束，直接load
 set.seed(42)
 kknn_tune <-
   tune_grid(kknn_workflow, 
             resamples = prostat_folds, 
-            grid = 20
+            grid = 20 # 生成20个网格搜索的结果
             )
 kknn_tune
 ```
 
-
 在tune完多个模型参数后，统一的查看其的metrics以进一步确定所需要的模型参数。
 ```{r}
 kknn_tune <- readRDS('./datasets/kknn_tune.rds')
+
 kknn_tune %>% 
   collect_metrics()
 ```
@@ -79,6 +106,7 @@ kknn_tune %>%
 依据roc-auc选择表现最佳的模型
 ```{r}
 show_best(kknn_tune)
+
 best_auc <- select_best(kknn_tune, "roc_auc")
 
 final_mod <- finalize_model(
@@ -88,6 +116,8 @@ final_mod <- finalize_model(
 
 final_mod
 ```
+
+
 然后用得到的最佳参数重新拟合模型.
 ```{r}
 final_wf <- workflow() %>% add_model(final_mod) %>% 
@@ -95,12 +125,17 @@ final_wf <- workflow() %>% add_model(final_mod) %>%
 # 此处的fit是否需要呢, final_res$.workflow[[1]]应该就是在训练集上的最后的模型
 final_fit <- final_wf %>% fit(prostat_train)
 
+
+```
+
+```{r}
 # last_fit在训练集拟合，在测试集verify performance
 final_res <- final_wf %>%
   last_fit(split = df_split)
 final_res %>% 
   collect_metrics()
 ```
+
 
 
 模型评价参数：
@@ -121,6 +156,8 @@ final_res %>%
   roc_auc(class, .pred_0)
 
 ```
+
+
 验证是否一致, final_fit & final_res$.workflow[[1]]是否是同一个对象。
 初步验证是一样的。
 ```{r}
@@ -137,6 +174,10 @@ cancer_pred2
 ```
 
 
+保存模型：
+```{r}
+
+```
 
 
 
