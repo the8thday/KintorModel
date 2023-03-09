@@ -9,13 +9,23 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 ## lightGBM
 
-https://www.kaggle.com/code/athosdamiani/lightgbm-with-tidymodels/notebook
+> https://lightgbm.readthedocs.io/en/latest/
+> https://www.kaggle.com/code/athosdamiani/lightgbm-with-tidymodels/notebook
+> https://sefiks.com/2020/05/13/xgboost-vs-lightgbm/
+> https://stackoverflow.com/questions/70450755/shap-xgboost-and-lightgbm-difference-in-shap-values-calculation
+> https://zhuanlan.zhihu.com/p/99069186
 
-以一个分类问题进行示例。
 
-`randomforest` & `xgboost`都可以确定特征重要性，so？SHAPLEY?
+lightGBM(Light Gradient Boosting Machine)是一个流行的基于决策树算法的梯度提升( gradient boosting)集成框架， 设计初衷是提供一个快速、高效、低内存、高准确度、支持并行和大规模数据处理的工具。LightGBM可以减小数据对内存的使用、减小通信代价以及提升多机并行时的效率，在数据计算上实现线性加速。
+
+
+lightGBM是，，其和`xgboost`的差异在于The main difference between these frameworks is the way they are growing. XGBoost applies `level-wise` tree growth where LightGBM applies `leaf-wise` tree growth. Level-wise approach grows horizontal whereas leaf-wise grows vertical.
+
+
+*lightGBM的数据输入要求：*LightGBM直接支持类别特征，对类别特征不必进行独热编码处理
 
 
 
@@ -35,6 +45,8 @@ registerDoParallel(cores = all_cores)
 
 
 ### 理解数据
+
+以一个分类问题进行示例。
 
 ```{r}
 adult <- read_csv("./datasets/adult.csv")
@@ -221,8 +233,80 @@ saveRDS(adult_wf_model, here::here("final_model.rds"))
 
 
 
+## lightGBM by lightgbm
+
+boosting_type:
+弱学习器的类型。取值如下：
+gbdt（默认）：使用基于树的模型进行计算。
+gblinear：使用线性模型进行计算。
+rf：使用随机森林模型进行计算。
+dart：使用dropout技术删除部分树，防止过拟合。
+goss：使用单边梯度抽象算法进行计算。速度快，但是可能欠拟合。
 
 
+```{r}
+library(lightgbm)
+```
+
+```{r}
+# define the training parameters
+params <- list(objective = "regression",
+               metric = "rmse",
+               num_leaves = 30,
+               learning_rate = 0.1)
+
+lgb.grid = list(objective = "binary",
+                metric = "auc",
+                min_sum_hessian_in_leaf = 1,
+                feature_fraction = 0.7,
+                bagging_fraction = 0.7,
+                bagging_freq = 5,
+                min_data = 100,
+                max_bin = 50,
+                lambda_l1 = 8,
+                lambda_l2 = 1.3,
+                min_data_in_bin=100,
+                min_gain_to_split = 10,
+                min_data_in_leaf = 30,
+                is_unbalance = TRUE)
+
+
+# Gini for Lgb
+lgb.normalizedgini = function(preds, dtrain){
+  actual = getinfo(dtrain, "label")
+  score  = NormalizedGini(preds,actual)
+  return(list(name = "gini", value = score, higher_better = TRUE))
+}
+```
+
+
+```{r}
+#lgb.model.cv = lgb.cv(params = lgb.grid, data = lgb.train, learning_rate = 0.02, num_leaves = 25,
+#                   num_threads = 2 , nrounds = 7000, early_stopping_rounds = 50,
+#                   eval_freq = 20, eval = lgb.normalizedgini,
+#                   categorical_feature = categoricals.vec, nfold = 5, stratified = TRUE)
+
+#best.iter = lgb.model.cv$best_iter
+
+lgb.model = lgb.train(params = lgb.grid, data = lgb.train, learning_rate = 0.02,
+                      num_leaves = 25, num_threads = 2 , nrounds = best.iter,
+                      eval_freq = 20, eval = lgb.normalizedgini,
+                      categorical_feature = categoricals.vec)
+```
+
+```{r}
+# train the model
+model <- lgb.train(params,
+                   data = train,
+                   verbose = 1)
+
+# make predictions on the test set
+predictions <- predict(model, test)
+
+# evaluate the model
+rmse <- mean((predictions - test$target)^2)
+print(rmse)
+```
 
 
 
