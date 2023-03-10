@@ -11,6 +11,34 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## modelStudio
 
+> https://ema.drwhy.ai/
+
+modelStudio是，
+
+
+`SHAP`(Shapley Additive Explanations)是指，
+Shapley values is the only prediction explanation framework with a solid theoretical foundation (Lundberg and Lee (2017)).
+在Python中有较好的实现，不过目前还没有在R中见到较好的R包，现在此做一个笔记。
+
+传统的feature importance只告诉哪个特征重要，但我们并不清楚该特征是怎样影响预测结果的。SHAP value最大的优势是SHAP能对于反映出每一个样本中的特征的影响力，而且还表现出影响的正负性。
+
+
+### SHAP
+
+首先是收集一些R包。
+
+```{r}
+library(shapr)
+library(SHAPforxgboost)
+# library(shapviz)
+# library(shapper)
+```
+
+```{r}
+
+```
+
+
 ### everybody love modelStudio!!
 
 在诸多模型的构建中，对变量的解释，或者说变量对模型的贡献度需要清晰的解释。
