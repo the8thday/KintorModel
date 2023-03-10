@@ -17,10 +17,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 支持向量机(Support vector machines)可以处理complex classification, regression, and outlier detection problems。 支持向量指的是在svm寻找超平面时，只需要让最靠近中间分割线的那些点尽量远离，即只用到那些「支持向量 support vector」的样本。核函数是很重要的。把一个数据集正确分开的超平面可能有多个，而具有「最大间隔」的超平面就是 SVM 所要找的最优解。最靠近超平面的样本点即为「支持向量」。支持向量到超平面的距离称为「间隔 margin」。
-简单点讲，SVM就是一种二类分类模型，他的基本模型是的定义在特征空间上的间隔最大的线性分类器，SVM的学习策略就是间隔最大化。
+简单点讲，SVM就是一种二类分类模型，他的基本模型是定义在特征空间上的间隔最大的线性分类器，SVM的学习策略就是间隔最大化。
 
 1.线性可分SVM,
-当训练数据线性可分时，通过硬间隔(hard margin，什么是硬、软间隔下面会讲)最大化可以学习得到一个线性分类器，即硬间隔SVM，如上图的的H3。
+当训练数据线性可分时，通过硬间隔hard margin最大化可以学习得到一个线性分类器，即硬间隔SVM
 2.线性SVM,
 当训练数据不能线性可分但是可以近似线性可分时，通过软间隔(soft margin)最大化也可以学习到一个线性分类器，即软间隔SVM。
 3.非线性SVM,
@@ -43,7 +43,7 @@ SVMs do not directly provide probability estimates, these are calculated using a
 只适用于二分类问题。(SVM的推广SVR也适用于回归问题；可以通过多个SVM的组合来解决多分类问题)
 
 
-*SVM重要的超参数：*
+*SVM重要的超参数：*cost(错误项的惩罚参数), margin()
 
 
 
@@ -54,7 +54,7 @@ SVMs do not directly provide probability estimates, these are calculated using a
 
 
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 library(tidymodels)
 library(usemodels)
@@ -62,7 +62,7 @@ library(usemodels)
 ```
 
 
-在建立模型之前，可以通过一些`tidymodels`所提供的辅助工具进行一些初步的工作，比如我们打算在前列腺癌表达数据集上进行重要变量（基因）的筛选和建立区分癌和癌旁的模型，并打算利用SVM算法，那么首先可以利用`usemodels`建立一个基本的模型框架，并基于具体的数据进行一些修改, 不过`usemodels`所支持的模型还有限，`parsnip::parsnip_addin()`也有一 段时间没有 更新了。
+在建立模型之前，可以通过一些`tidymodels`所提供的辅助工具进行一些初步的工作，比如我们打算在前列腺癌表达数据集上进行重要变量（基因）的筛选和建立区分癌和癌旁的模型，并打算利用SVM算法，那么首先可以利用`usemodels`建立一个基本的模型框架，并基于具体的数据进行一些修改, 不过`usemodels`所支持的模型还有限，`parsnip::parsnip_addin()`也有一段时间没有更新了。
 `show_engines()`函数可以查看所支持的引擎。
 ```{r}
 usemodels::use_kernlab_svm_rbf(formula = class ~ ., data = prostat_train,
@@ -71,9 +71,11 @@ usemodels::use_kernlab_svm_rbf(formula = class ~ ., data = prostat_train,
                                )
 ```
 
+### 一个简单的示例
+
 
 准备数据
-```{r}
+```{r, include=FALSE}
 expr_file <- "datasets/prostat.expr.symbol.txt"
 metadata_file <- "datasets/prostat.metadata.txt"
 
@@ -101,13 +103,22 @@ prostat_test <- testing(df_split)
 
 
 
-svm主要由两个R包提供内在的引擎`show_engines('svm_linear')`: kernlab & LiblineaR
+svm_linear主要由两个R包提供内在的引擎`show_engines('svm_linear')`: kernlab & LiblineaR
+
+`svm_linear`, `svm_poly`, `svm_rbf` 其分别和`scikit-learn`中对应的关系为,`linear`：线性核函数, `poly`：多项式核函数,
+`rbf`：径像核函数/高斯核, `sigmod`：sigmod 核函数.
+
+`?kernlab::ksvm`中有提供的很多的kernal选择，但是`parsnip`提供的就比较有限了。
 ```{r}
 prostat_folds <- vfold_cv(prostat_train, strata = class)
 
 
 svm_spec <- svm_linear(mode = "classification") %>% 
   set_engine('kernlab')
+
+# svm_spec <- svm_rbf(mode = 'classification', 
+#                     cost = tune(), rbf_sigma = tune()) %>% 
+#   set_engine('kernlab')
 
 prostat_rec <-
   recipe(class ~ ., data = prostat_train)
@@ -128,7 +139,9 @@ set.seed(123)
 prostat_metrics <- metric_set(accuracy, sens, spec)
 
 # `fit_resamples`不可以做tune的操作，即不可以做网格搜索；但提供一种类似交叉验证的操作
-prostat_rs <- fit_resamples(prostat_wf, resamples = prostat_folds, metrics = prostat_metrics)
+prostat_rs <- fit_resamples(prostat_wf, resamples = prostat_folds, 
+                            metrics = prostat_metrics)
+
 collect_metrics(prostat_rs)
 ```
 
@@ -137,6 +150,8 @@ last_fit() to fit one final time to the training data and evaluate one final tim
 以下结果显示在测试集数据上具有不错的表现。
 ```{r}
 final_rs <- last_fit(prostat_wf, df_split, metrics = prostat_metrics)
+
+
 collect_metrics(final_rs)
 ```
 
@@ -153,6 +168,8 @@ confusion matrix:
 If we decide this model is good to go and we want to use it in the future, we can extract out the fitted workflow. This object can be used for prediction:
 ```{r}
 final_fitted <- extract_workflow(final_rs)
+
+# 测试集数据上的验证
 augment(final_fitted, new_data = slice_sample(prostat_test, n = 3)) %>% 
   dplyr::select(last_col(5:1))
 ```
@@ -160,6 +177,7 @@ augment(final_fitted, new_data = slice_sample(prostat_test, n = 3)) %>%
 
 We can also examine this model (which is just linear with coefficients) to understand what drives its predictions.
 在engine选择为LiblineaR时tidy函数支持，不过kernlab不支持。
+
 ```{r}
 tidy(final_fitted) %>%
   slice_max(abs(estimate), n = 20) %>%
@@ -174,6 +192,38 @@ tidy(final_fitted) %>%
   labs(x = "Estimate from linear SVM (absolute value)", y = NULL, 
        fill = "How many weeks on\nbestseller list?")
 ```
+
+
+### 带网格搜索，交叉验证的示例
+
+所使用数据依旧为上述数据。
+
+```{r}
+prostat_folds <- vfold_cv(prostat_train, strata = class)
+
+
+svm_spec <- svm_rbf(mode = 'classification', 
+                    cost = tune(), 
+                    rbf_sigma = tune()) %>% 
+  set_engine('kernlab')
+
+prostat_rec <-
+  recipe(class ~ ., data = prostat_train) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) 
+
+
+prostat_wf <- workflow(prostat_rec, svm_spec)
+prostat_wf
+```
+
+
+```{r}
+svm_grid <- grid_max_entropy()
+```
+
+
+
 
 
 
