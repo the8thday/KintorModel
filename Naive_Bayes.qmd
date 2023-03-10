@@ -8,13 +8,23 @@ format: html
 > https://github.com/thebioengineer/TidyX
 > http://optimumsportsperformance.com/blog/
 > https://parsnip.tidymodels.org/reference/naive_Bayes.html
+> https://parsnip.tidymodels.org/reference/details_naive_Bayes_naivebayes.html
 
 
-Bayes是
+Bayes定理是,
+
+
+Naive Bayes是基于贝叶斯定理和条件独立性假设的假设方法(所有的特征间彼此独立)。
+通过特征求的条件概率最大的分类。
+
+
+*This model has 2 tuning parameter:*
+`smoothness`: Kernel Smoothness (type: double, default: 1.0)
+`Laplace`: Laplace Correction (type: double, default: 0.0)
 
 
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 library(tidymodels)
 library(palmerpenguins)
@@ -48,6 +58,7 @@ cv_folds
 
 ```{r}
 # ?naive_Bayes
+# 目前只能fit classification model
 nb_model <- naive_Bayes() %>% 
   set_mode("classification") %>% 
   set_engine("klaR")
@@ -77,6 +88,8 @@ nb_fit <- penguins_wf %>%
   fit_resamples(
     resamples = cv_folds
   )
+
+
 collect_metrics(nb_fit)
 ```
 
@@ -88,13 +101,21 @@ nb_final <- penguins_wf %>%
   last_fit(
     split = penguin_split
   )
+
 collect_metrics(nb_final)
+
 nb_test_pred <- bind_cols(
   test,
   nb_final %>% collect_predictions() %>% dplyr::select(starts_with(".pred_"))
 )
+
+```
+
+
+```{r}
 table("predicted class" = nb_test_pred$.pred_class,
       "observed class" = nb_test_pred$species)
+
 nb_test_pred %>% 
   roc_curve(
     truth = species,
@@ -102,5 +123,4 @@ nb_test_pred %>%
   ) %>% 
   autoplot()
 ```
-
 
