@@ -11,15 +11,29 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-```{r message=FALSE}
+> http://www.ehbio.com/ML/feature-selection.html
+
+一个细致的随机森林分析建模过程，基于`Randomforest`包。
+
+有一些算法如随机森林等在构建模型时可以自己选择有最合适的分类或预测能力的特征集合。前面提到，基于随机置换的变量的整体重要性得分(ACS)是评估变量重要性的一个比较可靠的方式。但这种方式获得的ACS Z-score只能用于排序确定哪些变量更重要， 但不能根据统计显著性获得所有重要的变量。因此如果我们的目的还希望鉴定出哪些特征对分类或预测有贡献时，还需要借助其他的方式。
+
+特征递归消除(RFE, recursive feature elimination)是一个常用的方法；它基于模型预测性能评估指标如准确性等选择 一个性能较佳的最小集合的特征变量。它首先应用所有的特征变量构建模型，然后移除对模型最不重要的一定比例的变量再次构建模型；持续迭代直至获得准确性最高的模型。
+
+在后续应用预测模型时，只需要使用数目比较少的变量，这样的好处是便于新样品的变量检测。但在临床应用时，不同的数据集包含的变量可能相差较大，共有的变量较少，但却可以获得相似的预测性能。其中一个主要原因是组学数据中，很多变量之间是相关性比较强的。因此不同的变量集合可能会获得同样的预测性能。而在构建模型时保留这些相关的冗余变量可以获得更稳定、准确的预测结果，同时对病理机制也能提供更全面的解释。
+
+其它变量选择方法不去除冗余变量，而是通过估计不相干变量的重要性值的分布，选择具有显著更高重要性值的变量作为预测变量。这些方法越来越受欢迎。包括permutation (Perm)和它的参数化版本Altmann,Boruta, r2VIM (recurrent relative variable importance)和Vita。在2019年的一篇基于组学数据的评估文章中得出结论：Boruta和Vita算法的稳定性最好，适合分析高维数据。Vita的计算速度比Boruta快很多更适合大数据集，但只有Boruta可用于低维数据。 (https://doi.org/10.1093/bib/bbx124).
+
+
+
+```{r message=FALSE, include=FALSE}
 library(caret)
 library(glmnet)
 
-library(Boruta)
+library(Boruta) # 特征选择
 
 ```
 
-read data
+read data, 一个摘抄自网路上的示例数据。
 ```{r}
 expr_file <- "./datasets/prostat.expr.symbol.txt"
 metadata_file <- "./datasets/prostat.metadata.txt"
@@ -29,6 +43,8 @@ expr_mat <- read.table(expr_file, row.names = 1, header = T, sep="\t",
 rownames(expr_mat) <- make.names(rownames(expr_mat))
 metadata <- read.table(metadata_file, row.names=1, header=T, sep="\t", stringsAsFactors =T)
 table(metadata)
+
+
 expr_mat <- t(expr_mat)
 expr_mat_sampleL <- rownames(expr_mat)
 metadata_sampleL <- rownames(metadata)
@@ -39,11 +55,13 @@ metadata <- metadata[common_sampleL,,drop=F]
 
 ```
 
+102例样本的9千多个特征。数据为特征维度远多于样本数量的数据。
 
 ```{r}
 set.seed(42)
 
 train_index <- createDataPartition(metadata$class, p=0.75, list = F)
+
 train_data <- expr_mat[train_index,]
 train_data_group <- metadata[["class"]][train_index]
 
@@ -57,19 +75,27 @@ dim(test_data)
 
 ### 建模
 
-特征选择
+*特征选择*
+
+随机森林模型可以自身对变量特征进行选择。
+
 `Boruta`法在特征变量筛选是既可以用于分类问题，也可以用于回归问题，其是通过随机森林建模并计算每个变量的重要性得分，通过和影子变量进行对比，得到重要的变量。
+
 ```{r}
 
-boruta <- Boruta::Boruta(x = train_data, y = train_data_group, pValue=0.01, mcAdj=T, maxRuns=300)
+boruta <- Boruta::Boruta(x = train_data, y = train_data_group, 
+                         pValue=0.01, 
+                         mcAdj=T, 
+                         maxRuns=300)
+
 table(boruta$finalDecision)
 # boruta$finalDecision[boruta$finalDecision=="Confirmed"]
 
 Boruta::plotImpHistory(boruta)
 ```
+*Tentative, Confirmed, Rejected*
 
-
-提取重要变量, 其结果为Tentative+Confirmed, 如下将提取99个变量
+提取重要变量, 其结果为Tentative+Confirmed, 如下将提取99个变量.
 
 ```{r}
 boruta.finalVarsWithTentative <- data.frame(Item=getSelectedAttributes(boruta, withTentative = T), 
