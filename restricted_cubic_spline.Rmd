@@ -11,6 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## restricted cubic spline in R
 
+条形图是piece-wise polynomials named after the tools draftsmen used to use to draw curves.
+
+条形图是一种多项式回归。
+
 非线性关系分析:
 
 在观察性研究中遇到定量或者等级资料的时候，一般会绘制 限制性立方样条图，并采用似然比检验分析非线性关系。
@@ -29,6 +33,7 @@ knitr::opts_chunk$set(echo = TRUE)
  Various proposals have been made, but Frank Harrell recommends using 4 knots if N < 100 and 5 for larger data sets and placing them at the 5th, 35th, 65th and 95th percentiles for k = 4 and the 5th, 27.5th, 50th, 72.5th and 95th for k = 5 (where k is the number of knots).
 
 下面在R语言中实现其应用:
+
 ```{r}
 library(splines)
 library(splines2)
@@ -84,6 +89,36 @@ interpretation: `g statistic` it’s based on Gini’s mean difference and is pu
 In figure 1, we used restricted cubic splines to flexibly model and visualize the relation of predicted fat mass and lean body mass with all cause mortality in men. The risk of all cause mortality was relatively flat until around 21 kg of predicted fat mass and then started to increase rapidly afterwards (P for non-linearity <0.001). The average BMI for men with 21 kg of predicted fat mass was 25. Above 21 kg, the hazard ratio per standard deviation higher predicted fat mass was 1.22 (1.18 to 1.26). Regarding the strong U shaped relation between predicted lean body mass and all cause mortality, the plot showed a substantial reduction of the risk within the lower range of predicted lean body mass, which reached the lowest risk around 56 kg and then increased thereafter (P for non-linearity <0.001). Below 56 kg, the hazard ratio per standard deviation higher predicted lean body mass was 0.87 (0.82 to 0.92). 
 
 > Predicted lean body mass, fat mass, and all cause and cause specific mortality in men: prospective US cohort study
+
+
+```{r}
+
+library(plotRCS)
+```
+
+
+```{r}
+# View data
+head(cancer)
+
+# RCS curves for a logistic regression model
+rcsplot(data = cancer,
+        outcome = "status",
+        exposure = "age",
+        covariates = c("sex", "race", "size", "metastasis"),
+        xlab = "Age", ylab = "OR (95%CI)")
+```
+
+
+如果要绘制未校正其他变量的限制性立方样条图，去掉covariates协变量即可。
+```{r}
+# RCS curves for a Cox regression model
+rcsplot(data = cancer,
+        outcome = "status",
+        time = "time",
+        exposure = "age",
+        covariates = c("sex", "race", "size", "metastasis"))
+```
 
 
 
