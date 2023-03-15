@@ -27,12 +27,24 @@ A `bagging model` is the same as a random forest where mtry is equal to the numb
 *常适用的数据*，随机森林对于维度很高的数据（特征很多的数据）比如微生物组数据，不用特征工程也可以直接使用。对于连续数据和分类数据混合的数据集，
 
 
-*重要的超参数*，随机森林算法有三个主要的超参数，需要在训练之前进行设置。 其中包括节点大小(min_n)、树的数量(ntree)和 采样的特征数量(mtry)。
+*重要的超参数*，随机森林算法有三个主要的超参数，需要在训练之前进行设置。 其中包括节点大小(min_n)、树的数量(ntree)和 采样的特征数量(mtry)。其它需要tune的超参数，在`set_engine`中可以进行设置。
 其中采样的特征数量通常randomForest() `p / 3` variables when building a random forest of regression trees, and `sqrt(p)` variables when building a random forest of classification trees. 
 树的数量一般会控制在500以下，but one should never use over 500 trees because it is a waste of time.虽然有人这么说， 但还是会用到很多的trees的。
 当然具体还要依据数据的情况而定，`dials`包所提供的一些列的函数值得参考。
 
 其他的可以tune的超参数，Criterion(gini or mse, et.), 
+
+`n_estimators`: We know that a random forest is nothing but a group of many decision trees, the n_estimator parameter controls the number of trees inside the classifier. We may think that using many trees to fit a model will help us to get a more generalized result, but this is not always the case. However, it will not cause any overfitting but can certainly increase the time complexity of the model. The default number of estimators is 100 in scikit-learn.
+`max_depth`: It governs the maximum height upto which the trees inside the forest can grow. It is one of the most important hyperparameters when it comes to increasing the accuracy of the model, as we increase the depth of the tree the model accuracy increases upto a certain limit but then it will start to decrease gradually because of overfitting in the model. It is important to set its value appropriately to avoid overfitting. The default value is set to None, None specifies that the nodes inside the tree will continue to grow until all leaves become pure or all leaves contain less than min_samples_split (another hyperparameter).
+`min_samples_split`: It specifies the minimum amount of samples an internal node must hold in order to split into further nodes. If we have a very low value of min_samples_splits then, in this case, our tree will continue to grow and start overfitting. By increasing the value of min_samples_splits we can decrease the total number of splits thus limiting the number of parameters in the model and thus can aid in reducing the overfitting in the model. However, the value should not be kept very large that a number of parameters drop extremely causing the model to underfit. We generally keep min_samples_split value between 2 and 6. However, the default value is set to 2.
+`min_samples_leaf`:  It specifies the minimum amount of samples that a node must hold after getting split. It also helps to reduce overfitting when we have ample amount of parameters. Less number of parameters can lead to overfitting also, we should keep in mind that increasing the value to a large number can lead to less number of parameters and in this case model can underfit also. The default value is set to 1.
+`max_features`: Random forest takes random subsets of features and tries to find the best split.  max_features helps to find the number of features to take into account in order to make the best split. It can take four values “auto“, “sqrt“, “log2” and None.
+In case of auto: considers max_features = sqrt(n_features)
+In case of sqrt: considers max_features = sqrt(n_features), it is same as auto
+In case of log2: considers max_features = log2(n_features)
+In case of None: considers max_features = n_features
+`max_leaf_nodes`: It sets a limit on the splitting of the node and thus helps to reduce the depth of the tree, and effectively helps in reducing overfitting. If the value is set to None, the tree continues to grow infinitely.
+max_samples: This hyperparameter helps to choose maximum number of samples from the training dataset to train each individual tree.
 
 
 *随机森林对于特征重要性的评估*，基尼重要性和平均不纯度减少 (MDI) 常用于衡量排除给定变量时模型准确度的降低程度。 此外，排列重要性（又称 MDA，平均精度下降）也是一种衡量重要性的方法。 MDA 通过随机排列 oob 样本中的特征值来识别准确性的平均降低程度。 
@@ -61,7 +73,7 @@ library(tidyverse)
 library(tidymodels)
 library(vip)
 library(usemodels)
-
+library(shapr)
 
 tidymodels_prefer()
 
@@ -606,6 +618,11 @@ collect_metrics(crash_res) %>%
 ```
 
 
+#### Random Forests 回归问题
+
+```{r}
+
+```
 
 
 
