@@ -24,6 +24,8 @@ dat <- data_survey[ , -1]
 head(dat)
 ```
 
+模型检验，包括KMO检验和Bartlett球形检验等，
+
 **KMO** 
 
 The Kaiser-Meyer-Olkin (KMO) used to measure sampling adequacy is a better measure of factorability.
@@ -33,6 +35,7 @@ X <- dat[,-c(13)]
 Y <- dat[,13]
 
 # 首先通过相关性大概看下变量间的关系。
+# 只有数据之间的相关性好，才有可能提炼出公共因子
 datamatrix <- cor(X)
 corrplot::corrplot(datamatrix, method="number")
 
@@ -45,6 +48,10 @@ det(datamatrix)
 ```
 
 判断需提取的公共因子的数量，每个因子被认为可解释多个观测变量间共有的方差，因此它们常被称为公共因子(common factor)。
+
+通过参`·fa = "both"`同时给出了PCA和因子分析的碎石图，根据因子分析碎石图的结果，建议我们提取3个因子。
+`rotate`参数确定旋转方法，有多种不同的选择，比如不旋转、正交旋转法（比如最大方差法）、斜交旋转法等，
+`fm`参数选择因子计算方法，比如最大似然法ml、主轴迭代法pa、加权最小二乘wls、广义加权最小二乘gls、最小残差minres，等。
 
 ```{r}
 #确定最佳因子数量，详情 ?fa.parallel
