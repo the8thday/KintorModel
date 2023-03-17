@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 > https://scikit-learn.org/stable/modules/svm.html#svm-regression
 > https://github.com/thebioengineer/TidyX
+> https://www.csie.ntu.edu.tw/~cjlin/papers/guide/guide.pdf
 
 
 支持向量机(Support vector machines)可以处理complex classification, regression, and outlier detection problems。 支持向量指的是在svm寻找超平面时，只需要让最靠近中间分割线的那些点尽量远离，即只用到那些「支持向量 support vector」的样本。核函数是很重要的。把一个数据集正确分开的超平面可能有多个，而具有「最大间隔」的超平面就是 SVM 所要找的最优解。最靠近超平面的样本点即为「支持向量」。支持向量到超平面的距离称为「间隔 margin」。
@@ -27,8 +28,6 @@ knitr::opts_chunk$set(echo = TRUE)
 当训练数据线性不可分时，通过使用核技巧(kernel trick)和软间隔最大化，可以学习到一个非线性SVM。
 
 
-SVM善于处理高纬度数据，比如基因表达数据集、微生物组OTU数据集等。
-
 _The disadvantages of support vector machines include:_
 If the number of features is much greater than the number of samples, avoid over-fitting in choosing Kernel functions and regularization term is crucial.
 SVMs do not directly provide probability estimates, these are calculated using an expensive five-fold cross-validation (see Scores and probabilities, below).
@@ -41,16 +40,44 @@ SVMs do not directly provide probability estimates, these are calculated using a
 *支持向量机的缺点是:*
 二次规划问题求解将涉及m阶矩阵的计算(m为样本的个数), 因此SVM不适用于超大数据集。(SMO算法可以缓解这个问题)
 只适用于二分类问题。(SVM的推广SVR也适用于回归问题；可以通过多个SVM的组合来解决多分类问题)
+_by chatGPT:_
+Support Vector Machines (SVMs) are a popular machine learning algorithm that can be used for both classification and regression tasks. Here are some advantages and disadvantages of using SVMs:
+_Advantages:_
+Effective in high-dimensional spaces: SVMs perform well in high-dimensional spaces and can handle large feature sets with ease.
+Good generalization performance: SVMs are less prone to overfitting compared to other algorithms, making them suitable for small and medium-sized datasets.
+Versatile: SVMs can be used for both linear and non-linear problems.
+Effective with unstructured and semi-structured data: SVMs can work with unstructured and semi-structured data such as text, images, and genomic data.
+Robust: SVMs are less sensitive to the choice of the kernel function and hyperparameters, making them a robust choice for many problems.
+__Disadvantages:__
+Computationally intensive: SVMs can be computationally expensive, especially when dealing with large datasets.
+Difficult to interpret: SVMs can be difficult to interpret, and it may not be clear which features are contributing most to the decision boundary.
+Sensitive to the choice of kernel function and hyperparameters: The choice of kernel function and hyperparameters can significantly affect the performance of the model, making it challenging to find the optimal configuration.
+Memory-intensive: The memory requirements for SVMs can be high, especially when dealing with large feature sets.
+Can be sensitive to class imbalance: SVMs can be sensitive to class imbalance, where the number of examples in one class is much larger than the others.
 
 
-*SVM重要的超参数：*cost(错误项的惩罚参数), margin()
+*SVM相对比较适合的数据：*对于机器学习算法而言，虽然不存在绝对的适合数据问题，SVM比较适合基因表达数据、OTU数据，这些数据样本一般不会太大，毕竟SVM运行的时间和样本数目息息相关，但是特征数目会比较多，SVM倒是便于处理特征多的情况。同时如果数据集中Outlier较多，SVM也可以handle，毕竟其只需用到支持向量。
 
+
+*SVM重要的超参数：*cost(C,错误项的惩罚参数)The value of C determines the penalty for the classifier； margin() regression only；kernel的选择是重要的，有一些kernel还有 自己的需要注意的参数，
+比如对于`poly`kernel有degree, 一般在1-10之间; `svm_linear`经常只需要Cost一个超参数。radial kernel这一常用又成功的kernel在`tidymodels` 以`svm_rbf`需要tune的参数有，recommend to search C in the range [2^−5;2^15] and γ in the range [2^−15;2^3].
+对于`tidymodels`的超参数设置而言，其所提供的参数选项看起来不如`sklearn`，而且如果需要`set_engine`中的超参数的话还是需要自己去查阅资料的。
+
+_from chatGPT_
+调整支持向量机（Support Vector Machine，SVM）的超参数是实现最佳性能的关键步骤。以下是调整SVM超参数的一般步骤：
+1.选择适当的核函数：核函数是SVM的一个重要超参数。常见的核函数包括线性、多项式、径向基函数（RBF）和sigmoid函数。您应根据数据的性质选择核函数。
+2.设置正则化参数C：正则化参数C控制最大化间隔和最小化分类错误之间的权衡。C值高会导致较窄的间隔，可能会过拟合数据。相反，C值低会导致较宽的间隔，可能会欠拟合数据。
+3.设置特定于核函数的超参数：如果您选择的核函数不是线性的，则需要设置额外的超参数。例如，对于多项式核，您需要设置多项式的次数，对于RBF核，您需要设置gamma参数。
+4.使用交叉验证：为了找到最佳超参数，您应使用交叉验证。将数据分为训练集和验证集，并在训练集上尝试不同的超参数组合。然后，评估每个组合在验证集上的性能。
+5.评估性能：最后，评估具有最佳超参数的SVM在测试集上的性能，以确保它对新数据具有良好的泛化性能。
+6.不同的编程语言中有多个库可用于调整SVM的超参数，例如Python中的scikit-learn中的GridSearchCV或RandomizedSearchCV。
 
 
 *做为一个调包选手，机器学习意味着什么呢*意味着何种算法适合何种数据，输入数据有什么要求，需要进行哪些特征工程，每个模型的解释有啥其自身的特点，具体的模型有哪些需要关注的超参数，具体的超参数如何设置范围、需不需要依据具体的数据集进行超参数的设置等等。剩下的就是真正在用的过程中不断的优化、优化、优化。
 
 
-`sklearn`Python包中支持的SVM种类很多，`svm.LinearSVC`,`svm.SVC`,`svm.NuSVC`,`svm.OneClassSVM`等等，可以看到 SVM 在 sklearn 上有三个接口，分别是 LinearSVC、SVC 和 NuSVC。最常用的一般是 SVC 接口。除了特别表明是线性的两个类 LinearSVC 和 LinearSVR 之外，其他的所有类都是同时支持线性和非线性的。NuSVC和NuSVC 可以手动调节支持向量的数目， 其他参数都与最常用的SVC和SVR一致。而OneClassSVM 则是无监督的类。在R中其对应的函数为，
+`sklearn`Python包中支持的SVM种类很多，`svm.LinearSVC`,`svm.SVC`,`svm.NuSVC`,`svm.OneClassSVM`等等，可以看到 SVM 在 sklearn 上有三个接口，分别是 LinearSVC、SVC 和 NuSVC。最常用的一般是 SVC 接口。除了特别表明是线性的两个类 LinearSVC 和 LinearSVR 之外，其他的所有类都是同时支持线性和非线性的。NuSVC和NuSVC 可以手动调节支持向量的数目， 其他参数都与最常用的SVC和SVR一致。而OneClassSVM 则是无监督的类。`svm.SVC`中fit的时间是样本数的平方、甚至更多，For large datasets consider using LinearSVC or SGDClassifier instead。
+`tidymodels`和`sklearn`在`SVM`间的最大差异，应该就是kernel的选择了，前者直接提供单独的建模函数，
 
 
 
@@ -58,6 +85,7 @@ SVMs do not directly provide probability estimates, these are calculated using a
 library(tidyverse)
 library(tidymodels)
 library(usemodels)
+library(kernlab)
 
 ```
 
@@ -74,7 +102,7 @@ usemodels::use_kernlab_svm_rbf(formula = class ~ ., data = prostat_train,
 ### 一个简单的示例
 
 
-准备数据
+准备数据，为前列腺癌102例患者的RNASeq标准化的数据，其中caner 52例，normal样本50例，分组均衡。
 ```{r, include=FALSE}
 expr_file <- "datasets/prostat.expr.symbol.txt"
 metadata_file <- "datasets/prostat.metadata.txt"
@@ -106,22 +134,26 @@ prostat_test <- testing(df_split)
 svm_linear主要由两个R包提供内在的引擎`show_engines('svm_linear')`: kernlab & LiblineaR
 
 `svm_linear`, `svm_poly`, `svm_rbf` 其分别和`scikit-learn`中对应的关系为,`linear`：线性核函数, `poly`：多项式核函数,
-`rbf`：径像核函数/高斯核, `sigmod`：sigmod 核函数.
+`rbf`：径像核函数/高斯核, `sigmod`：sigmod 核函数，在`sklearn`中kernel参数为不同的核函数，并进一步的有其对应的需要 调整的参数，而在`tidymodels`中，则以上述几种建模函数做为选择。
 
-`?kernlab::ksvm`中有提供的很多的kernal选择，但是`parsnip`提供的就比较有限了。
+`?kernlab::ksvm`中有提供的很多的kernal选择，但是`parsnip`就只提供了三个选择。
+
 ```{r}
 prostat_folds <- vfold_cv(prostat_train, strata = class)
 
 
-svm_spec <- svm_linear(mode = "classification") %>% 
-  set_engine('kernlab')
-
-# svm_spec <- svm_rbf(mode = 'classification', 
-#                     cost = tune(), rbf_sigma = tune()) %>% 
+# svm_spec <- svm_linear(mode = "classification") %>% 
 #   set_engine('kernlab')
 
+svm_spec <- svm_rbf(mode = 'classification',
+                    cost = tune(), rbf_sigma = tune()) %>%
+  set_engine('kernlab')
+
+
 prostat_rec <-
-  recipe(class ~ ., data = prostat_train)
+  recipe(class ~ ., data = prostat_train) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors())
 
 ## just to see how it is working:
 # prep(prostat_rec) %>% bake(new_data = NULL) %>% glimpse()
@@ -130,11 +162,65 @@ prostat_wf <- workflow(prostat_rec, svm_spec)
 prostat_wf
 ```
 
+tuning the hyper parameter:
+对于`rbf`kernel，选择cost, 等超参数。
 
+因为没有筛选特征，此步运行很慢。
 
 ```{r}
 doParallel::registerDoParallel()
 
+# svm_grid <- grid_max_entropy()
+
+param_grid <- grid_regular(dials::cost(), 
+                           rbf_sigma(),
+                           levels = 3
+                           )
+
+tune_res <- tune_grid(
+  prostat_wf, 
+  resamples = prostat_folds, 
+  grid = param_grid
+)
+```
+
+```{r}
+autoplot(tune_res)
+```
+
+得到超参数优化好的最终模型，并拟合：
+
+`metrics`中的准确度表现很差呀，
+```{r}
+collect_metrics(tune_res)
+
+best_cost <- select_best(tune_res, metric = "roc_auc")
+
+svm_linear_final <- finalize_workflow(prostat_wf, best_cost)
+```
+
+`last_fit`得到最终模型：
+
+在此之前先手动fit最终模型，以和`last_fit`得到的模型做对比，二者应该一摸一样，不过在构建随机森林时发现不一样。
+```{r}
+svm_C_fit <- svm_linear_final %>% fit(prostat_train)
+
+svm_C_fit %>%
+  extract_fit_engine() %>%
+  plot()
+
+# 测试集数据的表现
+augment(svm_C_fit,
+        new_data = prostat_test) %>%
+  roc_curve(truth = class, estimate = .pred_0) %>%
+  autoplot()
+```
+
+
+
+不tuning 超参数，直接10X交叉验证，
+```{r}
+# 网格搜索搜索的过程太慢，直接先fit一个模型。
 set.seed(123)
 prostat_metrics <- metric_set(accuracy, sens, spec)
 
@@ -149,6 +235,7 @@ collect_metrics(prostat_rs)
 last_fit() to fit one final time to the training data and evaluate one final time on the testing data.
 以下结果显示在测试集数据上具有不错的表现。
 ```{r}
+# 默认参数的表现
 final_rs <- last_fit(prostat_wf, df_split, metrics = prostat_metrics)
 
 
@@ -177,6 +264,7 @@ augment(final_fitted, new_data = slice_sample(prostat_test, n = 3)) %>%
 
 We can also examine this model (which is just linear with coefficients) to understand what drives its predictions.
 在engine选择为LiblineaR时tidy函数支持，不过kernlab不支持。
+对于`svm_linear`，且engine为`LiblineaR`时适用。
 
 ```{r}
 tidy(final_fitted) %>%
@@ -194,32 +282,9 @@ tidy(final_fitted) %>%
 ```
 
 
-### 带网格搜索，交叉验证的示例
-
-所使用数据依旧为上述数据。
 
 ```{r}
-prostat_folds <- vfold_cv(prostat_train, strata = class)
 
-
-svm_spec <- svm_rbf(mode = 'classification', 
-                    cost = tune(), 
-                    rbf_sigma = tune()) %>% 
-  set_engine('kernlab')
-
-prostat_rec <-
-  recipe(class ~ ., data = prostat_train) %>% 
-  step_zv(all_predictors()) %>% 
-  step_normalize(all_numeric_predictors()) 
-
-
-prostat_wf <- workflow(prostat_rec, svm_spec)
-prostat_wf
-```
-
-
-```{r}
-svm_grid <- grid_max_entropy()
 ```
 
 
