@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ## modelStudio
 
 > https://ema.drwhy.ai/
+> https://medium.com/dataman-in-ai/explain-your-model-with-lime-5a1a5867b423
+> https://medium.com/analytics-vidhya/explain-your-model-with-microsofts-interpretml-5daab1d693b4
 
 modelStudio是，
 
@@ -25,18 +27,29 @@ Shapley values is the only prediction explanation framework with a solid theoret
 
 ### SHAP
 
-首先是收集一些R包。
+首先是收集一些R包。在R中，主要提供了shapper和fastshap两个包。shapper是python中shap包的一种封装，所以在使用它之前一定要配置好python环境。而fastshap提供了SHAP的近似计算方法。shapforxgboost包提供了专门针对xgboost模型的SHAP值的绘图。
+
+以下将介绍 `fastshap` 包。这是一个更加通用的包，除了xgboost之外，该包还可以用于SVM，randomforest, GBM等模型的解释。
 
 ```{r}
 library(shapr)
 library(SHAPforxgboost)
+library(fastshap)
 # library(shapviz)
 # library(shapper)
 ```
 
+拟合一个模型并解释：
 ```{r}
 
 ```
+
+
+### Explain Your Model with LIME
+
+
+### Explaining Your Model with Microsoft’s InterpretML
+
 
 
 ### everybody love modelStudio!!
