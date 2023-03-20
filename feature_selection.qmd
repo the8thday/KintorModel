@@ -10,6 +10,20 @@ format: html
 > http://r-statistics.co/Variable-Selection-and-Importance-With-R.html
 
 
+There are several popular feature selection methods in machine learning. Here are some of the most commonly used ones:
+
+Recursive Feature Elimination (RFE): This method recursively removes features from the dataset and evaluates the performance of the model at each step. It selects the subset of features that results in the best model performance.
+
+Principal Component Analysis (PCA): PCA is a technique that transforms the original features into a new set of uncorrelated features (principal components) that explain the maximum amount of variance in the data. The principal components can be used as features for the model.
+
+Lasso regularization: Lasso is a regularization technique that adds a penalty term to the objective function of the model. The penalty term encourages the model to select a sparse set of features by shrinking the coefficients of less important features to zero.
+
+Mutual Information: This method measures the mutual information between each feature and the target variable. It selects the subset of features with the highest mutual information.
+
+Tree-based feature selection: This method uses decision trees to evaluate the importance of each feature. It selects the subset of features with the highest importance scores.
+
+Correlation-based feature selection: This method evaluates the correlation between each feature and the target variable. It selects the subset of features with the highest correlation.
+
 
 
 # Feature Selection packages in R
@@ -90,6 +104,18 @@ https://cran.r-project.org/web/packages/RWeka/RWeka.pdf
 
 CRAN pdf: <br>
 https://cran.r-project.org/web/packages/featurefinder/featurefinder.pdf
+
+### more...
+
+mRMRe: A package that implements the minimum redundancy maximum relevance algorithm, a feature selection method that selects features that are both relevant to the target variable and not redundant with each other.
+
+Rborist: A package that implements the Borist algorithm, a feature selection method that evaluates the importance of features by comparing them with a random forest model.
+
+CORElearn: A package that includes several feature selection methods, such as ReliefF and Correlation-based Feature Selection.
+
+caretEnsemble: A package that includes several ensemble feature selection methods, such as recursive feature elimination and forward selection.
+
+
 
 
 
