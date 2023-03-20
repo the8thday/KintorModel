@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## modelStudio
 
+model interpretation technique 的记录笔记。
+
 > https://ema.drwhy.ai/
 > https://medium.com/dataman-in-ai/explain-your-model-with-lime-5a1a5867b423
 > https://medium.com/analytics-vidhya/explain-your-model-with-microsofts-interpretml-5daab1d693b4
@@ -37,6 +39,7 @@ library(SHAPforxgboost)
 library(fastshap)
 # library(shapviz)
 # library(shapper)
+library(treeshap)
 ```
 
 拟合一个模型并解释：
@@ -47,8 +50,43 @@ library(fastshap)
 
 ### Explain Your Model with LIME
 
+Local Interpretable Model-agnostic Explanations
+
+```{r}
+library(lime)
+library(e1071)
+```
+
+```{r}
+
+# Load data
+data(iris)
+X <- iris[, 1:4]
+y <- ifelse(iris$Species == "versicolor", 1, 0)
+
+# Train SVM model
+svm_model <- svm(x = X, y = y, kernel = "linear", probability = TRUE)
+
+# Create explainer object
+explainer <- lime(X, model = svm_model, bin_continuous = TRUE)
+
+# Select instance to explain
+instance_to_explain <- X[1, ]
+
+# Generate explanations
+explanations <- explain(instance_to_explain, explainer, n_features = 2, n_labels = 1)
+
+# Print explanations
+print(explanations)
+```
+
 
 ### Explaining Your Model with Microsoft’s InterpretML
+
+```{r}
+
+```
+
 
 
 
@@ -61,8 +99,8 @@ library(fastshap)
 
 ```{r, include=FALSE}
 
-library(DALEXtra)
 library("DALEX")
+library(DALEXtra)
 library("modelStudio")
 
 ```
@@ -165,6 +203,24 @@ rf_pparts <- DALEX::predict_parts(explainer = explainer,
 ```{r}
 plot(rf_pparts)
 ```
+
+
+### SVM
+
+```{r}
+# Train SVM model
+svm_model <- svm(x = X, y = y, kernel = "linear", probability = TRUE)
+
+# Create explainer object
+explainer <- explain(svm_model, data = X, y = y, label = "SVM")
+
+# Generate feature importance plot
+plot_features_contrib(explainer, type = "contribution", top_n = 4)
+```
+
+
+
+
 
 
 
