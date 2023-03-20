@@ -80,6 +80,14 @@ _from chatGPT_
 `tidymodels`和`sklearn`在`SVM`间的最大差异，应该就是kernel的选择了，前者直接提供单独的建模函数，
 
 
+*preprocessing steps before fitting an SVM: *
+Data scaling:SVM is sensitive to the scale of the input data. If the input features have different scales, then it can cause problems with the optimization of the SVM. To avoid this, you should scale the input data so that each feature has a similar range. This can be done using techniques like normalization, standardization, or scaling to a specific range.
+*svm*对于特征NA值的处理：
+纳入过多特征的数据集有一个大麻烦在于后续预测时，不是每一个样本都会包含这些特征，比如对于基因表达数据的检验，很有可能某一个基因其的表达本次没有检测到，而作为一个样本输入，如何去预测其的分类呢？
+分类变量：one-hot编码。
+
+
+### 一个简单的示例
 
 ```{r, include=FALSE}
 library(tidyverse)
@@ -99,10 +107,9 @@ usemodels::use_kernlab_svm_rbf(formula = class ~ ., data = prostat_train,
                                )
 ```
 
-### 一个简单的示例
-
 
 准备数据，为前列腺癌102例患者的RNASeq标准化的数据，其中caner 52例，normal样本50例，分组均衡。
+下载自网络。
 ```{r, include=FALSE}
 expr_file <- "datasets/prostat.expr.symbol.txt"
 metadata_file <- "datasets/prostat.metadata.txt"
@@ -127,11 +134,17 @@ df_split <- initial_split(input_data %>% select(-rowname))
 
 prostat_train <- training(df_split)
 prostat_test <- testing(df_split)
+
+# Print the number of cases in each split
+cat("Training cases: ", nrow(prostat_train), "\n",
+    "Test cases: ", nrow(prostat_test), sep = "")
 ```
 
 
 
-svm_linear主要由两个R包提供内在的引擎`show_engines('svm_linear')`: kernlab & LiblineaR
+`svm_linear`主要由两个R包提供内在的引擎`show_engines('svm_linear')`: kernlab & LiblineaR；
+`svm_poly`目前由`kernlab`提供；
+`svm_rbf`目前由`kernlab` & `liquidSVM`提供。
 
 `svm_linear`, `svm_poly`, `svm_rbf` 其分别和`scikit-learn`中对应的关系为,`linear`：线性核函数, `poly`：多项式核函数,
 `rbf`：径像核函数/高斯核, `sigmod`：sigmod 核函数，在`sklearn`中kernel参数为不同的核函数，并进一步的有其对应的需要 调整的参数，而在`tidymodels`中，则以上述几种建模函数做为选择。
@@ -163,15 +176,16 @@ prostat_wf
 ```
 
 tuning the hyper parameter:
-对于`rbf`kernel，选择cost, 等超参数。
+对于`rbf`kernel，选择cost, sigma等超参数。
 
-因为没有筛选特征，此步运行很慢。
+因为没有筛选特征，此步运行很慢。可以考虑不用`tune_grid`，而是使用`grid_random`, 或者利用`Bayesian Optimization, tune_bayes`tune 超参数。`tune` and `finetune` package provide some tune function.
 
 ```{r}
 doParallel::registerDoParallel()
 
 # svm_grid <- grid_max_entropy()
 
+# 此两个参数的取值范围
 param_grid <- grid_regular(dials::cost(), 
                            rbf_sigma(),
                            levels = 3
@@ -182,9 +196,50 @@ tune_res <- tune_grid(
   resamples = prostat_folds, 
   grid = param_grid
 )
+
+# save(tune_res, './datasets/svm_tune_res.rda')
 ```
 
+
+*Bayesian Optimization*
+Gaussian process model
+```{r, eval=FALSE}
+ctrl <- control_bayes(verbose = TRUE) # can also add more arguments, like no_improve
+svm_initial <- tune_res
+svm_param <- 
+  svm_wflow %>% 
+  parameters() %>% 
+  update(rbf_sigma = rbf_sigma(c(-7, -1)))
+
+set.seed(420)
+
+svm_bo <-
+  prostat_wf %>%
+  tune_bayes(
+    resamples = prostat_folds, 
+    # metrics = roc_res, 
+    initial = svm_initial, # tune_grid object produced earlier
+    param_info = svm_param, # specified earlier too, with our new bounds for rbf_sigma
+    iter = 25, # maximum number of search iterations
+    control = ctrl
+  )
+
+show_best(svm_bo)
+```
+
+```{r, eval=FALSE}
+p1 <- autoplot(svm_bo, type = "performance")
+p2 <- autoplot(svm_bo, type = "parameters")
+
+p1 + p2
+```
+
+
+
 ```{r}
+load('./datasets/svm_tune_res.rda')
+
+# 只有cost这一参数；sigma 
 autoplot(tune_res)
 ```
 
@@ -196,24 +251,28 @@ collect_metrics(tune_res)
 
 best_cost <- select_best(tune_res, metric = "roc_auc")
 
-svm_linear_final <- finalize_workflow(prostat_wf, best_cost)
+svm_final_wf <- finalize_workflow(prostat_wf, best_cost)
 ```
 
-`last_fit`得到最终模型：
+*`last_fit`得到最终模型：*
 
 在此之前先手动fit最终模型，以和`last_fit`得到的模型做对比，二者应该一摸一样，不过在构建随机森林时发现不一样。
 ```{r}
-svm_C_fit <- svm_linear_final %>% fit(prostat_train)
-
-svm_C_fit %>%
-  extract_fit_engine() %>%
-  plot()
+svm_C_fit <- svm_final_wf %>% fit(prostat_train)
+# 
+# svm_C_fit %>%
+#   extract_fit_engine() %>%
+#   plot()
 
 # 测试集数据的表现
 augment(svm_C_fit,
         new_data = prostat_test) %>%
   roc_curve(truth = class, estimate = .pred_0) %>%
   autoplot()
+```
+*缺失对模型自身的评价是不合适的，包括模型的AUC、区分度、校准曲线等都是需要的：*
+```{r}
+
 ```
 
 
@@ -225,7 +284,8 @@ set.seed(123)
 prostat_metrics <- metric_set(accuracy, sens, spec)
 
 # `fit_resamples`不可以做tune的操作，即不可以做网格搜索；但提供一种类似交叉验证的操作
-prostat_rs <- fit_resamples(prostat_wf, resamples = prostat_folds, 
+prostat_rs <- fit_resamples(prostat_wf, 
+                            resamples = prostat_folds, 
                             metrics = prostat_metrics)
 
 collect_metrics(prostat_rs)
@@ -236,7 +296,9 @@ last_fit() to fit one final time to the training data and evaluate one final tim
 以下结果显示在测试集数据上具有不错的表现。
 ```{r}
 # 默认参数的表现
-final_rs <- last_fit(prostat_wf, df_split, metrics = prostat_metrics)
+final_rs <- last_fit(svm_final_wf, 
+                     df_split, 
+                     metrics = prostat_metrics)
 
 
 collect_metrics(final_rs)
@@ -246,19 +308,32 @@ collect_metrics(final_rs)
 confusion matrix:
 在测试集数据上的混淆矩阵
 ```{r}
-(collect_predictions(final_rs) %>%
-  conf_mat(class, .pred_class)) %>%
+collect_predictions(final_rs) %>%
+  conf_mat(class, .pred_class)
+
+# ROC曲线，和上面直接fit的模型进行对比
+aug_res <- augment(svm_C_fit,
+        new_data = prostat_test) 
+
+aug_res %>%
+  roc_auc(truth = class, estimate = .pred_0)
+
+aug_res %>% 
+  roc_curve(truth = class, estimate = .pred_0) %>%
   autoplot()
 ```
 
 
 If we decide this model is good to go and we want to use it in the future, we can extract out the fitted workflow. This object can be used for prediction:
+final workflow 可以用作后续的模型。
 ```{r}
+# final_fitted 即是最终拟合好的模型
 final_fitted <- extract_workflow(final_rs)
 
 # 测试集数据上的验证
-augment(final_fitted, new_data = slice_sample(prostat_test, n = 3)) %>% 
-  dplyr::select(last_col(5:1))
+augment(final_fitted, 
+        new_data = slice_sample(prostat_test, n = 3)) %>% 
+  dplyr::select(last_col(1):last_col(5))
 ```
 
 
@@ -282,10 +357,53 @@ tidy(final_fitted) %>%
 ```
 
 
+SVM不像线性模型或者树模型一样可以有模型变量重要性的信息，但是可以通过permutation of the variables得到变量的相对重要性
+, 以及利用`SHAP`值等方式确认变量的重要性。
+```{r}
+library(vip)
+```
+也忒慢了
+```{r}
+set.seed(42)
+
+prostat_prep <- prep(prostat_rec)
+
+prostat_imp <- svm_C_fit %>% 
+  extract_fit_parsnip() %>%
+  vip::vi(
+    method = "permute", nsim = 10,
+    target = "class", metric = "auc", reference_class = "0",
+    pred_wrapper = kernlab::predict, train = juice(prostat_prep)
+  )
+
+prostat_imp %>%
+  slice_max(Importance, n = 8) %>%
+  mutate(
+    # Variable = str_remove(Variable, ""),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  ggplot(aes(Importance, Variable, color = Variable)) +
+  geom_errorbar(aes(xmin = Importance - StDev, xmax = Importance + StDev),
+    alpha = 0.5, size = 1.3
+  ) +
+  geom_point(size = 3) +
+  theme(legend.position = "none") +
+  scale_color_avatar(palette = "FireNation") +
+  labs(y = NULL)
+```
+
+
+### 基于SHAP值的SVM和RandomForest间特征重要性的差异
+
 
 ```{r}
 
 ```
+
+
+
+
+
 
 
 
