@@ -10,6 +10,9 @@ format: html
 > http://r-statistics.co/Variable-Selection-and-Importance-With-R.html
 
 
+特征选择。
+
+
 There are several popular feature selection methods in machine learning. Here are some of the most commonly used ones:
 
 Recursive Feature Elimination (RFE): This method recursively removes features from the dataset and evaluates the performance of the model at each step. It selects the subset of features that results in the best model performance.
@@ -24,6 +27,19 @@ Tree-based feature selection: This method uses decision trees to evaluate the im
 
 Correlation-based feature selection: This method evaluates the correlation between each feature and the target variable. It selects the subset of features with the highest correlation.
 
+Genetic algorithms:
+
+`caret::safs` 模拟退火算法: 
+
+Boruta和Vita算法，不去除冗余变量，对于不同的数据集包含的变量可能相差较大的生物医药数据比较合适。类似的方法还有Altmann、Permr、2VIM等。
+
+Boruta:
+1.初次建模时，把原始变量拷贝一份作为影子变量。
+2.原始变量的值随机化后作为对应影子变量的值 (随机化就是打乱原始变量值的顺序)。
+3.使用随机森林建模并计算每个变量的重要性得分。
+4.对于每一个真实特征变量，统计检验其与所有影子变量的重要性最大值的差别。重要性显著高于影子变量的真实特征变量定义为重要。重要性显著低于影子变量的真实特征变量定义为不重要。
+5.所有不重要的变量和影子变量移除。
+6.基于新变量构成的数据集再次重复刚才的建模和选择过程，直到所有变量都被分类为重要或不重要，或达到预先设置的迭代次数。
 
 
 # Feature Selection packages in R
@@ -117,9 +133,46 @@ caretEnsemble: A package that includes several ensemble feature selection method
 
 
 
+# 一些示例
+
+> https://bookdown.org/max/FES/recursive-feature-elimination.html
 
 
+此处主要记录特征递归消除(RFE, recursive feature elimination)的应用，它基于模型预测性能评估指标如准确性、mse等选 择一个性能较佳的最小集合的特征变量。它首先应用所有的特征变量构建模型，然后移除对模型最不重要的一定比例的变量再次构建模型；持续迭代直至获得准确性最高的模型。在后续应用预测模型时，只需要使用数目比较少的变量，这样的好处是便于新样品的变量检测。
 
+
+```{r}
+library(caret)
+```
+
+
+```{r}
+# ?caret::rfe
+# x: 训练集数值矩阵 (不包含响应值或分类信息)
+# y: 响应值或分类信息向量
+# sizes: 一个整数向量，设定需要评估的变量子集的大小。默认是2^(2:4)，这个怎么确定呢
+# metric: By default, possible values are "RMSE" and "Rsquared" for regression and "Accuracy" and "Kappa" for classification.
+# rfeControl: 模型评估所用的方法、性能指标和排序方式等。
+
+# rfFuncs
+control <- rfeControl(functions=rfFuncs, method="repeatedcv", number=10, repeats=5)
+
+rfe <- caret::rfe(x=train_data, y=train_data_group, size=subsets, rfeControl=control)
+```
+
+
+```{r}
+print(rfe, top=10)
+```
+
+```{r}
+plot(rfe, type=c("g", "o"))
+```
+
+可以使用predictors函数提取最终选定的最小关键特征变量集，也可以直接从rfe对象中提取。
+```{r}
+predictors(rfe)
+```
 
 
 
