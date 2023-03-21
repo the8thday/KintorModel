@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 > http://www.ehbio.com/ML/randomForest.html
 > https://towardsdatascience.com/understanding-random-forest-58381e0602d2
+> https://github.com/stevenpawley/recipeselectors/issues/1
 
 
 随机森林，采用随机抽样的ensembled决策树构建的模型。其属于集成学习中的bagging(Bootstrap AGgregation 的简称).
@@ -24,7 +25,7 @@ A `bagging model` is the same as a random forest where mtry is equal to the numb
 *oob* error rate，随机森林中每一颗决策树在构建时因为有放回的采样缘故，约有1/3的样本不会被用到，这些没有被用到的样本会用来测试该决策树的分类能力。随机森林与其他机器学习方法不同的是存在OOB，相当于自带多套训练集和测试集，自己内部就可以通过OOB值评估模型的准确度 (Bootstrap方式)。其他一些机器学习方法却没有这一优势。
 
 
-*常适用的数据*，随机森林对于维度很高的数据（特征很多的数据）比如微生物组数据，不用特征工程也可以直接使用。对于连续数据和分类数据混合的数据集，
+*常适用的数据*，随机森林对于维度很高的数据（特征很多的数据）比如微生物组数据，不用特征工程也可以直接使用。对于连续数据和分类数据混合的数据集，也可以使用，可以说是适用一切数据，甚至可以拿它来仅仅进行变量筛选，当然机器学习的样本数量也不能太少。
 
 
 *重要的超参数*，随机森林算法有三个主要的超参数，需要在训练之前进行设置。 其中包括节点大小(min_n)、树的数量(ntree)和 采样的特征数量(mtry)。其它需要tune的超参数，在`set_engine`中可以进行设置。
@@ -47,7 +48,7 @@ In case of None: considers max_features = n_features
 max_samples: This hyperparameter helps to choose maximum number of samples from the training dataset to train each individual tree.
 
 
-*随机森林对于特征重要性的评估*，基尼重要性和平均不纯度减少 (MDI) 常用于衡量排除给定变量时模型准确度的降低程度。 此外，排列重要性（又称 MDA，平均精度下降）也是一种衡量重要性的方法。 MDA 通过随机排列 oob 样本中的特征值来识别准确性的平均降低程度。 
+*随机森林对于特征重要性的评估*，基尼重要性和平均不纯度减少 (MDI) 常用于衡量排除给定变量时模型准确度的降低程度。 此外，排列重要性（又称 MDA，平均精度下降）也是一种衡量重要性的方法。 MDA 通过随机排列 oob 样本中的特征值来识别准确性的平均降低程度。 基于随机置换的变量的整体重要性得分(ACS)是评估变量重要性的一个比较可靠的方式。但这种方式获得的ACS Z-score只能用于排序确定哪些变量更重要，但不能根据统计显著性获得所有重要的变量。
 
 
 *优缺点：*
@@ -67,12 +68,18 @@ max_samples: This hyperparameter helps to choose maximum number of samples from 
 2. 对于有不同取值的属性的数据，取值划分较多的属性会对随机森林产生更大的影响，所以随机森林在这种数据上产出的属性权值是不可信的
 
 
+*输入数据的处理preprocessing: *
+虽然随机森林对Outlier之类的数据不是很敏感，往往不需要对数据进行前处理，但是缺失值、分类变量等还是需要依据具体的问题处理一下的，并且对数据基本的检测中，符合理性的Outlier等自然也是要删掉的。还有不均衡数据的问题。So, data preprocessing is very important even in the case of Random Forest.
+
+
+
 ```{r, include=FALSE}
 
 library(tidyverse)
 library(tidymodels)
 library(vip)
 library(usemodels)
+library(themis)
 library(shapr)
 
 tidymodels_prefer()
@@ -92,7 +99,7 @@ The prostate data set (Singh et al.) includes the gene expression measurements f
 本测试数据虽则样本数量不是很多，但是变量挺多，采用决策树模型并非是一个好的策略。
 
 ```{r, include=FALSE}
-
+# 数据探索的步骤暂时不进行
 expr_file <- "datasets/prostat.expr.symbol.txt"
 metadata_file <- "datasets/prostat.metadata.txt"
 
@@ -123,7 +130,9 @@ df_test <- testing(df_split)
 
 ```
 
-##### 一个网上的RF小例子
+##### 一个网上的RF回归小例子
+
+回归问题。
 
 ```{r}
 # 一个网上的小例子
@@ -360,17 +369,34 @@ Whereas the `randomForest` package provides forests based on traditional decisio
 
 不同于决策树、罗辑回归等模型，随机森林等一众模型，其在变量解释上有黑盒子模型之称。虽则随机森林也有提供变量重要性等指标，在构建完随机森林后，我们将采用XAI计划中的一些包进行模型解释上的一些示例。
 
+
+*对于特征如此多的情况，自然特征工程是少不了的*
+但是下面的例子用到的是全部的特征。以做测试。
+```{r, eval=FALSE}
+# Boruta特征选择鉴定关键分类变量
+library(Boruta)
+
+set.seed(42)
+
+boruta <- Boruta(x=df_train[,-'class'], y=df_train[, 'class'], 
+                 pValue=0.01, mcAdj=T, 
+                 maxRuns=300)
+
+boruta
+```
+
+
 ```{r}
 show_engines('rand_forest')
 
-
+# set_engine 设置额外的参数也是需要查询原来的R包的吧
 rf_spec <- rand_forest(
   mtry = tune(),
   trees = tune(),
   min_n = tune()
 ) %>%
   set_engine("ranger", 
-             impotance = 'impurity', 
+             importance = 'impurity', 
              # num.threads = 4
              ) %>%
   set_mode("classification")
@@ -379,9 +405,17 @@ rf_spec <- rand_forest(
 # 对于变量多达9000个，而样本数量只有100多个的样本，是否需要一些recipe的过程呢
 # 随机森林似乎不需要
 
+rf_rec <- recipe(class ~ ., data = df_train) %>% 
+  step_impute_knn(all_predictors()) %>% 
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric()) %>% 
+  step_dummy(all_nominal(), -all_outcomes())
+  # themis::step_downsample(Class, under_ratio = 1, skip = TRUE)
+
+
 class_rf_wf <- workflow() %>% 
   add_model(rf_spec) %>% 
-  add_formula(class ~.)
+  add_recipe(rf_rec)
 
 ```
 
@@ -403,8 +437,10 @@ extract_parameter_set_dials(class_rf_wf)
 set.seed(42)
 
 trees_folds <- vfold_cv(df_train,
-                        v = 10
+                        v = 5
                         )
+
+metricSet <- metric_set(accuracy, yardstick::sens, yardstick::spec, ppv)
 
 # 在进行具体的模型构建过程中，超参数的范围选择是件需要参考的事情
 # dials 可以提供一些参考，是一个不错的设计
@@ -416,6 +452,7 @@ grid <- expand.grid(
     )
 
 # use dials to create grid
+# mtry 的数目 看起来有些多
 dials_grid <- dials::grid_random(
   finalize(mtry(), x = df_train),
   min_n(),
@@ -441,7 +478,7 @@ tune_res <- tune_grid(
 利用验证集数据进行自动的`hyperparameter`设置也是不错的选择。
 
 ```{r}
-# load('./datasets/tune_res_rf.rda')
+load('./datasets/tune_res_rf.rda')
 
 
 tune_res %>%
@@ -478,7 +515,7 @@ autoplot(tune_res)
 得到超参数后，对候选的模型进行拟合，注意目前得到的参数只是超参数，而机器学习里的参数是模型拟合的过程。
 
 ```{r, eval=FALSE}
-# 本cell可以不运行
+# 本cell做为单独的拟合
 best_auc <- select_best(tune_res, "roc_auc")
 
 final_rf <- finalize_model(
@@ -488,16 +525,22 @@ final_rf <- finalize_model(
 
 final_rf
 
+# 此处final_rf 和 final_wf的主要差别在于，
+final_wf <- finalize_workflow(class_rf_wf, best_auc)
 
-# final_wf <- class_rf_wf %>% finalize_workflow(final_rf)
-final_wf <- workflow() %>% add_model(final_rf) %>% 
-  add_formula(class ~ .)
-
+# final_fit 在拟合时
 final_fit <- final_wf %>% fit(df_train)
 
 
 ```
+*详细的查看final_fit 对象*
+```{r}
+final_fit
+```
 
+
+
+最佳参数的AUC和ROC曲线，
 ```{r}
 rf_auc <- 
   tune_res %>% 
@@ -515,7 +558,7 @@ rf_auc %>%
 ```
 
 
-`final_res`便是在测试集数据上拟合过的模型，其应该包含最终模型吧
+`final_res`便是在测试集数据上拟合过的模型，`extract_`系列函数对其的操作。
 和`final_fit`二者运行其一即可。
 
 ```{r}
@@ -526,10 +569,10 @@ final_rf <- finalize_model(
   best_auc
 ) %>% 
   set_engine("ranger", 
-             impotance = 'impurity' # 'permutation'
+             importance = 'impurity' # 'permutation'
              )
 
-final_wf <- class_rf_wf %>% 
+final_wf <- final_wf %>% 
   update_model(final_rf)
 
 
@@ -537,47 +580,70 @@ final_wf <- class_rf_wf %>%
 final_res <- final_wf %>%
   last_fit(split = df_split)
 
+# 在测试集上的表现
 final_res %>% 
   collect_metrics()
 ```
 
-测试集数据
+测试集数据上的表现，
+`final_fit`是在训练集数据直接拟合的模型；
+`final_res`是在训练集数据拟合完后又在测试集上拟合的结果，其包含有`final_fit`的结果。
 
 ```{r}
 test_aug <- augment(final_fit, new_data = df_test) %>% 
   select(class, starts_with('.'))
+
+# test_aug 和 final_res$.predictions 间的细微差别和xgboost的原因一致
+final_res$.predictions
 ```
 
 
 
 variable importance by package `vip`：
 变量重要性也是经常需要去关注的指标。在随机森林模型中用以解释变量的重要性、贡献度。
+vip包的主要目的在于，
 
 `vip` functions when we want to use model-based methods that take advantage of model structure (and are often faster);
 DALEX functions when we want to use model-agnostic methods that can be applied to any model
 
 ```{r}
-# 此处之所以在重新跑一遍是为了演示，在模型构建中可以设置参数的
-vip_res <- final_rf %>%
-  set_engine("ranger", importance = "permutation") %>%
-  fit(class ~ .,
-    data = df_train
-  ) 
+# 此处之所以在重新跑一遍是为了演示，其实在模型构建中可以设置参数的
+# vip_res <- final_wf %>%
+#   update_engine_parameters(importance = "permutation") %>%
+#   fit(class ~ .,
+#     data = df_train
+#   ) 
+# 
+# vip_res %>%
+#   vip::vip(geom = "col", num_features = 20)
 
-vip_res %>%
-  vip::vip(geom = "col", num_features = 20)
 
-
-# final_res %>% 
-#   extract_fit_parsnip() %>% 
-#   vip::vip(num_features = 20)
+# or we can run this 
+final_res %>%
+  extract_fit_parsnip() %>%
+  vip::vip(num_features = 20)
 ```
 
-在测试集数据上对模型参数，
 
+*对数据进行预测：*
+拟合好的模型，其目的便在于对模型进行预测，新输入的数据也需要进行和训练集数据一致的recipe过程。
+`final_fit` 为直接拟合训练集数据得到的模型，在此例子中，其也是`class(final_fit)` worflow类。
+`final_res` 也是通过workflow得到的模型
 ```{r}
-cancer_pred <- predict(final_fit, new_data = df_test) %>%
+# 如果数据经过了recipe处理，那么在直接的predict中，是应该对新输入的数据进行同样的处理的
+# 速度慢的有点奇怪
+test_processed <- prep(rf_rec, df_test) %>% 
+  bake(df_test)
+
+# 如果对final_fit直接输入原来的数据
+cancer_pred <- predict(final_fit, 
+                       new_data = df_test) %>%
   bind_cols(predict(final_fit, df_test, type = "prob")) %>%
+  bind_cols(df_test %>% select(class))
+
+cancer_pred2 <- predict(final_fit, 
+                       new_data = test_processed) %>%
+  bind_cols(predict(final_fit, test_processed, type = "prob")) %>%
   bind_cols(df_test %>% select(class))
 
 # 和上面 final_res的结果一致
@@ -585,6 +651,9 @@ cancer_pred %>%  roc_auc(truth = class, .pred_1, event_level="second")
 
 cancer_pred %>% accuracy(truth = class, .pred_class)
 
+
+```
+```{r}
 # confusion matrix for test dataset
 final_res %>%
     collect_predictions() %>%
@@ -593,13 +662,27 @@ final_res %>%
 
 
 在测试集数据上绘制ROC曲线:
-
 ```{r}
 collect_predictions(final_res) %>%
   roc_curve(class, .pred_0) %>%
   autoplot()
 ```
-这曲线也太丑了，得优化一下呀。
+
+优化一下ROC曲线，为在测试集数据上的表现：
+```{r}
+
+roc_d <- collect_predictions(final_res) %>%
+  roc_curve(class, .pred_0)
+
+roc_d %>% 
+  ggplot(aes(x = 1 - specificity, y = sensitivity)) + 
+  geom_path(linewidth = 1.5, alpha = 0.8) +
+  geom_abline(lty = 3) + 
+  coord_equal() + 
+  scale_color_viridis_d(option = "plasma", end = .6) +
+  theme_bw()
+```
+
 
 
 
