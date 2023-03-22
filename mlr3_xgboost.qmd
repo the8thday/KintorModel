@@ -1,0 +1,106 @@
+---
+title: "mlr3_xgboost"
+format: html
+---
+
+## use mlr3 to fit a xgboost moodel
+
+
+
+```{r, include=FALSE}
+library(mlr3verse)
+```
+price是结果变量（target），其余是预测变量（feature）。
+```{r}
+library(anytime)
+
+data("kc_housing", package = "mlr3data") # 加载数据
+
+
+dates <- anytime(kc_housing$date)
+kc_housing$date <- as.numeric(difftime(dates, min(dates), units = "days"))
+
+kc_housing$renovated <- as.numeric(!is.na(kc_housing$yr_renovated))
+kc_housing$has_basement <- as.numeric(!is.na(kc_housing$sqft_basement))
+kc_housing$yr_renovated <- NULL
+kc_housing$sqft_basement <- NULL
+
+kc_housing$price <- kc_housing$price / 1000
+```
+
+
+```{r}
+task <- as_task_regr(kc_housing, target = "price")
+task
+
+autoplot(task)+facet_wrap(~ condition)
+```
+
+```{r}
+split <- partition(task, ratio = 0.7)
+train_idx <- split$train
+test_idx <- split$test
+
+task_train <- task$clone()$filter(train_idx)
+task_test <- task$clone()$filter(test_idx)
+```
+
+
+```{r}
+#  先不用zipcode这一列
+task_nozip <- task_train$clone()$select(setdiff(task$feature_names, "zipcode"))
+
+# 建模
+lrn <- lrn("regr.rpart")
+lrn$train(task_nozip, row_ids = train_idx)
+
+# 可视化决策树
+library(rpart.plot)
+```
+
+```{r}
+rpart.plot(lrn$model)
+```
+
+
+下面用加上邮政区域的数据进行建模，使用3折交叉验证提高模型稳定性：
+```{r}
+lrn_rpart <- lrn("regr.rpart")
+cv3 <- rsmp("cv", folds = 3)
+
+res <- resample(task_train, lrn_rpart, cv3, store_models = T)
+res$aggregate(msr("regr.rmse"))
+```
+
+
+XGBoost
+```{r}
+lrn_xgboost <- lrn("regr.xgboost")
+
+lrn_xgboost$param_set # 查看可以设置的超参数
+```
+
+```{r}
+search_space <- ps(
+   eta = p_dbl(lower = 0.2, upper = .4),
+  min_child_weight = p_dbl(lower = 1, upper = 20),
+  subsample = p_dbl(lower = .7, upper = .8),
+  colsample_bytree = p_dbl( lower = .9, upper = 1),
+  colsample_bylevel = p_dbl(lower = .5, upper = .7),
+  nrounds = p_int(lower = 1L, upper = 25)
+)
+
+at <- auto_tuner(
+  method = "random_search",
+  learner = lrn_xgboost,
+  resampling = rsmp("holdout"),
+  measure = msr("regr.rmse"),
+  search_space = search_space,
+  term_evals = 10,
+  batch_size = 8
+)
+
+res <- resample(task_nozip, at, cv3, store_models = T)
+res$aggregate() 
+```
+
