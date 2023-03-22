@@ -80,7 +80,6 @@ library(tidymodels)
 library(vip)
 library(usemodels)
 library(themis)
-library(shapr)
 
 tidymodels_prefer()
 
@@ -374,20 +373,34 @@ Whereas the `randomForest` package provides forests based on traditional decisio
 但是下面的例子用到的是全部的特征。以做测试。
 ```{r, eval=FALSE}
 # Boruta特征选择鉴定关键分类变量
+# R 里面的Boruta
 library(Boruta)
 
 set.seed(42)
 
-boruta <- Boruta(x=df_train[,-'class'], y=df_train[, 'class'], 
-                 pValue=0.01, mcAdj=T, 
-                 maxRuns=300)
+boruta <- Boruta(x=df_train %>% select(-class), 
+                 y=df_train %>% pull(class), 
+                 pValue=0.01, 
+                 mcAdj=T, 
+                 maxRuns=100
+                 )
 
 boruta
+
+boruta.finalVarsWithTentative <- data.frame(Item=getSelectedAttributes(boruta, withTentative = T), 
+                                            Type="Boruta_with_tentative")
+
+# boruta_train_data <- train_data[, boruta.finalVarsWithTentative$Item]
+# boruta_test_data <- test_data[, boruta.finalVarsWithTentative$Item]
+
+```
+
+```{r}
+show_engines('rand_forest')
 ```
 
 
 ```{r}
-show_engines('rand_forest')
 
 # set_engine 设置额外的参数也是需要查询原来的R包的吧
 rf_spec <- rand_forest(
@@ -420,10 +433,7 @@ class_rf_wf <- workflow() %>%
 ```
 
 
-`mtry`参数的设置？the number of predictors that are sampled at splits in a tree-based model.
-
-By default, randomForest() p / 3 variables when building a random forest of regression trees, and sqrt(p) variables when building a random forest of classification trees. 
-
+一些`tidymodels`系列包的操作：
 ```{r}
 # 查看parsnip对象的所有参数
 args(rand_forest)
@@ -484,8 +494,9 @@ load('./datasets/tune_res_rf.rda')
 tune_res %>%
   collect_metrics()
 
-show_best(tune_res, metric = "roc_auc")
+show_best(tune_res, metric = "roc_auc", n = 3)
 
+# 手动查看几个变量的分布和AUC的关系
 tune_res %>%
   collect_metrics() %>%
   filter(.metric == "roc_auc") %>%
@@ -497,13 +508,15 @@ tune_res %>%
   ggplot(aes(value, mean, color = parameter)) +
   geom_point(show.legend = FALSE) +
   facet_wrap(~parameter, scales = "free_x") +
-  labs(x = NULL, y = "AUC")
+  labs(x = NULL, y = "AUC") +
+  theme_bw()
 
 ```
-*interpret the result: *
+*interpret the result: *随着mtry的增加，AUC值的变化，不过mtry的分布不是很均一呀，在实际的操作中可以多搜索一些参数。
 
 
 ```{r}
+# 和上面的结果类似，只是用自带的autoplot
 autoplot(tune_res)
 
 ```
@@ -525,30 +538,43 @@ final_rf <- finalize_model(
 
 final_rf
 
-# 此处final_rf 和 final_wf的主要差别在于，
+# 此处final_rf 和 final_wf的主要差别在于，前者为一个模型，后者还包含数据的处理
 final_wf <- finalize_workflow(class_rf_wf, best_auc)
 
-# final_fit 在拟合时
+# final_fit 在拟合时会对数据进行recipe的
 final_fit <- final_wf %>% fit(df_train)
 
 
 ```
+
 *详细的查看final_fit 对象*
+`final_fit`对象是一个Workflow，在后续对新数据的predict时，可以直接输入原始数据。
+`final_fit`对象会不会有点太大了, 10G?
 ```{r}
 final_fit
+
+# 验证训练集数据是否经过了recipe
+extract_recipe(final_fit)
+```
+```{r}
+final_fit %>% lobstr::obj_sizes()
 ```
 
 
 
-最佳参数的AUC和ROC曲线，
+最佳参数的AUC和ROC曲线，`tune_res`has a lot of metrics,
+下面的结果显示在训练集上表现不错，
+*模型自身的标准metrics也是需要汇报的*
 ```{r}
-rf_auc <- 
+# 得到训练集最佳auc的预测
+# 可以考虑在图上增加AUC的值
+rf_train_auc <- 
   tune_res %>% 
   collect_predictions(parameters = best_auc) %>% 
   roc_curve(., truth = class, .pred_0) %>% 
   mutate(model = "Random Forest")
 
-rf_auc %>% 
+rf_train_auc %>% 
   ggplot(aes(x = 1 - specificity, y = sensitivity, col = model)) + 
   geom_path(linewidth = 1.5, alpha = 0.8) +
   geom_abline(lty = 3) + 
@@ -558,7 +584,7 @@ rf_auc %>%
 ```
 
 
-`final_res`便是在测试集数据上拟合过的模型，`extract_`系列函数对其的操作。
+`final_res`便是最终模型在测试集数据上拟合过的模型，`extract_`系列函数对其的操作。
 和`final_fit`二者运行其一即可。
 
 ```{r}
@@ -585,7 +611,25 @@ final_res %>%
   collect_metrics()
 ```
 
-测试集数据上的表现，
+*针对final_res的一系列的操作：*
+final_res 对象的操作总是很慢，因为？为什么这个对象有10G那么大？
+```{r, eval=FALSE}
+# do not run this!!!!!
+# 为什么只是查看一下对象，却要等好久，明明已经运行过了呀？
+final_res
+
+```
+
+
+```{r, eval=FALSE}
+# do not run this cell!!!!!
+extract_fit_engine(final_res)
+```
+
+
+
+
+*测试集数据上的表现，*
 `final_fit`是在训练集数据直接拟合的模型；
 `final_res`是在训练集数据拟合完后又在测试集上拟合的结果，其包含有`final_fit`的结果。
 
@@ -597,62 +641,6 @@ test_aug <- augment(final_fit, new_data = df_test) %>%
 final_res$.predictions
 ```
 
-
-
-variable importance by package `vip`：
-变量重要性也是经常需要去关注的指标。在随机森林模型中用以解释变量的重要性、贡献度。
-vip包的主要目的在于，
-
-`vip` functions when we want to use model-based methods that take advantage of model structure (and are often faster);
-DALEX functions when we want to use model-agnostic methods that can be applied to any model
-
-```{r}
-# 此处之所以在重新跑一遍是为了演示，其实在模型构建中可以设置参数的
-# vip_res <- final_wf %>%
-#   update_engine_parameters(importance = "permutation") %>%
-#   fit(class ~ .,
-#     data = df_train
-#   ) 
-# 
-# vip_res %>%
-#   vip::vip(geom = "col", num_features = 20)
-
-
-# or we can run this 
-final_res %>%
-  extract_fit_parsnip() %>%
-  vip::vip(num_features = 20)
-```
-
-
-*对数据进行预测：*
-拟合好的模型，其目的便在于对模型进行预测，新输入的数据也需要进行和训练集数据一致的recipe过程。
-`final_fit` 为直接拟合训练集数据得到的模型，在此例子中，其也是`class(final_fit)` worflow类。
-`final_res` 也是通过workflow得到的模型
-```{r}
-# 如果数据经过了recipe处理，那么在直接的predict中，是应该对新输入的数据进行同样的处理的
-# 速度慢的有点奇怪
-test_processed <- prep(rf_rec, df_test) %>% 
-  bake(df_test)
-
-# 如果对final_fit直接输入原来的数据
-cancer_pred <- predict(final_fit, 
-                       new_data = df_test) %>%
-  bind_cols(predict(final_fit, df_test, type = "prob")) %>%
-  bind_cols(df_test %>% select(class))
-
-cancer_pred2 <- predict(final_fit, 
-                       new_data = test_processed) %>%
-  bind_cols(predict(final_fit, test_processed, type = "prob")) %>%
-  bind_cols(df_test %>% select(class))
-
-# 和上面 final_res的结果一致
-cancer_pred %>%  roc_auc(truth = class, .pred_1, event_level="second")
-
-cancer_pred %>% accuracy(truth = class, .pred_class)
-
-
-```
 ```{r}
 # confusion matrix for test dataset
 final_res %>%
@@ -684,6 +672,73 @@ roc_d %>%
 ```
 
 
+*对数据进行预测：*
+拟合好的模型，其目的便在于对模型进行预测，新输入的数据也需要进行和训练集数据一致的recipe过程。
+`final_fit` 为直接拟合训练集数据得到的模型，在此例子中，其也是`class(final_fit)` worflow类。
+`final_res` 也是通过workflow得到的模型
+```{r}
+# 如果数据经过了recipe处理，那么在直接的predict中，是应该对新输入的数据进行同样的处理的
+# 速度慢的有点奇怪
+test_processed <- prep(rf_rec, df_test) %>% 
+  bake(df_test)
+
+# 如果对final_fit直接输入原来的数据
+cancer_pred <- predict(final_fit, 
+                       new_data = df_test) %>%
+  bind_cols(predict(final_fit, df_test, type = "prob")) %>%
+  bind_cols(df_test %>% select(class))
+
+cancer_pred2 <- predict(final_fit, 
+                       new_data = test_processed) %>%
+  bind_cols(predict(final_fit, test_processed, type = "prob")) %>%
+  bind_cols(df_test %>% select(class))
+
+# 和上面 final_res的结果一致
+cancer_pred %>%  roc_auc(truth = class, .pred_1, event_level="second")
+
+cancer_pred %>% accuracy(truth = class, .pred_class)
+
+
+```
+
+
+
+variable importance by package `vip`：
+变量重要性也是经常需要去关注的指标。在随机森林模型中用以解释变量的重要性、贡献度。
+vip包的主要目的在于，
+`vip` functions when we want to use model-based methods that take advantage of model structure (and are often faster);
+DALEX functions when we want to use model-agnostic methods that can be applied to any model
+
+```{r}
+# 此处之所以在重新跑一遍是为了演示，其实在模型构建中可以设置参数的
+# vip_res <- final_wf %>%
+#   update_engine_parameters(importance = "permutation") %>%
+#   fit(class ~ .,
+#     data = df_train
+#   ) 
+# 
+# vip_res %>%
+#   vip::vip(geom = "col", num_features = 20)
+
+
+# or we can run this 
+final_res %>%
+  extract_fit_parsnip() %>%
+  vip::vip(num_features = 20)
+```
+
+```{r}
+# 待保存的workflow
+save_wf_model <- extract_workflow(final_res)
+
+extract_fit_engine(save_wf_model) %>%
+  pluck("imp") %>%
+  slice_max(value, n = 10) %>%
+  ggplot(aes(value, fct_reorder(term, value))) +
+  geom_col(alpha = 0.8, fill = "midnightblue") +
+  labs(x = "Variable importance score", y = NULL)
+```
+
 
 
 *save model*
@@ -701,10 +756,30 @@ collect_metrics(crash_res) %>%
 ```
 
 
-#### Random Forests 回归问题
+```{r}
+library(vetiver)
+v <- vetiver_model(
+  save_wf_model, 
+  "traffic-crash-model", 
+  metadata = list(metrics = crash_metrics %>% dplyr::select(-.config))
+)
+
+v
+```
 
 ```{r}
+library(pins)
+b <- board_rsconnect()
+vetiver_pin_write(b, v)
+```
 
+
+
+#### Random Forests SHAP 值
+
+```{r}
+library(shapr)
+library(fastshap)
 ```
 
 
