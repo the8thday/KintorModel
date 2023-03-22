@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## 随机森林的一些笔记
 
 > http://www.ehbio.com/ML/feature-selection.html
 
@@ -24,6 +24,7 @@ knitr::opts_chunk$set(echo = TRUE)
 其它变量选择方法不去除冗余变量，而是通过估计不相干变量的重要性值的分布，选择具有显著更高重要性值的变量作为预测变量。这些方法越来越受欢迎。包括permutation (Perm)和它的参数化版本Altmann,Boruta, r2VIM (recurrent relative variable importance)和Vita。在2019年的一篇基于组学数据的评估文章中得出结论：Boruta和Vita算法的稳定性最好，适合分析高维数据。Vita的计算速度比Boruta快很多更适合大数据集，但只有Boruta可用于低维数据。 (https://doi.org/10.1093/bib/bbx124).
 
 
+## use caret
 
 ```{r message=FALSE, include=FALSE}
 library(caret)
@@ -80,20 +81,25 @@ dim(test_data)
 随机森林模型可以自身对变量特征进行选择。
 
 `Boruta`法在特征变量筛选是既可以用于分类问题，也可以用于回归问题，其是通过随机森林建模并计算每个变量的重要性得分，通过和影子变量进行对比，得到重要的变量。
+Python中有人实现了除了随机森林外的其他的树模型的包，以及整合SHAP变量特征重要性的包。详细见对应的Python笔记。
+
+`Boruta`
 
 ```{r}
-
+# boruta 的数据输入 需要对数据进行前处理吗？
 boruta <- Boruta::Boruta(x = train_data, y = train_data_group, 
                          pValue=0.01, 
                          mcAdj=T, 
-                         maxRuns=300)
+                         maxRuns=100)
 
 table(boruta$finalDecision)
 # boruta$finalDecision[boruta$finalDecision=="Confirmed"]
 
 Boruta::plotImpHistory(boruta)
 ```
-*Tentative, Confirmed, Rejected*
+*Tentative, Confirmed, Rejected*,
+其中图片的结果为：绿色是重要的变量，红色是不重要的变量，蓝色是影子变量，黄色是Tentative变量.
+
 
 提取重要变量, 其结果为Tentative+Confirmed, 如下将提取99个变量.
 
@@ -107,7 +113,9 @@ boruta_train_data <- train_data[, boruta.finalVarsWithTentative$Item]
 boruta_test_data <- test_data[, boruta.finalVarsWithTentative$Item]
 ```
 
+此处摘抄至网络上的一个小函数，主要为了实现基于Boruta 选择的变量拟合模型。
 ```{r}
+# 定义一个函数生成一些列用来测试的mtry (一系列不大于总变量数的数值)。
 generateTestVariableSet <- function(num_toal_variable){
   max_power <- ceiling(log10(num_toal_variable))
   tmp_subset <- c(unlist(sapply(1:max_power, function(x) (1:10)^x, simplify = F)), ceiling(max_power/3))
@@ -115,21 +123,25 @@ generateTestVariableSet <- function(num_toal_variable){
   base::unique(sort(tmp_subset[tmp_subset<num_toal_variable]))
 }
 
+# 交叉验证
 trControl <- trainControl(method = 'repeatedcv', number = 10, repeats = 3)
+
 # 在设置mtry时，可以随机选择，也可以Random generate 15 mtry values with tuneLength = 15
 mtry <- generateTestVariableSet(ncol(boruta_train_data))
 tuneGrid <- expand.grid(.mtry=mtry)
 
-rf <- train(x = boruta_train_data, 
+rf <- caret::train(x = boruta_train_data, 
             y = train_data_group,
             method = 'rf',
             tuneGrid = tuneGrid,
             trControl = trControl,
-            metric = 'Accuracy'
+            metric = 'Accuracy' # metric='Kappa'
             )
 
 print(rf)
 plot(rf)
+
+dotPlot(varImp(borutaConfirmed_rf_default))
 ```
 
 
@@ -164,6 +176,15 @@ dotPlot(varImp(rf), top = 20)
 rf_finalModel <- rf$finalModel
 ```
 
+此处有一个小trick，不建议提取finalModel，而是建议直接使用`rf`)去做后续预测。尤其是训练时指定了数据预处理参数时，使用rf会对测试集进行同样的预处理(等同于predict.train)，而使用borutaConfirmed_rf_default$finalModel则不会对测试集进行预处理（等同于predict.randomForest）
+```{r}
+
+```
+
+
+
+
+
 #### 模型评价
 ```{r}
 library(pROC)
@@ -177,6 +198,10 @@ prediction_prob <- predict(rf_finalModel,
 predictions <- predict(rf_finalModel, newdata = boruta_test_data)
 confusionMatrix(predictions, test_data_group)
 
+```
+
+
+```{r}
 # ROC curve
 roc_curve <- roc(test_data_group, prediction_prob[,1])
 roc_curve
@@ -194,10 +219,10 @@ print(best_thresh)
 ROC_data <- data.frame(FPR = 1- roc_curve$specificities, TPR=roc_curve$sensitivities)
 ROC_data <- ROC_data[with(ROC_data, order(FPR,TPR)),]
 
-
 ```
 
 
+手动绘图：
 ```{r}
 p <- ggplot(data=ROC_data, mapping=aes(x=FPR, y=TPR)) +
   geom_step(color="red", size=1, direction = "vh") +
@@ -224,5 +249,12 @@ predictions2 <- as.factor(predictions2$Predict_class)
 confusionMatrix(predictions2, test_data_group)
 ```
 
+## use ranger
+
+ranger 包拟合随机森林的笔记：
+
+```{r}
+library(ranger)
+```
 
 
