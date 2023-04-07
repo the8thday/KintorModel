@@ -30,7 +30,8 @@ library(tidyverse)
 library(easystats)
 library(rms)
 
-get_logistic_pred = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) {
+get_logistic_pred = function(mod, data, res = "y", 
+   pos = 1, neg = 0, cut = 0.5) {
   probs = predict(mod, newdata = data, type = "response")
   ifelse(probs > cut, pos, neg)
 }
@@ -92,6 +93,8 @@ df1
 
 利用**rms**包展开分析，此包提供了多种对于回归模型的包装函数。包括拟合、区分度分析、校准曲线、nomogram等。
 适合临床中的种种应用。
+
+一个值得注意的点是，在应用多种统计模型的时候，对于一些参数的选择一般都会选择默认参数，这和在机器学习建模过程中的逻辑是有所差异的，对于逻辑回归，也是有一些参数除了依据具体的问题去选择外，还需要tune 一些超参数。
 
 ```{r}
 # 为防止影响下游分析将每一列进行类型转换
