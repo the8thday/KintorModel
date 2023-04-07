@@ -12,15 +12,47 @@ format: html
 
 
 Bayes定理是,
+$$p(类别｜特征)=p(特征｜类别)p(类别)/p(特征)$$
 
 
 Naive Bayes是基于贝叶斯定理和条件独立性假设的假设方法(所有的特征间彼此独立)。
-通过特征求的条件概率最大的分类。
+通过特征求得条件概率最大的分类。其基本思想是根据样本数据中各特征之间的关系计算出分类的概率，并基于先验概率对各个分类进行排序，从而实现对新样本的分类任务。朴素贝叶斯算法的主要优点在于模型简单、计算效率高、准确率较高等方面，特别适合于多分类问题和高维数据集的处理。然而，其缺点在于对于输入数据的假设过于简单，如果特征之间存在关联性，那么朴素贝叶斯的分类性能会受到影响。
+
+
+朴素贝叶斯分类的优缺点
+优点：
+（1） 算法逻辑简单,易于实现
+（2）分类过程中时空开销小
+Simple, Fast in processing, and effective in predicting the class of test dataset. So you can use it to make real-time predictions for example to check if an email is spam or not. Email services use this excellent algorithm to filter out spam emails.
+Effective in solving a multiclass problem which makes it perfect for identifying Sentiment. Whether it belongs to the positive class or the negative class.
+Does well with few samples for training when compared to other models like Logistic Regression.
+Easy to obtain the estimated probability for a prediction. This can be obtained by calculating the mean, for example, print(result.mean()).
+It performs well in case of text analytics problems.
+It can be used for multiple class prediction problems where we have more than 2 classes.
+
+缺点：
+理论上，朴素贝叶斯模型与其他分类方法相比具有最小的误差率。但是实际上并非总是如此，这是因为朴素贝叶斯模型假设属性之间相互独立，这个假设在实际应用中往往是不成立的，在属性个数比较多或者属性之间相关性较大时，分类效果不好。
+Relies on and often an incorrect assumption of independent features. In real life, you will hardly find independent features. For example, Loan eligibility analysis would depend on the applicant's income, age, previous loan, location, and transaction history which might be interdependent.
+Not ideal for data sets with a large number of numerical attributes. If the number of attributes is larger then there will be high computation cost and it will suffer from the Curse of dimensionality.
+If a category is not captured in the training set and appears in the test data set then the model is assign 0 (zero) probability which leads to incorrect calculation. This phenomenon is referred to as 'Zero frequency' and to overcome 'Zero frequency' phenomena you will have to use smoothing techniques.
+
+
+*朴素贝叶斯含有3种模型*，分别是高斯模型，对连续型数据进行处理；多项式模型，对离散型数据进行处理，计算数据的条件概率(使用拉普拉斯估计器进行平滑的一个模型)；伯努利模型，伯努利模型的取值特征是布尔型，即出现为true,不出现为false,在进行文档分类时，就是一个单词有没有在一个文档中出现过。
+Gaussian Naive Bayes - This is a variant of Naive Bayes which supports continuous values and has an assumption that each class is normally distributed.
+Multinomial Naive Bayes - This is another variant which is an event-based model that has features as vectors where sample(feature) represents frequencies with which certain events have occurred.
+Bernoulli - This variant is also event-based where features are independent boolean which are in binary form.
+
+
+*NB常用来处理的数据和输入数据的处理：*
+NB常用来处理的问题，
 
 
 *This model has 2 tuning parameter:*
 `smoothness`: Kernel Smoothness (type: double, default: 1.0)
 `Laplace`: Laplace Correction (type: double, default: 0.0)
+
+
+拉普拉斯平滑法是朴素贝叶斯中处理零概率问题的一种修正方式。在进行分类的时候，可能会出现某个属性在训练集中没有与某个类同时出现过的情况，如果直接基于朴素贝叶斯分类器的表达式进行计算的话就会出现零概率现象。为了避免其他属性所携带的信息被训练集中未出现过的属性值“抹去”，所以才使用拉普拉斯估计器进行修正。具体的方法是：在分子上加1,对于先验概率，在分母上加上训练集中可能的类别数；对于条件概率，则在分母上加上第i个属性可能的取值数.
 
 
 
@@ -34,12 +66,15 @@ library(klaR)
 ```
 
 
+### 拟合模型
+
+
 ```{r}
 ## Remove the two observations with all data missing
 penguins_cleaned <- penguins %>%
   filter(!is.na(bill_depth_mm))
 
-set.seed(6923)
+set.seed(42)
 penguin_split <- initial_split(penguins_cleaned, strata = "species")
 train <- training(penguin_split)
 test <- testing(penguin_split)
@@ -47,7 +82,8 @@ test <- testing(penguin_split)
 
 
 ```{r}
-set.seed(3344)
+set.seed(42)
+
 cv_folds <- vfold_cv(
   data = train, 
   v = 5
@@ -59,6 +95,8 @@ cv_folds
 ```{r}
 # ?naive_Bayes
 # 目前只能fit classification model
+# show_engines('naive_Bayes')
+# 如何选择 是利用高斯、还是伯努利呢？
 nb_model <- naive_Bayes() %>% 
   set_mode("classification") %>% 
   set_engine("klaR")
@@ -77,12 +115,16 @@ penguins_rec <- recipe(
     new_role = "ID"
   )
 
+
 penguins_wf <- workflow() %>% 
   add_recipe(penguins_rec) %>% 
   add_model(nb_model)
 ```
 
 
+对于naive bayes而言，其超参数,
+
+`fit_resamples` 是用一个模型参数去fit多个resample的数据集，其不能用于tune 参数，
 ```{r}
 nb_fit <- penguins_wf %>% 
   fit_resamples(
@@ -90,8 +132,21 @@ nb_fit <- penguins_wf %>%
   )
 
 
+# 交叉验证是对一个模型而言的
 collect_metrics(nb_fit)
 ```
+
+带网格搜索的参数中，需要确定超参数的合适设置范围，
+`dials::smoothness()`
+`dials::Laplace()`
+```{r}
+nb_model <- naive_Bayes(smoothness = tune(),
+                        Laplace = tune()
+                        ) %>% 
+  set_mode("classification") %>% 
+  set_engine("klaR")
+```
+
 
 
 ### Make Predictions on Test Data
@@ -116,6 +171,9 @@ nb_test_pred <- bind_cols(
 table("predicted class" = nb_test_pred$.pred_class,
       "observed class" = nb_test_pred$species)
 
+```
+
+```{r}
 nb_test_pred %>% 
   roc_curve(
     truth = species,
@@ -123,4 +181,63 @@ nb_test_pred %>%
   ) %>% 
   autoplot()
 ```
+
+### use klaR package directly
+
+```{r, include=FALSE}
+library(e1071)
+```
+
+
+提取recipe后的数据
+```{r}
+
+train_bake <- penguins_rec %>% prep() %>% bake(new_data = NULL)
+
+test_bake <- penguins_rec %>% prep() %>% bake(new_data = test)
+
+test_bake
+```
+
+
+```{r}
+# ?NaiveBayes
+nb_model <- klaR::NaiveBayes(species ~ ., data = train_bake)
+```
+
+
+```{r}
+summary(nb_model)
+```
+```{r}
+# 在测试集上评估模型
+nb_pred <- predict(nb_model, newdata = test_bake, type = "class")
+nb_acc <- mean(nb_pred$class == test_bake$species)
+
+cat("Naive Bayes Test Accuracy:", nb_acc, "\n")
+```
+
+
+```{r}
+# 调整超参数
+# 尝试不同的拉普拉斯平滑参数
+laplace_params <- seq(0.1, 1, by = 0.1)
+nb_accs <- numeric(length = length(laplace_params))
+
+for (i in seq_along(laplace_params)) {
+  nb_model_tuned <- NaiveBayes(species ~ ., data = train, laplace = laplace_params[i])
+  nb_pred_tuned <- predict(nb_model_tuned, newdata = test, type = "class")
+  nb_acc_tuned <- mean(nb_pred_tuned$class == test$species)
+  nb_accs[i] <- nb_acc_tuned
+}
+
+# 绘制超参数调整结果的折线图
+plot(laplace_params, nb_accs, type = "l", xlab = "Laplace Smoothing Parameter", ylab = "Accuracy")
+```
+
+
+
+
+
+
 
