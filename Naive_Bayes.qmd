@@ -42,9 +42,11 @@ Gaussian Naive Bayes - This is a variant of Naive Bayes which supports continuou
 Multinomial Naive Bayes - This is another variant which is an event-based model that has features as vectors where sample(feature) represents frequencies with which certain events have occurred.
 Bernoulli - This variant is also event-based where features are independent boolean which are in binary form.
 
+事实上，依据不同的数据输入特点，也衍生出很多其他不同种类的模型。
+
 
 *NB常用来处理的数据和输入数据的处理：*
-NB常用来处理的问题，
+NB常用来处理的问题，特征之间的关系较为简单。还有需要关注特征的特点。微生物OTU数目是属于counts数据还是连续数据呢，应该属于counts数据。在NB常应用的文本分类领域，多项式朴素贝叶斯或者伯努利朴素贝叶斯应用的较多。
 
 
 *This model has 2 tuning parameter:*
@@ -68,6 +70,7 @@ library(klaR)
 
 ### 拟合模型
 
+数据特征为连续性数据，采用高斯贝叶斯模型。
 
 ```{r}
 ## Remove the two observations with all data missing
@@ -96,7 +99,7 @@ cv_folds
 # ?naive_Bayes
 # 目前只能fit classification model
 # show_engines('naive_Bayes')
-# 如何选择 是利用高斯、还是伯努利呢？
+# 如何选择 是利用高斯、还是伯努利呢, 针对不同的特征数据特点。
 nb_model <- naive_Bayes() %>% 
   set_mode("classification") %>% 
   set_engine("klaR")
@@ -122,7 +125,7 @@ penguins_wf <- workflow() %>%
 ```
 
 
-对于naive bayes而言，其超参数,
+对于naive bayes而言，其超参数不多。
 
 `fit_resamples` 是用一个模型参数去fit多个resample的数据集，其不能用于tune 参数，
 ```{r}
@@ -136,7 +139,7 @@ nb_fit <- penguins_wf %>%
 collect_metrics(nb_fit)
 ```
 
-带网格搜索的参数中，需要确定超参数的合适设置范围，
+带网格搜索的参数中，需要确定超参数的合适设置范围，不同的engine需要的超参数也不同。
 `dials::smoothness()`
 `dials::Laplace()`
 ```{r}
@@ -183,6 +186,8 @@ nb_test_pred %>%
 ```
 
 ### use klaR package directly
+
+目前来看，`klaR`应是R生态中计算朴素贝叶斯最好的包了。
 
 ```{r, include=FALSE}
 library(e1071)
