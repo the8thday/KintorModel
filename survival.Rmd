@@ -39,7 +39,7 @@ library(survminer) # for KM plot
 library(riskRegression)
 library(rms)
 library(gtsummary) # for beautiful table
-library(ggsurvfit) # recomend use survfit2
+library(ggsurvfit) # recommend use survfit2
 ```
 
 建模. 对于cox回归其实质同线性回归;cox回归需要满足等比例假设，对于不满足的自变量采用分层分析的方法。
@@ -396,7 +396,7 @@ cal <- rms::calibrate(coxm,#模型名称
               cmethod='KM',
               method='boot',#检测方法
               u=365 * 2, #评估的时间，注：一定要与模型的时间一致,如何在模型中设置此时间取决于自己
-              m=50, #每次抽样的样本量，样本总量除以3/4，因为一般将所有样本分为3、4组，当然如果样本量多也可以多设置组
+              m=50, #每次抽样的样本量，样本总量除以3或4，因为一般将所有样本分为3、4组，当然如果样本量多也可以多设置组
               B=1000)#抽样次数
 
 plot(cal,
@@ -504,6 +504,19 @@ anova(mod2, mod) #fist the reduced model, second the full model
 ## *KM plot*
 
 KM plot一个很重要的点在于，得有一个分类数据。
+
+一般来说，log-rank检验的应用条件跟COX回归类似，都需要满足等比例风险假定条件，通俗来说，最好是两条曲线大致平行（当然这不是严格定义，但容易理解）。Wilcoxon检验对服从对数正态分布的生存数据比log-rank检验更好一些。
+最后，简单说一下其它检验方法。
+除了log-rank检验和Wilcoxon检验，还有其它几种常见的，也是软件提供的。如Peto检验，Tarone-Ware检验。它们与log-rank检验和Wilcoxon检验的不同就是权重不一样，如Tarone-Ware检验的权重是根号N，即N的平方根，也就是说，它也是越来越小，但是既然开了根号，那变化就没有那么大了。Peto检验的权重是生存估计函数，也是一个变化值。所以，其实根据这些权重，就不难理解这些方法侧重的方向。
+最最后，几种检验方法应用场景小结。
+从统计学角度，这几种检验方法其实所做的无效假设都是一样的，都是为了检验组间的生存曲线是否有统计学差异。然而，具体细节上有不同。如果你在研究时，确信某种疗法在一开始效果较好，随着时间推移，可能效果会减弱，此时应事先就确定采用Wilcoxon检验（或Tarone-Ware检验，视情况而定）而不是log-rank检验。采用log-rank检验，实际上相当于你对某种疗法并没有太多的概念，可能认为该疗法在整个研究期间应该效果差不多。
+严格来说，统计学不应该根据事后的生存曲线图和p值来选择方法，而应该在研究设计时就有计划，确定统计学方法。因为它们所对应的情形并不相同。
+
+To perform a standard log rank test, one can use
+`survdiff(Surv(time, status) ~ group, data = obs, rho = 0)`
+How could you perform a Wilcoxon signed rank test, a Peto test or a Fleming-Harrington test?
+ to get a "Peto test" is to use rho=1, or we can use the `survMisc` package:
+ `library(survMisc) comp(fit)$tests$lrTests`，`comp(ten(fit))`结果里包含一系列的计算结果。R在这种时候容易给人一种不值得信任的感觉，如果有一个R统计联盟就好了。
 
 ```{r}
 fit <- survfit(Surv(time, status==2) ~ sex, data = lung,
