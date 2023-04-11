@@ -5,14 +5,86 @@ format: html
 
 ## Monte Carlo
 
+> https://www.r-bloggers.com/2017/08/monte-carlo-simulations-in-r/
+
+
+Monte Carlo Method, 蒙特卡罗方法，是一种数学技术，用于估计不确定事件的可能结果。它也被称为蒙特卡罗方法或多重概率模拟。其可以让我们计算某一事件全部可能的Outcome。实质上，蒙特卡罗方法涉及使用随机数和概率理论来模拟系统或过程的大量可能结果，然后分析这些结果来估计系统的行为或性能。通过大量随机样本，去了解一个系统，进而得到所要计算的值。
+
+蒙特卡罗方法的基本步骤如下：
+定义问题：第一步是清楚地定义问题，确定需要建模的系统或过程。
+生成随机数：下一步是使用随机数生成器生成大量随机数。这些随机数用于模拟系统或过程的各种结果。
+计算结果：使用第2步生成的随机数，计算每个随机情况下的系统或过程的结果。这涉及应用概率理论来确定每个结果发生的可能性。
+分析结果：在模拟大量结果之后，分析结果以确定系统的整体行为或性能。这可能涉及计算平均值、方差或其他统计量来总结数据。
+得出结论：最后，使用模拟结果得出关于正在建模的系统或过程的结论。这些结论可能会指导如何优化或改进系统，或提供有关驱动系统行为的基本机制的见解。
 
 
 
+```{r}
+# 模拟投掷一个骰子1000次
+n <- 1000
+rolls <- sample(1:6, n, replace = TRUE)
+
+# 计算骰子每个面出现的频率
+freq <- table(rolls) / n
+freq
+
+# 画出频率的直方图
+hist(rolls, breaks = 6, main = "Histogram of Dice Rolls")
+
+# 生成10000个符合正态分布的随机数
+n <- 10000
+mu <- 0
+sigma <- 1
+samples <- rnorm(n, mean = mu, sd = sigma)
+
+# 计算随机样本的均值和标准差
+sample_mean <- mean(samples)
+sample_sd <- sd(samples)
+
+# 打印均值和标准差
+cat("Sample Mean:", sample_mean, "\n")
+cat("Sample Standard Deviation:", sample_sd, "\n")
+
+# 画出随机样本的直方图
+hist(samples, breaks = 30, main = "Histogram of Random Samples")
+
+```
 
 
+下述示例代码模拟了10000次股票投资，计算了每次投资的收益率，然后计算了投资收益率的均值、标准差以及风险价值VaR和CVaR。在实际应用中，该方法可用于评估股票投资组合的风险，并帮助投资者制定投资策略。
 
+```{r}
+# 模拟股票投资回报率
+n <- 10000  # 模拟次数
+principal <- 10000  # 投资本金
+rate <- 0.1  # 年化收益率
+years <- 5  # 投资年限
 
+# 生成随机收益率样本
+annual_returns <- rnorm(n, mean = rate, sd = 0.2)
+total_returns <- numeric(n)
+for (i in 1:n) {
+  total_returns[i] <- principal * (1 + annual_returns[i])^years
+}
 
+# 计算投资收益率分布
+invest_return <- total_returns / principal - 1
+mean_return <- mean(invest_return)
+sd_return <- sd(invest_return)
+
+# 画出投资回报率分布的直方图
+hist(invest_return, breaks = 50, main = "Histogram of Investment Returns")
+
+# 计算风险价值VaR和CVaR
+alpha <- 0.05  # 置信水平
+VaR <- quantile(invest_return, alpha)
+CVaR <- mean(invest_return[invest_return < VaR])
+
+# 打印VaR和CVaR
+cat("Value at Risk (VaR):", VaR, "\n")
+cat("Conditional Value at Risk (CVaR):", CVaR, "\n")
+
+```
 
 
 
