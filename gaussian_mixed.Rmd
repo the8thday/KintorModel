@@ -11,8 +11,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 高斯混合模型
 
-https://towardsdatascience.com/mixture-modelling-from-scratch-in-r-5ab7bfc83eef
-高斯混合模型是非监督的聚类方法，其和kmeans都是利用EM(Expectation-Maximization) algorithm 进行的。
+> https://towardsdatascience.com/mixture-modelling-from-scratch-in-r-5ab7bfc83eef
+
+
+高斯混合模型是非监督的聚类方法，其和kmeans都是利用EM(Expectation-Maximization) algorithm 进行实现的。
+
+高斯混合模型 (Gaussian Mixture Model，GMM) 是一种概率模型，用于对由多个高斯分布组成的数据进行建模。它假设数据是由 K 个高斯分布混合而成的，每个高斯分布被称为一个组件，每个组件都有自己的均值和方差。GMM 的目标是通过最大化似然函数来估计模型参数，即均值、方差和混合系数，使得模型能够最好地拟合数据。
+
+GMM 可以用于多种任务，例如聚类、异常检测、密度估计等。在聚类任务中，GMM 可以将数据点分配到不同的组件中，从而实现聚类。在异常检测任务中，如果某个数据点的概率密度低于一个阈值，则认为该数据点是异常的。在密度估计任务中，GMM 可以估计数据的概率密度函数。
+
+GMM 的主要缺点是它对初始值敏感，如果初始值选的不好，则有可能会收敛到局部最优解。为了克服这个问题，可以使用多个初始值运行算法，并选择具有最大似然的模型。
 
 ```{r}
 library('easystats')
@@ -40,6 +48,8 @@ table(y, gmm.mclust$classification) # 结果可以看到GMM 对iris数据集的�
 
 ## 如何确定最佳的K值
 
+对于partitioning clustering，其不同于层次聚类，往往需要一个K值。
+
 ```{r}
 # mlust BIC 确认最佳的K值
 BIC <- mclust::mclustBIC(X)
@@ -64,7 +74,7 @@ d_clust$BIC
 plot(d_clust)
 ```
 
-继续最佳K值
+继续最佳K值的确认，采用elbow法
 
 ```{r}
 # the elbow method
