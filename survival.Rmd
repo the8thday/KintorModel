@@ -17,6 +17,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 <https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html>
 > https://thomaselove.github.io/2020-432-book/index.html
+> https://cran.r-project.org/web/packages/survminer/vignettes/Specifiying_weights_in_log-rank_comparisons.html
+
 
 本笔记主要记录较为完整的Cox回归模型和KM分析，其中对于Lasso-Cox、mixed-Cox等，详见*lasso_cox.Rmd*,
 *mixed_cox.Rmd*这两个笔记。
@@ -98,6 +100,13 @@ a more detailed description of the likelihood-ratio test of the model
 ```{r}
 anova(mod)
 ```
+
+```{r}
+car::Anova(mod = mod, type = 'III')
+```
+
+
+
 ```{r}
 broom::tidy(mod, exponentiate = TRUE)
 ```
@@ -517,6 +526,9 @@ To perform a standard log rank test, one can use
 How could you perform a Wilcoxon signed rank test, a Peto test or a Fleming-Harrington test?
  to get a "Peto test" is to use rho=1, or we can use the `survMisc` package:
  `library(survMisc) comp(fit)$tests$lrTests`，`comp(ten(fit))`结果里包含一系列的计算结果。R在这种时候容易给人一种不值得信任的感觉，如果有一个R统计联盟就好了。
+
+SAS中在计算CI时，默认使用的是loglog方法，可以更改`survfit`的参数，`survfit(Surv(time, status==2) ~ sex, data = lung,conf.type = "log-log")`
+
 
 ```{r}
 fit <- survfit(Surv(time, status==2) ~ sex, data = lung,
