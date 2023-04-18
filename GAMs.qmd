@@ -9,6 +9,8 @@ format: html
 
 > https://m-clark.github.io/generalized-additive-models/preface.html
 > https://noamross.github.io/gams-in-r-course/chapter1
+> https://www.seascapemodels.org/rstats/2021/03/27/common-GAM-problems.html#
+> https://support.sas.com/rnd/app/stat/topics/gam/gam.htm
 
 <\br>
 
@@ -31,7 +33,7 @@ $g(ui)=A_{i} + f_{1}(x_{1}) + f_{2}(x_{2i}) + ...$
 - `te()` tensor product smooth
 
 
-在广义线性模型的计算中，g() 和 link()都是对于respose变量而言的。link function maps a nonlinear relationship to a linear one so that a linear model can be fit (and then mapped to the original form).
+在广义线性模型的计算中，g() 和 link()都是对于response变量而言的。link function maps a nonlinear relationship to a linear one so that a linear model can be fit (and then mapped to the original form).
 
 而在广义加性模型中，增加了对自变量进行转换。
 
@@ -40,6 +42,14 @@ $g(ui)=A_{i} + f_{1}(x_{1}) + f_{2}(x_{2i}) + ...$
 
 `assumption: `
 1. Y的分布属于指数家族
+2. 
+
+
+Attention:
+Categorical variables should be input to gam() as factors,
+Adjust the degrees of freedom parameter to avoid an error involving the maximum degrees of freedom,
+Use the REML method for smaller datasets to avoid overfitting,
+How to deal with crazy extrapolations of a response when there are large gaps in measurements of a covariate
 
 
 ```{r, include=FALSE}
@@ -50,6 +60,7 @@ library(mgcv) # 首选R包
 library(gratia)
 # library(GAMLSS)
 library(scam)
+library(ggeffects)
 library(marginaleffects)
 ```
 
@@ -70,6 +81,12 @@ model_gam <- mgcv::gam(y ~ s(x), data = data)
 
 plot(modelbased::estimate_relation(model_gam), line = list(color = "blue"))
 ```
+
+一个实际拟合的数据：
+```{r}
+
+```
+
 
 
 ```{r}
@@ -211,7 +228,7 @@ GGally::ggpairs(dd %>% select(-Country))
 ```
 
 利用`dlookr`包进行数据探索：
-```{r}
+```{r, eval=FALSE}
 require(dlookr)
 
 categ <- target_by(dd, Overall)
@@ -220,7 +237,7 @@ dlookr::eda_report(categ)
 ```
 
 
-
+拟合模型，几个重要的参数：
 ```{r}
 # sp(smoothing parameter) 即可以放在s()中，也可以放在gam()中
 # k 参数, number of basis functions
@@ -251,6 +268,8 @@ A good way to interpret significance for smooth terms in GAMs is this: a signifi
 
 __模型诊断：__如果gam.check结果偏离较高，可以通过调整basis function数目等进行调整。p-value小于0.05一般认为需要在 增加k的数目。
 
+模型调整：
+
 ```{r}
 # partial effect plots
 # they show the component effect of each of the smooth or linear terms in the model, which add up to the overall prediction.
@@ -262,6 +281,7 @@ plot(mod_gam, page = 1, all.terms = TRUE, residuals = TRUE, shade = TRUE,
 
 # p-value 小于0.05indicate that residuals are not randomly distributed. This often means there are not enough basis functions.
 # 后四幅图都是对残差的绘图,第三幅最好在0附近
+set.seed(42)
 gam.check(mod_gam, k.rep = 1000)
 
 
@@ -271,7 +291,8 @@ concurvity(mod_gam)
 # pairwise
 concurvity(mod_gam, full = FALSE)
 ```
-*interpret the Results: *图一为
+*interpret the Results: *图一为,
+其中check的表格输出内容为，检验k值是否是合适的值，p-value小于0.05的话为k值设置的太小了。在s()函数中，可以为每一个变量指定一个k值。
 
 
 
@@ -301,6 +322,15 @@ plot(deriv, line = list(color = "blue")) +
 summary(deriv)
 ```
 *interpret the Result: *上图可以理解为随着Income值的变化，不同的10个点的9个区间的Income的effect。在Income收入较高和较低的两头Income对因变量有有意义的影响。
+
+
+
+```{r}
+# predict(mod_gam)
+
+estimate_prediction(mod_gam)
+```
+
 
 
 #### `easystats`包的一些应用:
