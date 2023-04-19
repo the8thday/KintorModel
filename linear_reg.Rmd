@@ -63,6 +63,9 @@ library(finalfit) #
 
 ##### 简单线性回归
 
+如下所示的简单线性回归，其在实际的应用中等同于Pearson's product-moment correlation. 可以理解为简单线性回归所能提供的
+数据分析结果为两变量间的相关性。
+
 ```{r}
 # 
 fit1 <- lm(weight ~ height, data=women)
@@ -70,16 +73,22 @@ fit1 <- lm(weight ~ height, data=women)
 summary(fit1)
 ```
 *interpret: *The residual standard error (1.53 pounds) can be thought of as the average error in predicting weight from height using this model. 
+在只有一个自变量的情况下，f-statistic值和t-test的检验P值一致。
 
 ```{r}
+# 和pearson相关性的相关系数进行对比
+# 系数的平方=R2
 cor(women$weight, fitted(fit1))^2
 ```
 
 
 ```{r}
+# 得到每一个观测的预测值
 broom::augment(fit1)
 ```
 
+
+如何理解线性关系呢？可以通过散点图等观察X自变量和Y因变量间的关系，似乎没有某种计算方式验证是否线性。
 ```{r}
 plot(women$height,women$weight, xlab="Height (in inches)", ylab="Weight (in pounds)")
 
@@ -90,15 +99,20 @@ abline(fit1)
 
 Fitting Polynomial Regression
 
-多项式回归或者通过log等对自变量进行转化后的模型依旧是线性模型，似乎对非线性模型有所误解呀我。。
+多项式回归或者通过log等对自变量进行转化后的模型依旧是线性模型，似乎对非线性模型有所误解呀我。。或者不能说是线性关系，因为多项式是明显的非线形关系。
+
+在对数据进行log处理的时候，一般选择对自变量进行log处理，如果对因变量进行log处理，则其和其他自变量的关系都会发生改变。
 
 ```{r}
+# 这种公式的写法并不推荐
 fit2 <- lm(weight ~ height + I(height^2), data=women)
 
-summary(fit2)
+# summary(fit2)
 
 # an nth-degree polynomial produces a curve with n-1 bends
 fit3 <- lm(weight ~ height + I(height^2) +I(height^3), data=women)
+
+summary(fit3)
 ```
 
 对于多项式回归，同时要考虑到变量间的共线性问题，所以一般采用`poly`函数的结果更为可靠，因其提供了正交多项式以消除共线性问题。
@@ -108,9 +122,19 @@ fit3 <- lm(weight ~ height + I(height^2) +I(height^3), data=women)
 对于临床上应用的多项式回归在进行线性检验时，有额外的考量，临床标准的线性检验中使用了两个统计量，ADL（偏离直线平均差异，average deviation from linearity）与PctBnd（百分区界 ，percent bound） ，对于大多数分析物PctBnd取5%。如ADL小于所要求的临界判断值，则可认为数据组具有临床可接受的线性，所拟合出的最适非线性多项式无临床意义。
 
 ```{r}
-fit3_2 <- lm(weight ~ poly(height, degree = 3), data=women)
+# 和上面的fit3的结果差别还是蛮大的
+# 主要原因在于poly的应用上，poly(height, degree = 3, raw = TRUE) 将得到一致的结果
+fit3_2 <- lm(weight ~ poly(height, degree = 3, raw = FALSE), data=women)
 
 summary(fit3_2)
+```
+
+```{r}
+ggplot(data = women, aes(x = weight, y = height)) +
+  geom_point() +
+  geom_smooth(method = 'lm', 
+              formula = y ~ ploy(x, 2)
+              )
 ```
 
 ```{r}
@@ -126,7 +150,10 @@ modelsummary::modelplot(fit3_2)
 
 *interpret the Result: *
 We can conclude from this plot that the slope is (significantly, because the confidence interval does not cover 0) negative until 0, and then becomes positive. 0 corresponds indeed to the point of inversion of the curve.
+
+
 ```{r}
+# estime_slopes 提供对连续变量间的关系
 deriv <- modelbased::estimate_slopes(fit3_2, trend = "x", at = "x")
 
 plot(deriv) +
@@ -144,10 +171,14 @@ summary(deriv)
 
 自变量间的共线性问题需要时时关注，同时在实际应用中，各种协变量、混淆变量、调节变量等等的分析总是很重要的。
 
+虽则`先单后多`的因素筛选方法有值得借鉴的地方，但同时应该谨记这只是用于参考的方法，具体的变量筛选还是要结合多种方面进行选择。
+
 ```{r}
 states <- as.data.frame(state.x77[,c("Murder", "Population", "Illiteracy", "Income", "Frost")])
 ```
 
+
+`car`包所提供的scatter plot，方便整体检查变量间的关系。
 ```{r}
 car::scatterplotMatrix(states, smooth=FALSE, main="Scatter Plot Matrix")
 ```
@@ -319,6 +350,7 @@ Several possible approaches to relative importance are captured in the `relaimpo
 vip::vip(fit4) +
   ggthemes::theme_economist()
 ```
+
 ```{r}
 
 sjPlot::tab_model(fit4, show.std = 'std')
@@ -329,6 +361,7 @@ sjPlot::tab_model(fit4, show.std = 'std')
 relaimpo::boot.relimp(fit4)
 ```
 
+R in action 中所提供的函数：
 ```{r}
 relweights <- function(fit, ...) {
   R <- cor(fit$model)
@@ -523,7 +556,10 @@ regplot::regplot(lreg)
 
 ### 利用`finalfit`一步法得到回归模型。
 
-finalfit支持的模型包括：linear lm(), logistic glm(), hierarchical logistic lme4::glmer() and Cox proportional hazards survival::coxph() regression models.
+`finalfit`确实包含在R中做几个常见模型的整体流程，做的多了确实应该也需要一个框架似的整合。
+
+finalfit支持的模型包括：linear lm(), logistic glm(), hierarchical logistic lme4::glmer() and Cox proportional hazards survival::coxph() regression models. 需要测试`lme4::lmer`。
+
 ```{r}
 library(finalfit)
 
