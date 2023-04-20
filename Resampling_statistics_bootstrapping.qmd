@@ -40,7 +40,7 @@ Robert I. Kabacoff
 set.seed(42)
 
 # one-way permutation test
-# 在下面书中的例子中，传统的ttest结果和permutation结果有出入，选择相信permutation的结果
+# 在下面书中的例子中，如果传统的ttest结果和permutation结果有出入，选择相信permutation的结果
 
 score <- c(40, 57, 45, 55, 58, 57, 64, 55, 62, 65)
 treatment <- factor(c(rep("A", 5), rep("B", 5)))
@@ -56,12 +56,32 @@ coin::oneway_test(score ~ treatment, data = mydata, distribution = "exact")
 
 ```{r}
 # ANOVA 分析
+data(cholesterol, package = 'multcomp')
 
-coin::oneway_test(response ~ trt,
+ff <- coin::oneway_test(response ~ trt,
   data = cholesterol,
   distribution = approximate(nresample = 9999)
 )
+
+ff
 ```
+```{r}
+# normal ANOVA
+
+ff2 <- aov(formula = response ~ trt, data = cholesterol, qr = TRUE)
+
+ff2 |> summary()
+```
+
+
+```{r}
+# 对于coin::oneway_test 的 ANOVA 多分组如何进行post-hoc 分析
+
+
+
+```
+
+
 
 
 `lmPerm`包的使用，provides a permutation approach to linear models, including regression and analysis of variance.
@@ -87,7 +107,7 @@ anova(fit2)
 
 ### bootstrap
 
-permutation 主要以提供pvalue区队null假设做判断，其很难给出CI。这在pvalue日益收到批评的研究氛围内愈发显得不太合适，bootstrap在这一点上具有相对的优势。
+permutation 主要以提供pvalue以对null假设做判断，其很难给出CI。这在pvalue日益收到批评的研究氛围内愈发显得不太合适，bootstrap在这一点上具有相对的优势。
 
 Bootstrapping generates an empirical distribution of a test statistic or set of test statistics by repeated random sampling with replacement from the original sample. It allows you to generate confidence intervals and test statistical hypotheses without having to assume a specific underlying theoretical distribution.
 
@@ -213,6 +233,7 @@ null_dist_2_sample %>%
   shade_p_value(observed_statistic,
                 direction = "two-sided")
 ```
+
 ```{r}
 null_dist_2_sample |>
   get_p_value(observed_statistic,
