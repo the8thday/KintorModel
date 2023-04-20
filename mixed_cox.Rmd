@@ -30,12 +30,20 @@ summary(m)
 
 # Competing Risks Regression
 
-竞争风险模型是指event有多种，一种发生则另外一种不发生。在竞争事件存在的情况下各个结局事件的累计发病函数是如何随着时间变化的，以及如何来比较不同的累计发病函数，以及如何探讨影响因素
+竞争风险模型是指event有多种，一种发生则另外一种不发生。在竞争事件存在的情况下各个结局事件的累计发病函数是如何随着时间变化的，以及如何来比较不同的累计发病函数，以及如何探讨影响因素.
+
+不得不说还是finalfit简单好用。
 
 ```{r}
 library(cmprsk)
+# library(ccrstep)
 library(condSURV)
 library(finalfit)
+library(ggsurvfit)
+```
+
+```{r}
+
 # The crr() syntax differs from survival::coxph() but finalfit brings these together
 # https://finalfit.org/articles/survival.html
 
@@ -117,6 +125,7 @@ fit
 
 detach()
 ```
+
 ```{r}
 # 上面介绍的方法相当于没有竞争风险的时候的KM法，通过上面的方法我们知道有了不同风险结局累计发病曲线的差异，继续我们会继续看影响因素，要做的就是竞争风险回归模型了，需要用到的函数就是crr
 cov1 = model.matrix(as.formula(paste0("~", paste0(explanatory, 
