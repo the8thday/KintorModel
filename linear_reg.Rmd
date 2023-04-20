@@ -33,6 +33,7 @@ contrast plots和conditional plots的异同点在于？conditional plot是在考
 
 ```{r, include=FALSE}
 library(car)
+library(lmtest)
 library(MASS)
 library(glmnet)
 library(rms)
@@ -288,6 +289,19 @@ summary(car::powerTransform(states$Murder))
 
 
 ```
+
+
+*还可以利用lmtest包提供的函数进行模型的检验：*
+```{r}
+# 残差检验, 检验异方差性
+# gqtest()：用于检验线性回归模型的异方差性。它可以使用Godfrey-Quinn检验和Newey-West检验等方法。
+lmtest::gqtest(fit4)
+lmtest::bptest(fit4)
+
+# 用于检验线性回归模型系数的显著性。它可以使用t检验、F检验和Wald检验等方法。
+coeftest(fit4, vcov = vcovHC(fit4)) # 异方差性稳健标准误差
+```
+
 
 
 ##### 模型选择和对比
