@@ -7,22 +7,24 @@ format: html
 
 > http://www.sthda.com/english/articles/40-regression-analysis/162-nonlinear-regression-essentials-in-r-polynomial-and-spline-regression-models/
 
-非线性模型是一系列模型的统称。在以前的笔记中所涉及到的GAM，splines, Polynomial 等都是非线性模型的应用。 GLMs也是将非线性的数据进行转换成线性而进行分析的。
+非线性模型是一系列模型的统称。在以前的笔记中所涉及到的GAM，splines，分段回归等都是非线性模型的范畴。
 
-GAM应该可以直接代替多项式、spline等模型。
+GLMs可以理解成将非线性分布的outcome数据进行转换成线性而进行分析的，因变量和自变量间的线性关系。
 
 
-1. Michaelis-Menten Regression model
+下面整理一些常见的非线性模型的例子：
+
+1. Michaelis-Menten Regression model(rectangular hyperbola)
 2. Generalized Additive Models
 3. loess (package ‘stats’)
-4. quantile regression (packages ’quantreg*’)
-5. segmented regression (segmented in package ‘segmented’)
+4. quantile regression (packages 'quantreg')
+5. segmented regression (segmented in package 'segmented')
 
 
-非线性回归中的convergence fails问题：
+*非线性回归中的convergence fails问题：*
 Convergence problems in nonlinear models can be caused by many different reasons. These are a few of them:
 
-The model is not appropriate for the observed data (or viceversa)
+The model is not appropriate for the observed data (or vice versa)
 The model is conceptually correct but there is an error in the formula
 The model is too complex; a simpler model should be used
 The model is too simple; a more complex model should be used
