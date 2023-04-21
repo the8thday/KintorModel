@@ -49,7 +49,8 @@ library(ggsurvfit) # recommend use survfit2
 _对于因子变量_应如何纳入到具体的模型中呢？对于设置成factor的因子R中模型常见的处理方式是将其自动设置为dummy变量。就像`model.matrix(~ 0 + factor(ph.ecog), lung)`
 
 ```{r}
-data('lung', package = 'survival')
+# data(lung)
+
 lung <- na.omit(lung) %>% 
   as_tibble() %>% 
   rstatix::convert_as_factor(sex, ph.ecog)
@@ -61,23 +62,31 @@ mod <- coxph(Surv(time, status==2)~age + sex + ph.ecog + ph.karno + meal.cal + w
              x = TRUE)
 summary(mod) # Concordance 即是c-index
 
+```
+
+
+```{r}
 # 等比例风险假设，cox回归需要满足的假设, 可采用cox.zph函数并结合cumulative incidence plot
 # GLOBAL为整体上是否满足等比例风险，p值大于0.05一般视为满足, 对于某一不满足的自变量采用分层分析的方法进行
 (z <- cox.zph(mod))
 
 # We can plot the scaled Schoenfeld residuals directly with ggcoxzph from the survminer package.
 ggcoxzph(z)
+```
 
-# 下面为分层分析后的变量，以下暂不考虑，此处只做一个记录
+```{r}
+# 下面为分层分析后的变量，以下更为具体的内容暂不考虑，此处只做一个记录
 # 
 mod_strata <- coxph(Surv(time, status)~age + sex + ph.ecog + strata(ph.karno) + meal.cal + wt.loss, 
              data = lung, 
              y=TRUE, 
              x = TRUE)
+
 mod_strata # 分层变量不在作为自变量因素
 summary(mod_strata)
-
 ```
+
+
 
 ```{r}
 #ggcoxdiagnostics(fit, type = "schoenfeld")
@@ -527,13 +536,17 @@ How could you perform a Wilcoxon signed rank test, a Peto test or a Fleming-Harr
  to get a "Peto test" is to use rho=1, or we can use the `survMisc` package:
  `library(survMisc) comp(fit)$tests$lrTests`，`comp(ten(fit))`结果里包含一系列的计算结果。R在这种时候容易给人一种不值得信任的感觉，如果有一个R统计联盟就好了。
 
-SAS中在计算CI时，默认使用的是loglog方法，可以更改`survfit`的参数，`survfit(Surv(time, status==2) ~ sex, data = lung,conf.type = "log-log")`
+*SAS*中在计算CI时，默认使用的是loglog方法，可以更改`survfit`的参数，`survfit(Surv(time, status==2) ~ sex, data = lung, conf.type = "log-log")`
 
+
+查看survfit.formula的帮助页。
 
 ```{r}
+# ?survfit.formula
 fit <- survfit(Surv(time, status==2) ~ sex, data = lung,
                conf.int = 0.95,
-               se.fit = TRUE
+               se.fit = TRUE,
+               conf.type = "log-log" # 和SAS保持一致
                )
 fit # 中位生存期以及95%CI
 
@@ -544,6 +557,9 @@ surv_pvalue(fit)
 # Estimating x-year survival
 # 查看某个时间点的生存率, 如下示例为1年时的生存率
 summary(survfit(Surv(time, status) ~ 1, data = lung), times = 365.25)
+```
+
+```{r}
 
 # 从survdiff中提取pvalue
 sd <- survdiff(Surv(time, status) ~ sex, data = lung)
@@ -713,7 +729,7 @@ plot(r_fit$unique.death.times,r_fit$survival[1,],
 > https://rpubs.com/FJRubio/PSRM
 
 
-two regression models: PH(the proportional hazards) and AFT(accelerated failure time).
+参数生存分析包含two regression models: PH(the proportional hazards) and AFT(accelerated failure time).
 
 By selecting a parametric from the catalogue of distributions, we are making assumptions about the possible hazard rates of the true distribution. Selecting the best model using formal tools is usually recommended.
 对于参数类的生存分析，需要选择所使用的参数方法。
@@ -723,41 +739,147 @@ By selecting a parametric from the catalogue of distributions, we are making ass
 - AFT
 - General Hazard (GH) model
 
+分布和两种model的关系，
+
+
+*Weibull分布：*
+生存分析的参数模型中，指数分布最为简单，不过其所假定的死亡风险不变太过理想化，在实际中应用不多。`Weibull`分布除了风险参数lambda参数外，多一个控制曲线形状的参数，用p表示，p<1表示多数病人较早死亡，少数人生存时间较长；p>1表示早期死亡例数较少，后期死亡数较多；p=1表示病人死亡数不随时间变化，此时相当于指数分布(指数分布可以看作其的一个特殊情况)。那么Weibull回归分析结果长什么样呢？其实跟普通回归没什么太大区别，也是给出截距、各影响因素的参数估计值。如果说唯一有不同的地方就是，它还给出了Weibull分布的参数。你会发现p=1.72，而且从置信区间来看，明显大于1。这说明了两件事：第一，既然p从统计学上来看不等于1，说明这不是指数分布，而是Weibull分布。第二，既然p大于1，说明在这个数据中，死亡风险一开始较低，后面逐渐增大。从生存角度则说明，一开始死亡人数可能较少，后面反而死亡人数越来越多。
+
+
+*lognormal: *
+Lognormal 分布是一种连续概率分布，通常用于描述正态分布的对数。在 R 中，可以使用“survival”包中的“survreg”函数进行 Lognormal 分布分析。
+
+
+*shared frailty model: *
+Shared frailty model是一种生存分析模型，它考虑了群组内个体之间的相关性，常用于分析有群组结构的数据，如医院、家庭、社区等。在R中，可以使用coxme包实现shared frailty model。类似于重复测量资料。详细见笔记`mixed_cox.Rmd`.
+
 
 
 ```{r, include=FALSE}
 library(flexsurv) # 此包提供诸多参数类的拟合
-library(eha)
+library(eha) # event history and survival analysis
 library(MASS)
 library(fitdistrplus)
 
 ```
 
-类似的三个模型是？
+
+### hp model
+
+
+类似的三个模型是？见上面的描述。weibull 分布，或者`log-logistic`分布，是值得在生存分析中应用的，不过作为参数模型，需要对数据的分布进行一些检验。
 
 ```{r}
 # Survival model using a Weibull distribution
-fit.weibull <- flexsurvreg(formula = Surv(time, status) ~ 1, data = lung,
+# wb 和 flexsurvreg 拟合函数分别可以做对应的weibull分析
+
+# By default R reports coefficients in the accelerated failure time metric.
+wb <- survival::survreg(formula = Surv(time, status) ~ 1, data = lung,
+                           dist = "weibull")
+
+# 
+fit.weibull <- flexsurv::flexsurvreg(formula = Surv(time, status) ~ 1, data = lung,
                            dist = "weibull")
 
 fit.weibull
+```
+*interpret the result:* shape参数确定了生存时间分布的形状，而scale参数确定了生存时间分布的比例因子。
+从置信区间来看，shape明显大于1，即是死亡风险在前期较低后期较高。
+
+
+
+```{r}
+# summary(fit.weibull)
+
+# 预测患者生存概率，对于有自变量的情况下
+lung$sex <- factor(lung$sex)
+
+weib_model <- flexsurv::flexsurvreg(formula = Surv(time, status) ~ age + sex + ph.ecog, 
+                                      data = lung,
+                           dist = "weibull")
+
+fit.aft <- eha::aftreg(formula = Surv(time, status) ~ age + sex + ph.ecog, data = lung,
+                         dist = "weibull" # 此处参数可以选择weibull等
+                         )
+
+
+new_data <- data.frame(age = 65, sex = "1", ph.ecog = 1)
+predict(weib_model, new_data, type = "survival")
 ```
 
 
 
 ```{r}
+# 拟合生存函数和风险函数
+spline_fit <- flexsurvspline(Surv(time, status) ~ 1, data = lung)
+
+
+```
+
+```{r}
+# 绘制生存概率密度函数和风险密度函数
+ggplot(data.frame(time = seq(0, 50, by = 0.1)), aes(x = time)) +
+  geom_line(aes(y = dweibull(time, shape = weibull_fit$estimate[1], 
+                            scale = weibull_fit$estimate[2])), 
+            color = "red") +
+  geom_line(aes(y = -log(survfit(Surv(time, status) ~ 1)$surv)), 
+            color = "blue") +
+  ylab("Probability")
+```
+
+
+### AFT fit
+
+> https://en.wikipedia.org/wiki/Accelerated_failure_time_model
+
+AFT(Accelerated Failure Time), AFT models assume that the hazard rate, or risk of an event occurring, is constant over time. This model estimates parameters for the effects of predictor variables on the time to event.
+
+```{r}
 # AFT model using a lognormal baseline distribution
-fit.aft <- eha::aftreg(formula = Surv(time, status) ~ age + sex, data = lung,
+fit.aft <- eha::aftreg(formula = Surv(time, status) ~ age + sex + ph.ecog, data = lung |> na.omit(),
                          dist = "lognormal" # 此处参数可以选择weibull等
                          )
 
 summary(fit.aft)
 
+
+```
+
+
+```{r}
+fit.aft2 <- eha::aftreg(formula = Surv(time, status) ~ age + sex + ph.ecog, data = lung,
+                         dist = "weibull"
+                         )
+
+fit.aft2
+```
+*interpret the result: *本模型的结果和SPSS结果保持一致。不过一些Coef值的正负不一致。
+
+
+*Cox-Snell Residual plot*
+```{r}
+# 四幅图的诊断
+plot(fit.aft2)
+```
+
+
+PH model, 指的是Proportional hazards model with parametric baseline hazard(s). Allows for stratification with different scale and shape in each stratum, and left truncated and right censored data.
+```{r}
 # PH model using a lognormal baseline distribution
 fit.ph <- eha::phreg(formula = Surv(time, status) ~ age + sex , data = lung,
                 dist = "lognormal")
 
 summary(fit.ph)
+```
+```{r}
+fit.ph2 <- eha::phreg(formula = Surv(time, status) ~ sex , data = lung,
+                dist = "gompertz")
+
+
+plot(fit.ph2, fn = "haz", col = c("red", "blue"), 
+     main = "Male mortality by social class", 
+     ylab = "Gompertz hazard", 
+     xlab = "Sex")
 ```
 
 
