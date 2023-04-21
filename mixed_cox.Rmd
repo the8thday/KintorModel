@@ -15,18 +15,27 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Mixed effects cox regression models are used to model survival data when there
 are repeated measures on an individual, individuals nested within some other
-hierarchy, or some other reason to have both fixed and random effects
+hierarchy, or some other reason to have both fixed and random effects.
+
+*shared frailty model: *
+Shared frailty model是一种有参生存分析模型，它考虑了群组内个体之间的相关性，常用于分析有群组结构的数据，如医院、家庭、社区等。在R中，可以使用coxme包实现shared frailty model。
+R allows fitting a frailty model via coxph by adding a frailty() term to the model formula. There is a new and more general approach in Therneau’s coxme library, which includes the coxme() function to fit mixed Cox survival models with Gaussian random effects using a Laplace approximation. In this example the two approaches give very similar answers, but this is not always the case.
 
 ```{r}
 library(tidyverse)
 library(survival)
 library(coxme)
 
+```
+
+```{r}
 m <- coxme(Surv(time, status) ~ age + sex + (1|ph.ecog), 
            data = lung)
-
-summary(m)           
+summary(m)
 ```
+
+
+
 
 # Competing Risks Regression
 
