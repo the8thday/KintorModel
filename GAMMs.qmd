@@ -1,0 +1,59 @@
+---
+title: "Generalized Additive Mixed Models"
+format: html
+---
+
+## Generalized Additive Mixed Models
+
+
+广义可加混合模型（Generalized Additive Mixed Models，GAMMs）是一种广义线性混合模型的扩展形式，用于建模非线性关系和非正态分布数据。它可以处理多个响应变量和多个随机效应，并且可以使用非参数平滑函数来建模预测变量和响应变量之间的关系。
+
+GAMMs的核心思想是将模型中的每个预测变量都视为一个单独的非参数平滑函数，并将它们组合起来以形成整个模型。这些平滑函数可以是任何形式的曲线，例如样条、核函数、多项式等。这种方法允许建模复杂的非线性关系，并且可以使用交互作用项来捕捉变量之间的相互作用。
+
+与传统的线性混合模型相比，GAMMs可以更好地处理非正态分布的数据，例如计数数据、二项分布数据和连续比例数据。此外，它还可以处理多个响应变量和多个随机效应，这使得它在许多实际应用中非常有用。
+
+GAMMs的建模过程通常涉及到选择适当的平滑函数和平滑参数，以及确定哪些预测变量应该被包括在模型中。这些决策通常需要进行交叉验证和模型比较来确定最佳模型。
+
+总之，GAMMs是一种非常有用的建模方法，可以用于处理复杂的非线性关系和非正态分布数据。它在许多实际应用中都得到了广泛的应用，并且可以通过现有的统计软件包进行实现和分析。
+
+
+
+### A Demo
+
+
+```{r, include=FALSE}
+library(mgcv)
+library(gratia)
+library(emmeans)
+library(marginaleffects)
+```
+
+
+
+```{r}
+model <- mgcv::gamm(formula = LOGCHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE,
+                random = ~1 | SUBJID,
+                method = "REML"
+                )
+```
+
+
+```{r}
+# 查看模型摘要信息
+summary(model)
+
+# 绘制自变量与响应变量的关系图
+plot(model, select = 2)
+
+# 绘制自变量与响应变量的偏差图
+plot(model, select = 3)
+```
+
+
+
+
+
+
+
+
+
