@@ -22,15 +22,53 @@ GAMMs的建模过程通常涉及到选择适当的平滑函数和平滑参数，
 
 
 ```{r, include=FALSE}
-library(mgcv)
+library(agridat)
+library(MASS)
+library(gamm4) # use lme4 as default
+library(mgcv) # syntax taken from the package nlme
 library(gratia)
 library(emmeans)
 library(marginaleffects)
 ```
 
 
+```{r}
+# 所使用数据为一批次测试数据
+dat <- lasrosas.corn  
+dat$year = as.factor(paste(dat$year)) 
+
+# 一个简单的随机截距模型
+gam.ME <- mgcv::gamm(yield ~ nitro + nf + topo + s(bv), data = dat, random = list(year = ~1))
+```
 
 ```{r}
+# 返回一个list
+summary(gam.ME)
+
+```
+
+```{r}
+summary(gam.ME[[1]])
+
+summary(gam.ME[[2]])  
+```
+
+
+```{r}
+
+plot(gam.ME$gam)
+```
+
+```{r}
+dat$resid.gam.mod <- residuals(gam.ME$lme, type = "pearson")
+dat$fit.gam.mod <- predict(gam.ME$gam, type = "link")
+dat$fit2.gam.mod <- predict(gam.ME$gam, type = "response")
+
+plot(dat$fit.gam.mod, dat$resid.gam.mod)
+```
+
+```{r}
+# do not run
 model <- mgcv::gamm(formula = LOGCHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE,
                 random = ~1 | SUBJID,
                 method = "REML"
@@ -43,6 +81,7 @@ model <- mgcv::gamm(formula = LOGCHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE,
 summary(model)
 
 # 绘制自变量与响应变量的关系图
+# 并不能运行，有时间的话可以再行探索
 plot(model, select = 2)
 
 # 绘制自变量与响应变量的偏差图
