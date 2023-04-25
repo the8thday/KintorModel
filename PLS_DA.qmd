@@ -194,10 +194,100 @@ summary(pls.fit)
 
 ### PLS-DA
 
-```{r}
-# 设置响应变量为 Species，并选择 3 个潜在变量
-plsda.fit <- pls::plsr(Species ~ ., data = trainData, ncomp = 3)
+> https://bioconductor.org/packages/devel/bioc/vignettes/ropls/inst/doc/ropls-vignette.html
 
+```{r}
+# The ropls R package implements the PCA, PLS(-DA) and OPLS(-DA) approaches with the original, NIPALS-based, versions of the algorithms
+library(ropls)
+
+library(mixOmics)
+```
+
+For PLS (and OPLS), the Y response(s) must be provided to the opls method. 
+Y can be either a numeric vector (respectively matrix) for single (respectively multiple) (O)PLS regression, or a character factor for (O)PLS-DA classification.
+```{r}
+data(sacurine)
+
+genderFc <- sacurine$sampleMetadata[, "gender"]
+
+# orthoI = 0 时执行 PLS-DA
+# when set to NA, OPLS is performed and the number of orthogonal components is automatically computed by using the cross-validation (with a maximum of 9 orthogonal components).
+# ?ropls::opls,其可以执行PCA、PLS, and OPLS 
+plsda.fit <- ropls::opls(x = sacurine$dataMatrix, y = genderFc)
+
+plsda.fit
+```
+
+
+```{r}
+#VIP 值帮助寻找重要的代谢物
+vipVn <- getVipVn(plsda.fit)
+vipVn_select <- vipVn[vipVn > 1]
+head(vipVn_select)
+```
+
+```{r}
+# 提取坐标值
+data <- as.data.frame(plsda.fit@scoreMN)
+data$group <- genderFc
+data$samples <- rownames(data)
+# 提取解释度
+x_lab <- plsda.fit@modelDF[1, "R2X"] * 100
+y_lab <- plsda.fit@modelDF[2, "R2X"] * 100
+# 绘图
+col <- c("#1597A5", "#FFC24B", "#FEB3AE")
+
+
+p2 <- ggplot(data, aes(
+  x = p1, y = p2,
+  color = group, shape = group
+)) + # 指定数据、X轴、Y轴，颜色
+  theme_bw() + # 主题设置
+  ggforce::geom_ellipse(aes(x0 = 0, y0 = 0, a = 10, b = 6, angle = 0), color = "grey", size = 0.5) +
+  ggforce::geom_ellipse(aes(x0 = 0, y0 = 0, a = 8, b = 4, angle = 0), color = "grey", size = 0.5) +
+  ggforce::geom_ellipse(aes(x0 = 0, y0 = 0, a = 6, b = 2, angle = 0), color = "grey", size = 0.5) +
+  coord_fixed() + # 图中椭圆的绘制代码，不需要可删除
+  geom_point(size = 1.8) + # 绘制点图并设定大小
+  theme(panel.grid = element_blank()) +
+  geom_vline(xintercept = 0, lty = "dashed", color = "red") +
+  geom_hline(yintercept = 0, lty = "dashed", color = "red") + # 图中虚线
+  geom_text(aes(label = samples, y = p2 + 0.4, x = p1 + 0.5, vjust = 0), size = 3.5) + # 添加数据点的标签
+  # guides(color=guide_legend(title=NULL))+#去除图例标题
+  labs(
+    x = paste0("P1 (", x_lab, "%)"),
+    y = paste0("P2 (", y_lab, "%)")
+  ) + # 将x、y轴标题改为贡献度
+  stat_ellipse(
+    data = data,
+    geom = "polygon", level = 0.95,
+    linetype = 2, linewidth = 0.5,
+    aes(fill = group),
+    alpha = 0.2,
+    show.legend = T
+  ) +
+  scale_color_manual(values = col) + # 点的颜色设置
+  scale_fill_manual(values = c("#1597A5", "#FFC24B", "#FEB3AE")) +
+  theme(
+    axis.title.x = element_text(size = 12), # 修改X轴标题文本
+    axis.title.y = element_text(size = 12, angle = 90), # 修改y轴标题文本
+    axis.text.y = element_text(size = 10), # 修改x轴刻度标签文本
+    axis.text.x = element_text(size = 10), # 修改y轴刻度标签文本
+    panel.grid = element_blank()
+  ) # 隐藏网格线
+
+p2
+```
+
+```{r}
+#检查关于训练子集的预测
+trainVi <- getSubsetVi(plsda.fit)
+table(sacurine$sampleMetadata[, 'gender'][trainVi], fitted(plsda.fit))
+ 
+#计算测试子集的性能
+table(sacurine$sampleMetadata[, 'gender'][-trainVi], predict(plsda.fit, sacurine$dataMatrix[-trainVi, ]))
+```
+
+```{r}
 # 对测试集进行预测
 plsda.pred <- predict(plsda.fit, newdata = testData)
 
@@ -207,26 +297,131 @@ cat("PLS-DA accuracy is", round(accuracy, 2))
 ```
 
 
-*vegan包的分析*
+*PCA for sacurine data*
 
 ```{r}
-# 进行 PLS-DA 分析
-plsda.fit <- vegan::rda(scale(iris[, 1:4]), iris$Species, method = "pls", nf = 3)
-
-# 预测测试集
-plsda.pred <- predict(plsda.fit, testData[, 1:4], display = "sites")
-
-# 计算预测准确度
-accuracy <- mean(plsda.pred$classes == testData$Species)
-cat("PLS-DA accuracy is", round(accuracy, 2))
-
+sacurine.pca <- opls(sacurine$dataMatrix)
 ```
 
 
 
+*mixOmics包的分析*
+
+```{r}
+##示例数据，详情 ?breast.tumors
+
+data(breast.tumors)
+
+X <- breast.tumors$gene.exp
+Y <- breast.tumors$sample$treatment
+
+```
+
+
+```{r}
+# 进行 PLS-DA 分析
+# 详情 ?plsda，这里列出前 5 个主要的轴
+# 如何像上面的操作一样得到准确的ncomp值，
+plsda_result <- mixOmics::plsda(X, Y, ncomp = 5, scale = TRUE)
+```
+
+```{r}
+predictions <- predict(plsda_result, X, dist = 'max.dist')
+prediction <- predictions$class$max.dist[,4]  #预测值
+get.BER(get.confusion_matrix(truth = Y, predicted = prediction))  #预测的错误率
+```
+
+
+```{r}
+#plotIndiv() 提供了较为灵活的二维、三维作图风格样式选择，包括 ggplot2、lattice、graphics 、3d 等，详情 ?plotIndiv
+plotIndiv(plsda_result, ind.names = TRUE, style = 'ggplot2')
+# plotIndiv(plsda_result, ind.names = TRUE, style = '3d')
+```
+
+```{r}
+plotIndiv(plsda_result , comp = c(1,2),
+          group = Y, style = 'ggplot2',ellipse = T, 
+          size.xlabel = 20, size.ylabel = 20, size.axis = 20, pch = 16, cex = 5)
+```
+
+```{r}
+df <- unclass(plsda_result)
+#提取坐标值
+df1 = as.data.frame(df$variates$X)
+df1$group = Y
+df1$samples = rownames(df1)
+#提取解释度
+explain = df$prop_expl_var$X
+x_lable <- round(explain[1],digits=3)
+y_lable <- round(explain[2],digits=3)
+#绘图
+col=c("#1597A5","#FFC24B","#FEB3AE")
+
+p1 <- ggplot(df1, aes(
+  x = comp1, y = comp2,
+  color = group, shape = group
+)) + # 指定数据、X轴、Y轴，颜色
+  theme_bw() + # 主题设置
+  geom_point(size = 1.8) + # 绘制点图并设定大小
+  theme(panel.grid = element_blank()) +
+  geom_vline(xintercept = 0, lty = "dashed") +
+  geom_hline(yintercept = 0, lty = "dashed") + # 图中虚线
+  geom_text(aes(label = samples, y = comp2 + 0.4, x = comp1 + 0.5, vjust = 0), size = 3.5) + # 添加数据点的标签
+  # guides(color=guide_legend(title=NULL))+#去除图例标题
+  labs(
+    x = paste0("P1 (", x_lable * 100, "%)"),
+    y = paste0("P2 (", y_lable * 100, "%)")
+  ) + # 将x、y轴标题改为贡献度
+  stat_ellipse(
+    data = df1,
+    geom = "polygon", level = 0.95,
+    linetype = 2, linewidth = 0.5,
+    aes(fill = group),
+    alpha = 0.2,
+    show.legend = T
+  ) +
+  scale_color_manual(values = col) + # 点的颜色设置
+  scale_fill_manual(values = c("#1597A5", "#FFC24B", "#FEB3AE")) +
+  theme(
+    axis.title.x = element_text(size = 12), # 修改X轴标题文本
+    axis.title.y = element_text(size = 12, angle = 90), # 修改y轴标题文本
+    axis.text.y = element_text(size = 10), # 修改x轴刻度标签文本
+    axis.text.x = element_text(size = 10), # 修改y轴刻度标签文本
+    panel.grid = element_blank()
+  ) # 隐藏网格线
+p1
+```
 
 
 
+```{r}
+
+sample_site <- data.frame(plsda_result$variates)[1:2]
+sample_site$names <- rownames(sample_site)
+names(sample_site)[1:2] <- c("plsda1", "plsda2")
+# sample_site <- merge(sample_site, mapfile, by.x = "names", by.y = "Description", all.x = TRUE)
+sample_site$group <- Y
+plsda_result_eig <- {
+  plsda_result$explained_variance$X
+}[1:2]
+
+p_plsda <- ggplot(sample_site, aes(plsda1, plsda2, color = group, label = names)) +
+  geom_point(size = 1.5, alpha = 0.6) +
+  stat_ellipse(show.legend = FALSE, linetype = 2) +
+  scale_color_manual(values = c("#1D7ACC", "#F67433", "#00815F", "#C673FF2E", "blue2")) +
+  scale_shape_manual(values = c(16, 17)) +
+  theme(
+    panel.grid = element_line(color = "grey50"),
+    panel.background = element_rect(color = "black", fill = "transparent")
+  ) +
+  theme(legend.title = element_blank(), legend.key = element_rect(fill = "transparent")) +
+  labs(
+    x = paste("PLS-DA axis1 ( explained variance ", round(100 * plsda_result_eig[1], 2), "% )", sep = ""),
+    y = paste("PLS-DA axis2 ( explained variance ", round(100 * plsda_result_eig[2], 2), "% )", sep = "")
+  )
+
+p_plsda
+```
 
 
 
