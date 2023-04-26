@@ -6,10 +6,15 @@ format: html
 ## nonlinear regression analysis
 
 > http://www.sthda.com/english/articles/40-regression-analysis/162-nonlinear-regression-essentials-in-r-polynomial-and-spline-regression-models/
+> https://statisticsbyjim.com/regression/difference-between-linear-nonlinear-regression-models/
 
-非线性模型是一系列模型的统称。在以前的笔记中所涉及到的GAM，splines，分段回归等都是非线性模型的范畴。
 
-GLMs可以理解成将非线性分布的outcome数据进行转换成线性而进行分析的，因变量和自变量间的线性关系。
+非线性模型是一系列模型的统称。在以前的笔记中所涉及到的GAM，splines，分段回归等都是非线性模型的范畴。似乎spline也应该和多项式回归一样属于线性回归的范畴。
+
+GLMs可以理解成将非线性分布的outcome数据进行转换成线性而进行分析的，因变量和自变量间的线性关系。罗辑回归经常被视为线性回归。The _linear_ in "generalized linear model" says the parameters enter the model linearly. Due to the parameter 𝜙1
+ the logistic growth model is not exactly equal to the logistic function used in logistic regression. 当然logistic的拟合其本身是非线性的，是在经过logit转换后a logit-linear model，其的公式才呈现为线性的模式。
+
+怎么更为合适的区分，线性和非线性呢？多项式回归应该属于线性回归，虽则其所拟合的曲线是弯曲的，*linear in the parameters*，可以作为区分的标准，或者说符合$y=a1*x1+a2x2+...$格式的都属于线性回归。其他的可以理解为非线性回归。
 
 
 下面整理一些常见的非线性模型的例子：
@@ -19,6 +24,7 @@ GLMs可以理解成将非线性分布的outcome数据进行转换成线性而进
 3. loess (package ‘stats’)
 4. quantile regression (packages 'quantreg')
 5. segmented regression (segmented in package 'segmented')
+6. power, Weibull growth, Fourier, loglogostic等。
 
 
 *非线性回归中的convergence fails问题：*
@@ -30,6 +36,23 @@ The model is too complex; a simpler model should be used
 The model is too simple; a more complex model should be used
 Starting values are too far from the solution
 
+
+Nonlinear regression models are generally assumed to be *parametric*, where the model is described as a nonlinear equation. Typically machine learning methods are used for non-parametric nonlinear regression.
+
+Popular algorithms for fitting a nonlinear regression include:
+- Gauss-Newton algorithm
+- Gradient descent algorithm
+- Levenberg-Marquardt algorithm
+
+
+It’s important to note that R-squared is invalid for nonlinear models and statistical software can’t calculate p-values for the terms.不过在Prism等软件中，在拟合dose-response curve时，会给出R2值。这是需要注意的地方，用这些R2做判断容易出现 问题，some like:
+R-squared is consistently high for both excellent and appalling models.
+R-squared will not rise for better models all of the time.
+If you use R-squared to pick the best model, it leads to the proper model only 28-43% of the time.
+
+
+*可用来评价非线形模型的指标：*
+There are other goodness-of-fit measures you can use for regression models that are not linear. For instance, you can use the standard error of the regression. For this statistic, smaller values represent better models.
 
 
 ```{r}
