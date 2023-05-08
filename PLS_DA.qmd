@@ -21,6 +21,7 @@ PLS-DA 的优点在于它能够同时考虑输入变量之间的相关性以及�
 - Use the method of least squares to fit a linear regression model using the PLS components as predictors.
 - Use k-fold cross-validation to find the optimal number of PLS components to keep in the model.
 
+Partial least squares (PLS) regression is useful when you have very few observations compared to the number of independent variables or when your independent variables are highly correlated. PLS decreases the independent variables down to a smaller number of uncorrelated components using Principal Component Analysis. Then, the procedure performs linear regression on these components rather than the original data. PLS emphasizes developing predictive models and is not used for screening variables. Unlike OLS, you can include multiple continuous dependent variables. PLS uses the correlation structure to identify smaller effects and model multivariate patterns in the dependent variables.
 
 *The principal component regression (PCR)* first applies Principal Component Analysis on the data set to summarize the original predictor variables into few new variables also known as principal components (PCs), which are a linear combination of the original data.
 These PCs are then used to build the linear regression model. The number of principal components, to incorporate in the model, is chosen by cross-validation (cv). Note that, PCR is suitable when the data set contains highly correlated predictors. 不过PCR方法所得到的PC不能好好的解释outcome。
