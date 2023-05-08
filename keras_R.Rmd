@@ -1,0 +1,19 @@
+---
+title: "keras in R"
+author: "liuc"
+date: '2022-06-06'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## keras
+
+
+
+
+
+
+
