@@ -1,0 +1,24 @@
+---
+title: "complete_wilcox"
+author: "liuc"
+date: '2022-06-01'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## one step wilcox test
+
+
+The permutation test is best for testing hypotheses(e.g. p-value) and bootstrapping is best for estimating confidence intervals.
+
+在尝试使用R包`infer`进行假设检验以及广义线性模型时, 碰到其经常用到bootstrap和permutation进行计算，现做一个记录。
+
+
+
+```{r}
+
+```
+
