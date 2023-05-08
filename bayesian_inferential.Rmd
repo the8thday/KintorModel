@@ -11,6 +11,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## bayesian inferential analysis
 
+> https://bayesf22.classes.andrewheiss.com/
+> https://easystats.github.io/bayestestR/
+> https://bayesf22-notebook.classes.andrewheiss.com/bayes-rules/02-chapter.html
+
+上述为两个学习资料。
+
 一个好用的R包是很重要的。stan项目在R中提供的多个包是很好用的。
 以工具使用的角度而言，统计学和统计工具作为工具，其自然不能离开具体的问题。此为生物信息分析或者数据分析的核心。此外对于较为抽象的分析对象，也不过是对象的改变而已。
 
@@ -87,6 +93,9 @@ print_md(posteriors, digits = 2)
 ggplot(posteriors_dist, aes(x = Petal.Length)) +
   geom_density(fill = "orange")
 ```
+*interpret the Result: *
+
+
 
 
 `bayesplot`提供了一系列的绘图函数，帮助visual MCMC diagnostics, and graphical posterior (or prior) predictive checking. 
@@ -97,7 +106,7 @@ bayesplot::mcmc_areas(posteriors_dist,
            prob = 0.8) + ggtitle("Posterior distributions",
                       "with medians and 80% intervals")
 ```
-
+*interpret the Result: *
 
 
 
