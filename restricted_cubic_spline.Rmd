@@ -11,30 +11,51 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## restricted cubic spline in R
 
-条形图是piece-wise polynomials named after the tools draftsmen used to use to draw curves.
+> https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+> https://stats.stackexchange.com/questions/328545/reporting-the-effect-of-a-predictor-in-a-logistic-regression-fitted-with-a-restr
 
-条形图是一种多项式回归。
+
+条形图是piece-wise polynomials named after the tools draftsmen used to use to draw curves. A spline function is, therefore, a set of smoothly joined piece-wise polynomials. “Smoothly joined” means that for polynomials of degree n, both the spline function and its first n-1 derivatives are continuous at the knots. 
+
+条形图是一种多项式回归。其将一条曲线，进行转换并分段进行拟合。
 
 非线性关系分析:
-
 在观察性研究中遇到定量或者等级资料的时候，一般会绘制 限制性立方样条图，并采用似然比检验分析非线性关系。
 该方法可以探讨暴露因素与结局的非线性关系。
 在医学研究中，我们经常构建回归模型来分析自变量和因变量之间的关系。事实上，大多数的回归模型有一个重要的假设就是自变量和因变量呈线性关联，这个条件实际很难满足。常见的解决方法是将连续变量分类，但类别数目和节点位置的选择往往带有主观性，并且分类往往会损失信息。因此，一个更好的解决方法是拟合自变量与因变量之间的非线性关系，限制性立方（Restricted cubic spline，RCS）就是分析非线性关系的最常见的方法之一。
 
 事实上，限制性立方样条的应用范围非常广，凡是想描述自变量和因变量的关系都可以在回归模型中加入限制性立方样条，除了以上的例子中的COX回归外，还可以应用到线性回归、Logistic回归、以及Meta分析中剂量反应关系的Meta回归等。
 
- In statistics, splines are a broad class of methods for transforming variables.
+ In statistics, splines are a broad class of methods for transforming variables.In spline terminology, letting a curve jump is called “unrestricted”.
  
- - Dummy variable
- - Unrestricted linear splines
- - Restricted linear splines
- - Restricted cubic splines
  
- Various proposals have been made, but Frank Harrell recommends using 4 knots if N < 100 and 5 for larger data sets and placing them at the 5th, 35th, 65th and 95th percentiles for k = 4 and the 5th, 27.5th, 50th, 72.5th and 95th for k = 5 (where k is the number of knots).
+ 对于非限制性条形图的理解，可以从以下的顺序去了解，Dummy variables -> Unrestricted linear splines -> Restricted linear splines -> Restricted cubic splines. 对于连续变量其和因变量间有非线性关系，可以将其变成分类变量来观察，但是relationship is flat within each segment and it jumps between segments，step2消除了线段的平坦性成为一条由角度的线段，但依旧jump， step3后没有jump了，但是线段还是直的，step4后，变成了曲线。
+ 
+Restricted cubic splines are just a transformation of an independent variable.
+Thus, they can be used not only in ordinary least squares regression, but also in logistic regression,
+survival analysis, and so on. 
+If k knots are used, fitting a polynomial of degree n requires k + n + 1 regression parameters (including
+the intercept). In practice, cubic splines are usually used (i.e., a polynomial of degree 3), requiring k + 3
+coefficients in addition to the intercept, compared to only 1 coefficient to fit a linear model. This is the
+smallest degree of polynomial that allows an inflection, providing sufficient flexibility for fitting data, while
+not requiring as many degrees of freedom as higher order splines. Cubic splines are smooth in
+appearance due to the fact that both the first and second derivatives (the slope and the rate of change in
+the slope) are continuous at the knots. Cubic splines tend to be poorly behaved at the two tails (before the first knot and after the last knot). To avoid this, restricted cubic splines are used. A restricted cubic spline is a cubic spline in which the splines are constrained to be linear in the two tails.
+ 
+ 
+ Various proposals have been made, but Frank Harrell recommends using 4 knots if N < 100 and 5 for larger data sets and placing them at the 5th, 35th, 65th and 95th percentiles for k = 4 and the 5th, 27.5th, 50th, 72.5th and 95th for k = 5 (where k is the number of knots).For some studies, theory may suggest the location of the knots. More commonly, the location of the knots are prespecified based on the quantiles of the continuous variable. This ensures that there are
+enough observations in each interval to estimate the cubic polynomial. 
+ 
+ 
+ 限制性立方条形图，are created by dividing the range of values of an independent variable into a number of intervals, and then fitting a cubic polynomial to each interval. The cubic polynomials are constrained to be linear at the ends of the range, which helps to prevent overfitting.
+ 
+ 
+限制性立方条形图和GAM模型有何异同呢？RCS是对一条曲线分段拟合立方条形图，
+
 
 下面在R语言中实现其应用:
 
-```{r}
+```{r, include=FALSE}
 library(splines)
 library(splines2)
 # library(gss)
@@ -45,6 +66,58 @@ library(rms)
 
 > https://towardsdatascience.com/restricted-cubic-splines-c0617b07b9a5
 > https://www.mediecogroup.com/zhuanlan/lessons/600/
+
+
+限制性立方条形图中，对于连续变量一般设置4个knots。
+`?rms::rcs`可以看到, `rms`提供一系列拟合回归的函数。
+
+
+### 连续Outcome问题
+
+
+```{r}
+data("Boston", package = "MASS")
+
+
+# step3的绘图
+# x,y 都是连续变量
+mlinspline <- lm(medv ~ lspline::lspline(lstat, quantile(lstat, c(0, .05, .275, .5, .775, .95, 1),
+                             include.lowest = TRUE)), data = Boston)
+
+plot(Boston$lstat, 
+     mlinspline$fitted.values, 
+     las = 1,
+     xlab = "x",
+     ylab = "y",
+     col = "red",
+     xlim = c(min(Boston$lstat),max(Boston$lstat)),
+     ylim = c(min(Boston$medv),max(Boston$medv)))
+points(Boston$lstat,
+       Boston$medv, 
+       pch  = 20, cex = .5)
+```
+
+
+```{r}
+d <- datadist(Boston)
+options(datadist = 'd')
+
+
+f <- rms::ols(formula = medv ~ rms::rcs(lstat, 4,
+                                        include.lowest = TRUE
+                                        ), data = Boston)
+
+
+plot(Boston$lstat,
+     f$fitted.values,
+     col = "red",
+     xlim = c(min(Boston$lstat),max(Boston$lstat)),
+     ylim = c(min(Boston$medv),max(Boston$medv)))
+points(Boston$lstat,Boston$medv)
+```
+
+
+### survival 问题
 
 
 ```{r}
@@ -60,19 +133,62 @@ dd$limits$age[2] <- 60 ###这里是设置参考点，也就是HR为1的点，常
 
 fit <- update(fit)
 summary(fit) # effect estimates, 其中low/high分别表示25th to the 75th percentile of each variable, CI为在其他变量不变的情况下计算的,summary(newmod, conf.type=c('simultaneous'))可以得到同时考量多个变量的
-# 对于下图的理解为从25%到75% age变量对y的贡献增长0.019，图中三种颜色分别表示99% 95% 90%的CI
+
+# 对于下图的理解为从25%到75% age变量对y的贡献增长1.0199，图中三种颜色分别表示99% 95% 90%的CI
+# 类似森林图
 plot(summary(fit))
 
-HR <- Predict(fit, age,fun=exp,ref.zero = TRUE) ####预测HR值
 
+```
+
+```{r}
+# a more complete report of coefficients, measures of goodness-of-fit, etc.
+fit
+```
+*解读：* The "4" in rcs(age, 4) specifies the number of knots that are used in fitting the continuous predictor.
+
+
+```{r}
+summary(fit, conf.type=c('simultaneous'))
+
+# with a spline the log-odds difference and odds ratio for a given change in the predictor will depend on the predictor values.
+# With the rms package you can get a summary for different values of the predictor. 
+summary(fit, age=c(60,60+13))
+```
+*interpret the result: *`low/high`分别表示25th to the 75th percentile of each variable. `quantile(df$age,c(0.25,0.75))`求的即是Low和High的值。Those values of "Low" and "High" are based solely on the data and have nothing to do with the model itself. 
+`Effect`表示
+
+
+
+```{r}
+plot(Predict(fit))
+```
+
+
+```{r}
 # 查看是否存在非线性关系, p值小于0.05为存在非线性关联
 (an <- anova(fit))
+```
+This particular data set shows no significant evidence of an association between `age` and ``. 
+
+
+
+```{r}
+HR <- Predict(fit, age,fun=exp,ref.zero = TRUE) ####预测HR值
 
 # plot
 ggplot(HR)
 # ggplot(fit) # 每个变量的单独效应
+
+
 plot(HR, anova=an, pval = TRUE)
 
+
+```
+ANOVA的结果和对应绘图的结果显示，age并不存在非线性关系。
+
+
+```{r}
 
 # 哪一行的观测对这个变量是有影响的
 which.influence(fit)
@@ -80,6 +196,8 @@ which.influence(fit)
 # for a logistic or Cox model
 Hmisc::rcspline.plot()
 ```
+
+
 
 interpretation: `g statistic` it’s based on Gini’s mean difference and is purported to be a robust and highly efficient measure of variation.
 对于anova的结果其describe the marginal impact of removing each covariate from `fit`.
@@ -89,6 +207,11 @@ interpretation: `g statistic` it’s based on Gini’s mean difference and is pu
 In figure 1, we used restricted cubic splines to flexibly model and visualize the relation of predicted fat mass and lean body mass with all cause mortality in men. The risk of all cause mortality was relatively flat until around 21 kg of predicted fat mass and then started to increase rapidly afterwards (P for non-linearity <0.001). The average BMI for men with 21 kg of predicted fat mass was 25. Above 21 kg, the hazard ratio per standard deviation higher predicted fat mass was 1.22 (1.18 to 1.26). Regarding the strong U shaped relation between predicted lean body mass and all cause mortality, the plot showed a substantial reduction of the risk within the lower range of predicted lean body mass, which reached the lowest risk around 56 kg and then increased thereafter (P for non-linearity <0.001). Below 56 kg, the hazard ratio per standard deviation higher predicted lean body mass was 0.87 (0.82 to 0.92). 
 
 > Predicted lean body mass, fat mass, and all cause and cause specific mortality in men: prospective US cohort study
+
+
+### logisitic 问题
+
+顺便加上`plotRCS`包的应用。
 
 
 ```{r}
@@ -101,12 +224,43 @@ library(plotRCS)
 # View data
 head(cancer)
 
+```
+
+```{r}
 # RCS curves for a logistic regression model
 rcsplot(data = cancer,
         outcome = "status",
         exposure = "age",
         covariates = c("sex", "race", "size", "metastasis"),
         xlab = "Age", ylab = "OR (95%CI)")
+```
+
+```{r}
+# 一个利用rms包的对比
+
+ddd <- datadist(cancer)
+options(datadist = 'ddd')
+
+
+fit2 <- rms::lrm(formula = status ~ rcs(age, 4) + sex + race + size + metastasis, 
+            data = cancer)
+
+# predict.lrm
+summary(fit2)
+```
+
+```{r}
+(an2 <- anova(fit2))
+```
+```{r}
+plot(nomogram(fit2))
+```
+
+```{r}
+Hmisc::rcspline.plot(x = cancer$age,
+                     y = cancer$status,
+                     model = 'logistic'
+                     )
 ```
 
 
@@ -117,7 +271,8 @@ rcsplot(data = cancer,
         outcome = "status",
         time = "time",
         exposure = "age",
-        covariates = c("sex", "race", "size", "metastasis"))
+        covariates = c("sex", "race", "size", "metastasis")
+        )
 ```
 
 
