@@ -50,12 +50,13 @@ enough observations in each interval to estimate the cubic polynomial.
  限制性立方条形图，are created by dividing the range of values of an independent variable into a number of intervals, and then fitting a cubic polynomial to each interval. The cubic polynomials are constrained to be linear at the ends of the range, which helps to prevent overfitting.
  
  
-限制性立方条形图和GAM模型有何异同呢？RCS是对一条曲线分段拟合立方条形图，
+限制性立方条形图和GAM模型有何异同呢？RCS是对一条曲线分段拟合立方条形图，并保持线段间的smooth；GAM对自变量进行smooth函数转变。
 
 
 下面在R语言中实现其应用:
 
 ```{r, include=FALSE}
+library(tidyverse)
 library(splines)
 library(splines2)
 # library(gss)
@@ -74,12 +75,26 @@ library(rms)
 
 ### 连续Outcome问题
 
+首先是一个自变量为连续变量的问题。
+只考虑`medv` 和 `lstat` 的关系。
+
 
 ```{r}
 data("Boston", package = "MASS")
+```
 
 
-# step3的绘图
+```{r}
+ggplot(data = Boston, aes(x = lstat, y=medv)) +
+  geom_point() +
+  geom_smooth() +
+  theme_classic()
+```
+
+
+```{r}
+
+# step3的绘图，即是绘制分段的直线
 # x,y 都是连续变量
 mlinspline <- lm(medv ~ lspline::lspline(lstat, quantile(lstat, c(0, .05, .275, .5, .775, .95, 1),
                              include.lowest = TRUE)), data = Boston)
@@ -94,7 +109,7 @@ plot(Boston$lstat,
      ylim = c(min(Boston$medv),max(Boston$medv)))
 points(Boston$lstat,
        Boston$medv, 
-       pch  = 20, cex = .5)
+       pch  = 10, cex = .5)
 ```
 
 
@@ -105,7 +120,8 @@ options(datadist = 'd')
 
 f <- rms::ols(formula = medv ~ rms::rcs(lstat, 4,
                                         include.lowest = TRUE
-                                        ), data = Boston)
+                                        ), 
+              data = Boston)
 
 
 plot(Boston$lstat,
@@ -117,7 +133,17 @@ points(Boston$lstat,Boston$medv)
 ```
 
 
+一个由GAM拟合的模型。bs选择cubic，结果和上图相比还是差别挺大的。
+```{r}
+m_gam <- mgcv::gam(medv ~ s(lstat, bs = "cr"), data = Boston)
+
+gratia::draw(m_gam, residuals = TRUE)
+```
+
+
 ### survival 问题
+
+生存数据一般其Y轴为HR，在结果解释时通过X轴的数据变化，得到HR随之而来的变化。
 
 
 ```{r}
@@ -210,6 +236,9 @@ In figure 1, we used restricted cubic splines to flexibly model and visualize th
 
 
 ### logisitic 问题
+
+
+结局为二分类问题的示例。
 
 顺便加上`plotRCS`包的应用。
 
