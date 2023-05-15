@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 条形图是piece-wise polynomials named after the tools draftsmen used to use to draw curves. A spline function is, therefore, a set of smoothly joined piece-wise polynomials. “Smoothly joined” means that for polynomials of degree n, both the spline function and its first n-1 derivatives are continuous at the knots. 
 
-条形图是一种多项式回归。其将一条曲线，进行转换并分段进行拟合。
+条形图是一种分段多项式回归, 一般要求每个分段点上连续并且二阶可导，这样可以保证曲线的平滑性。其将一条曲线，进行转换并分段进行拟合。
 
 非线性关系分析:
 在观察性研究中遇到定量或者等级资料的时候，一般会绘制 限制性立方样条图，并采用似然比检验分析非线性关系。
@@ -130,6 +130,10 @@ plot(Boston$lstat,
      xlim = c(min(Boston$lstat),max(Boston$lstat)),
      ylim = c(min(Boston$medv),max(Boston$medv)))
 points(Boston$lstat,Boston$medv)
+```
+
+```{r}
+anova(f)
 ```
 
 
