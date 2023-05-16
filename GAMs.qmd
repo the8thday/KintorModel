@@ -11,6 +11,7 @@ format: html
 > https://noamross.github.io/gams-in-r-course/chapter1
 > https://www.seascapemodels.org/rstats/2021/03/27/common-GAM-problems.html#
 > https://support.sas.com/rnd/app/stat/topics/gam/gam.htm
+> https://multithreaded.stitchfix.com/blog/2015/07/30/gam/
 
 <\br>
 
@@ -25,12 +26,18 @@ GAMs对其的predictors应用一些smooth function(like splines):
 
 $g(ui)=A_{i} + f_{1}(x_{1}) + f_{2}(x_{2i}) + ...$
 
+$g(E(Y))=alpha+s_{1}(x_{1})+s_{2}(x_{2})+...$
+
+where Y is the dependent variable (i.e., what we are trying to predict), E(Y) denotes the expected value, and g(Y) denotes the link function that links the expected value to the predictor variables x1,…,xp. The terms s1(x1),…,sp(xp)
+denote smooth, nonparametric functions. 
+
 
 `mgcv`的`s()`, `lo()` 等smoother:
 <!-- ?smooth.terms -->
 - `s()` 平滑器指定为样条平滑
 - `lo()` 指定为LOESS平滑
 - `te()` tensor product smooth
+- `ti()`
 
 
 在广义线性模型的计算中，g() 和 link()都是对于response变量而言的。link function maps a nonlinear relationship to a linear one so that a linear model can be fit (and then mapped to the original form).
@@ -38,21 +45,23 @@ $g(ui)=A_{i} + f_{1}(x_{1}) + f_{2}(x_{2i}) + ...$
 而在广义加性模型中，增加了对自变量进行转换。
 
 
-总之，GAM是一种
+总之，GAM是一种非参数的，即是没有可表述性的函数或是分布的，拟合变量间关系的函数。一般的将其用于数据探索和模型预测是较为方便的方法。GAM在拟合时需注意过拟合问题，达到偏差和方差均衡。When a regression model is additive, the interpretation of the marginal impact of a single variable (the partial derivative) does not depend on the values of the other variables in the model. 
+
 
 `assumption: `
 1. Y的分布属于指数家族
 2. 
 
 
-Attention:
-Categorical variables should be input to gam() as factors,
-Adjust the degrees of freedom parameter to avoid an error involving the maximum degrees of freedom,
-Use the REML method for smaller datasets to avoid overfitting,
-How to deal with crazy extrapolations of a response when there are large gaps in measurements of a covariate
+*Attention: *
+- Categorical variables should be input to `mgcv::gam()` as factors,It is always safest to declare categorical variables as factors if using mgcv.
+- Adjust the degrees of freedom parameter to avoid an error involving the maximum degrees of freedom,
+- Use the REML method for smaller datasets to avoid overfitting,
+- How to deal with crazy extrapolations of a response when there are large gaps in measurements of a covariate
 
 
 ```{r, include=FALSE}
+# gam and mgcv do not work well when loaded at the same time. Restart the R session if you want to switch between the two packages
 library(tidyverse)
 library(easystats) # every model need it !
 library(mgcv) # 首选R包
@@ -64,6 +73,12 @@ library(ggeffects)
 library(marginaleffects)
 ```
 
+`mgcv` Does not support loess or smoothing splines, but supports a wide array of regression splines (P-splines, B-splines, thin plate splines, tensors) + tensors. PIRLS Optimization.
+
+P-splines are a B-spline basis with a difference penalty applied directly to the model coefficients. In typical use the P-spline penalty penalizes the squared differences between adjacent model coefficients, which in turn penalises wiggliness. P-splines are very easy to set-up and result in a sparse penalty matrix which makes them very amenable to estimation of spline terms in MCMC based Bayesian models (Wood, 2017).
+
+
+`gam::gam` Smoothing splines and loess.Local scoring Optimization.
 
 
 ### 用mgcv model一个线性关系
@@ -186,6 +201,8 @@ cm2 <- lm(Overall ~ poly(Income, degree = 3, raw = TRUE), data = dd |> na.omit()
 
 summary(cm)
 ```
+
+
 ```{r}
 plot(effects::Effect("Income",cm))
 ```
@@ -237,36 +254,75 @@ dlookr::eda_report(categ)
 ```
 
 
+通过散点图初步查看变量间的关系：
+```{r}
+ggplot(dd, aes(y = Overall, x=Income)) +
+  geom_point() +
+  geom_smooth() +
+  geom_smooth(method = lm, se = FALSE, color = 'red4') +
+  theme_bw()
+```
+
 拟合模型，几个重要的参数：
+拟合优度和光滑度之间的结合点通常用光滑参数(Smoothing Parameter)来表示，通过设定光滑参数的大小可以调整曲线的光滑度。
+光滑参数越小，数据拟合效果越好，但线条波动非常大，光滑度不好；光滑参数越大，线条越光滑，但拟合效果欠佳，最光滑的曲线就是直线。the smoothing parameter allows us to explicitly balance the bias/variance tradeoff; smoother curves have more bias (in-sample error), but also less variance.
+
 ```{r}
 # sp(smoothing parameter) 即可以放在s()中，也可以放在gam()中
 # k 参数, number of basis functions
 # In practice, we rarely make continuous variables linear in GAMs. This is because, if the relationship is really linear, or there is not enough data to show otherwise, automatic smoothing will force a linear shape.
+# s()函数默认的bs为Thin plate regression splines
 
-mod_gam <- gam(Overall ~ s(Income) + s(Edu) + s(Health), data = dd,
-               family=gaussian(),
-                method = "REML")
+mod_gam <- mgcv::gam(Overall ~ s(Income) + s(Edu) + s(Health),
+  data = dd,
+  family = gaussian(),
+  method = "REML"
+)
 
 # mod_gam <- gam()
 
 summary(mod_gam)
+
+cat('\n返回模型的SP:\n')
 mod_gam$sp
 
 # extracts the coefficients of these basis functions the GAM model object.
 # The coef() function extracts all the model coefficients, which are coefficients for each basis function that makes up the smooth.
-# coef(mod_gam2)
+# coef(mod_gam)
 
-mod_gam2B <- update(mod_gam, . ~ . - s(Health) + Health)
 ```
 *interpret results: *The "Family" component tells us the model assumes a Gaussian or normal distribution of our errors, and the "Link" of "identity" shows that the model doesn't transform the predictions.
 Parametric means models that have a pre-determined form. In this context, it refers to the linear terms in the model.
-For smooths coefficients are not printed. This is because each smooth has several coefficients - one for each basis function. Instead, the first column reads edf, which stands for effective degrees of freedom. This value represents the complexity of the smooth. An edf of 1 is equivalent to a straight line. An edf of 2 is equivalent to a quadratic curve, and so on, with higher edfs describing more wiggly curves.
+For smooths coefficients are not printed. This is because each smooth has several coefficients - one for each basis function. Instead, the first column reads `edf`, which stands for effective degrees of freedom. This value represents the complexity of the smooth. An edf of 1 is equivalent to a straight line. An edf of 2 is equivalent to a quadratic curve, and so on, with higher edfs describing more wiggly curves.
 
-A good way to interpret significance for smooth terms in GAMs is this: a significant smooth term is one where you can not draw a horizontal line through the 95% confidence interval. 对于edf值接近1的，
+A good way to interpret significance for smooth terms in GAMs is this: a significant smooth term is one where you can not draw a horizontal line through the 95% confidence interval. 这里的解释在于，对于p-value小于0.05的比如s(Income)，你不能对其的IC绘制一条水平直线，但是对s(Health) 是可以的，见下面的图。但是对对于edf值接近1的，其也分为pvalue小于0.05和大于0.05的，对于P大于0.05的可以理解为，此变量既不表现为非线形的关系，也没有统计意义。s(Edu)即有意义又是线形的。
 
 
+```{r}
+mod_gam2A <- update(mod_gam, . ~ . - s(Health) + Health)
+mod_gam2B <- update(mod_gam, . ~ . - s(Health))
 
-__模型诊断：__如果gam.check结果偏离较高，可以通过调整basis function数目等进行调整。p-value小于0.05一般认为需要在 增加k的数目。
+summary(mod_gam2A)
+summary(mod_gam2B)
+
+# The plots generated by mgcv's plot() function are partial effect plots.
+plot(mod_gam2B, page = 1)
+
+plot(mod_gam2A, page = 1)
+```
+
+*结果解读：*对于2A和2B这两个模型具有较大的出入。当不把连续变量Health纳入到s()函数中时，其的意义为fixed effect, 这里有一个问题，对于edf为1也即是线性的变量，有没有必要单独拿出来而不放入s()函数中呢，如模型mod_gam2A。
+模型2A可以理解为，除了s()函数外还纳入了一个已知的线形变量。但是2A这种格式在实际中很少用到，一般的，凡是连续变量都会纳入到s()中去的。This is because, if the relationship is really linear, or there is not enough data to show otherwise, automatic smoothing will force a linear shape.
+
+
+```{r, eval=FALSE}
+# loess smoothers with the gam package (restart R before loading gam)
+library(gam)
+b4 <- gam::gam(y ~ lo(Income, span=0.6) + lo(Edu, span=0.6) + x3, data = dd)
+summary(b4)
+```
+
+
 
 模型调整：
 
@@ -274,25 +330,90 @@ __模型诊断：__如果gam.check结果偏离较高，可以通过调整basis f
 # partial effect plots
 # they show the component effect of each of the smooth or linear terms in the model, which add up to the overall prediction.
 # by default we only see the smooth plots, but by setting all.terms = TRUE, we can display partial effects of linear or categorical terms, as well.
-# 第一幅图的结果显示，edf接近1其几乎是线性关系。
-plot(mod_gam, page = 1, all.terms = TRUE, residuals = TRUE, shade = TRUE,
-     shade.col = "lightblue"
+# 第一幅图的结果显示，Edu自变量edf接近1其几乎是线性关系。
+plot(mod_gam, page = 1, all.terms = TRUE, 
+     residuals = TRUE, shade = TRUE,
+     shade.col = "lightblue",
+     rug = TRUE
      )
 
-# p-value 小于0.05indicate that residuals are not randomly distributed. This often means there are not enough basis functions.
+
+plot(mod_gam2A, page = 1, all.terms = TRUE, residuals = TRUE, shade = TRUE,
+     shade.col = "lightblue"
+     )
+```
+*结果解读：*展示每个自变量和因变量间的关系，Income和自变量间是曲线关系；Edu是直线关系，且P小于0.05，可保留；Health自变量其也呈现线性关系，但其P值大于0.05，
+
+
+```{r}
+# visreg can also plot the figure
+
+visreg::visreg(mod_gam)
+```
+
+
+
+```{r}
+# plot the smooth predictor function for x1 with ggplot to get a nicer looking graph
+# 好要考虑样本的缺失值问题
+p <- predict(mod_gam, type="lpmatrix")
+beta <- coef(mod_gam)[grepl("Income", names(coef(mod_gam)))]
+s <- p[,grepl("Income", colnames(p))] %*% beta
+
+ggplot(data=cbind.data.frame(s, dd$Income), aes(x=dd$Income, y=s)) + geom_line()
+```
+
+
+
+__模型诊断：__如果gam.check结果偏离较高，可以通过调整basis function数目等进行调整。p-value小于0.05一般认为需要在 增加k的数目。
+
+```{r}
+# p-value 小于0.05 indicate that residuals are not randomly distributed. This often means there are not enough basis functions.
 # 后四幅图都是对残差的绘图,第三幅最好在0附近
 set.seed(42)
 gam.check(mod_gam, k.rep = 1000)
-
-
-# 弯曲度
-# 三个值各有其用处，比如worst大于0.8可就要小心了
-concurvity(mod_gam)
-# pairwise
-concurvity(mod_gam, full = FALSE)
 ```
 *interpret the Results: *图一为,
 其中check的表格输出内容为，检验k值是否是合适的值，p-value小于0.05的话为k值设置的太小了。在s()函数中，可以为每一个变量指定一个k值。
+
+
+除了共线性外，GAM还需考虑弯曲度，that is, one may be a smooth curve of another. 
+```{r}
+# 弯曲度
+# 三个值各有其用处，比如worst大于0.8可就要小心了
+# The first mode, full = TRUE, reports overall concurvity for each smooth. Specifically, it shows how much each smooth is predetermined by all the other smooths.
+concurvity(mod_gam) # overall concurvity
+
+# pairwise
+# If any of these values from the full = TRUE mode is high, we will want to also use the second mode, setting full = FALSE. With full = FALSE, the function returns matrices of pairwise concurvities. 
+concurvity(mod_gam, full = FALSE)
+```
+*interpret the Results: *worst的数值大于0.8，这是需要注意的地方。full=F的结果中，worst结果中可以看到s(Edu)和其他两个的都有很高的相关性。This can be used to pinpoint which variables have a close relationship. 
+
+
+```{r}
+# par(mfrow = c(1, 2))
+# acf和pacf指的是，
+acf(resid(mod_gam), lag.max = 36, main = "ACF")
+pacf(resid(mod_gam), lag.max = 36, main = "pACF")
+```
+
+
+
+#### Another model
+
+
+```{r}
+mod_hwy <- gam(hw.mpg ~ s(weight) + s(rpm) + 
+               s(price) + s(comp.ratio) +
+               s(width) + fuel + cylinders,
+               data = mpg, method = "REML")
+
+summary(mod_hwy)
+```
+*结果结果：*The first part of the summary describes the model we fit. The "Family" component tells us the model assumes a Gaussian or normal distribution of our errors, and the "Link" of "identity" shows that the model doesn't transform the predictions.
+The next section describes the parametric terms of our model. Parametric means models that have a pre-determined form. In this context, it refers to the linear terms in the model.
+The next section covers smooth terms. For smooths coefficients are not printed. This is because each smooth has several coefficients - one for each basis function. Instead, the first column reads edf, which stands for effective degrees of freedom. The Ref.df and F columns are test statistics used in an ANOVA test to test overall significance of the smooth. 
 
 
 
@@ -301,10 +422,16 @@ concurvity(mod_gam, full = FALSE)
 `smooth_estimates`等函数可以帮助提取绘图数据，其是提取图一的结果。文档中的示例展示了如何绘制个性化的基于ggplot2的图。
 
 ```{r}
+# 绘制模型的关系图
 gratia::draw(mod_gam, residuals = TRUE)
 
+```
+
+```{r}
+# 模型检验
 gratia::appraise(mod_gam) # Model diagnostics
 ```
+
 
 如上所述，通过求导得到自变量的系数。
 `Income`变量为一个edf为6.7的变量，其不像线性模型具有一个slope。
@@ -370,6 +497,8 @@ Logistic and Logit Functions in R:
 GAM所返回的结果是log-odds的结果，需要通过plogis()转换成probability.
 
 ```{r}
+# 首先是一些函数概念的理清
+
 plogis() # Logistic
 qlogis() # Logit
 
@@ -379,14 +508,20 @@ qlogis(0.25) == log(1/3) # ....
 ```
 
 
+There are two ways of estimating the smoothing parameter for a logistic GAM:
+- Generalized cross validation criteria (GCV).
+- Mixed model approach via restricted maximum likelihood (REML).
+
 ```{r}
 csale <- readRDS('./datasets/csale.rds')
 
-log_mod <- gam(purchase ~ s(n_acts) + s(bal_crdt_ratio) + s(mortgage_age) + 
+log_mod <- mgcv::gam(purchase ~ s(n_acts) + s(bal_crdt_ratio) + s(mortgage_age) + 
                  s(avg_fin_balance) + s(retail_crdt_ratio) + s(cred_limit) + s(avg_prem_balance),
                 data = csale,
                 family = binomial,
                 method = "REML")
+
+summary(log_mod)
 ```
 
 The output of a logistic GAM looks similar to that of previous GAMs we fit.However, it's important to understand that outputs are on the log-odds scale. To interpret them as probabilities, we need to convert them using the logistic function.We can use the plogis() logistic function to convert it to a probability. 转换后的interept值表示在其他变量取均值时， 二分类结局具体发生的概率。
@@ -399,8 +534,9 @@ plot(log_mod, pages = 1, trans = plogis)
 
 # Adding an intercept
 plot(log_mod, pages = 1, trans = plogis,
-     shift = coef(binom_mod)[1])
+     shift = coef(log_mod)[1])
 
+# more beautiful
 plot(log_mod, pages = 1, trans = plogis, shift = coef(log_mod)[1],
      seWithMean = TRUE, rug = FALSE, shade = TRUE, shade.col = "lightgreen", 
      col = "purple")
