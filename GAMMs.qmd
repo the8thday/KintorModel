@@ -18,7 +18,7 @@ GAMMs的建模过程通常涉及到选择适当的平滑函数和平滑参数，
 
 
 
-### A Demo
+### A Demo by mgcv
 
 
 ```{r, include=FALSE}
@@ -34,28 +34,46 @@ library(marginaleffects)
 
 ```{r}
 # 所使用数据为一批次测试数据
+# 在不同的年份采集的数据，年份为随机因素
 dat <- lasrosas.corn  
 dat$year = as.factor(paste(dat$year)) 
 
-# 一个简单的随机截距模型
-gam.ME <- mgcv::gamm(yield ~ nitro + nf + topo + s(bv), data = dat, random = list(year = ~1))
+
 ```
+
+
+```{r}
+# 一个简单的随机截距模型
+gam.ME <- mgcv::gamm(yield ~ nitro + nf + topo + s(bv), 
+                     data = dat, 
+                     random = list(year = ~1))
+```
+
 
 ```{r}
 # 返回一个list
 summary(gam.ME)
 
+gam.ME
 ```
+
 
 ```{r}
 summary(gam.ME[[1]])
 
-summary(gam.ME[[2]])  
 ```
 
 
 ```{r}
+summary(gam.ME[[2]])
+```
 
+
+
+```{r}
+# 可以对返回对象里的任一对象进行对应的操作
+# 如下可以查看GAM的曲线图
+# 可是此刻应该作何解释呢？
 plot(gam.ME$gam)
 ```
 
@@ -67,12 +85,16 @@ dat$fit2.gam.mod <- predict(gam.ME$gam, type = "response")
 plot(dat$fit.gam.mod, dat$resid.gam.mod)
 ```
 
+
+### by gamm4
+
+同样是Simon Wood的作品，不过有短时间没有更新了。
+
 ```{r}
 # do not run
-model <- mgcv::gamm(formula = LOGCHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE,
-                random = ~1 | SUBJID,
-                method = "REML"
-                )
+model <- gamm4::gamm4(formula = yield ~ nitro + nf + topo + s(bv),
+                      random = ~|year,
+                      )
 ```
 
 
@@ -81,7 +103,6 @@ model <- mgcv::gamm(formula = LOGCHG ~ VISIT + AGEGR1 + SEX + ACTARM + LOGBASE,
 summary(model)
 
 # 绘制自变量与响应变量的关系图
-# 并不能运行，有时间的话可以再行探索
 plot(model, select = 2)
 
 # 绘制自变量与响应变量的偏差图
