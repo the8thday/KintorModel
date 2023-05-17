@@ -1,0 +1,133 @@
+---
+title: "log-linear model"
+format: html
+---
+
+## log-linear model
+
+> https://mengte.online/archives/9829
+> https://cran.r-project.org/web/packages/vcdExtra/vignettes/loglinear.html
+> http://dwoll.de/rexrepos/index.html
+
+
+
+对数线性模型(Log-linear model)是专门用于探索多个分类变量之间相关关系的分析方法，本文概要介绍对数线性模型的相关理论。
+
+
+对于分类变量，常用卡方检验进行数据分析，但卡方检验更多的应用于二维列联表的情形，若列联表维度更高，如要同时研究多个分类变量间的关系，卡方检验显然不够，因为它不可能为多个分类变量间的关系给出一个系统而综合的评价，也不可能在控制其他因素作用的同时，对变量的效应作出估计。此时，除了用logistic回归模型分析之外，也可以考虑采用对数线性模型这一多元统计分析方法来研究多个分类变量之间的关系。
+
+对数线性模型将列联表资料中各个格子理论频数的自然对数表示为各个分类变量的主效应，以及各个分类变量之间交互效应的线性模型。通过迭代计算估计模型中的参数，应用方差分析的思想，检验各分类变量的主效应和交互效应的大小。此时，不区分因变量和自变量，强调的是模型的拟合优度检验和分类变量间交互效应的检验。
+
+
+对数线性模型的构建一般以饱和模型开始，饱和模型包含了所有变量的主效应，低阶交互效应和高阶交互效应。
+对数线性模型为层次模型，如果模型中包含了某几个变量的高阶交互效应项时，这几个变量的低阶交互效应项与主效应项也一定包含在模型中。但由于饱和模型的理论频数完全拟合了实际频数，因此在实际应用过程中的意义不大，所以需要找到最简约的模型，对变量之间的关系进行解释。拟合优度检验过程中通过后退法(即最先对饱和模型中的最高阶交互效应项进行假设检验，然后依次向次高阶和低阶交互效应进行假设检验)逐渐排除没有统计学意义的项，最后得到最优简化模型。
+
+确定最优简化模型后，通常用最大似然估计法对拟合的简化模型参数进行估计。最大似然估计利用多项分布的原理构造自然函数，再求对数似然函数。由对数线性模型的结构可以发现，该模型不仅可以解决两个因素是否相关的问题。还可以用来分析各因素主效应是否起作用。
+
+对数线性模型的构建需要满足以下条件：
+
+观测值之间是独立和随机的，所有的变量均为分类变量。
+有充足的样本量，在对数线性模型中需要有>5倍于格子数的样本量，如3×3×2的列联表样本量至少为90。
+基于一定理论频数的重复样本其实际频数的分布满足正态性，所有格子的理论频数应当>1，并不能有20%以上的格子的理论频数<5，否则会降低假设检验的效能。SPSS软件中有时通过给每一个格子加一个固定的值(常见为0.05)以解决理论频数较小的问题。但这种做法可能会使得检验效能下降。
+
+
+```{r, include=FALSE}
+library(easystats)
+library(MASS)
+library(vcdExtra)
+
+# the gnm package allows a much wider class of models for frequency data to be fit than can be handled by loglm(). 
+library(gnm)
+```
+
+
+You can use the loglm() function in the MASS package to fit log-linear models. Equivalent models can also be fit (from a different perspective) as generalized linear models with the glm() function using the family='poisson' argument, and the gnm package provides a wider range of generalized nonlinear models, particularly for testing structured associations.
+
+
+```{r}
+# UCBAdmissions is a built-in (2×2×6) contingency table.
+
+str(UCBAdmissions)
+```
+
+
+Test model of complete independence (= full additivity) based on data in a contingency table.
+```{r}
+(llFit <- loglm(~ Admit + Dept + Gender, data=UCBAdmissions))
+```
+
+```{r, eval=FALSE}
+# Test the same model based on data in a data frame with variable Freq as the observed category frequencies.
+
+UCBAdf <- as.data.frame(UCBAdmissions)
+loglm(Freq ~ Admit + Dept + Gender, data=UCBAdf)
+```
+
+
+```{r}
+mosaicplot(~ Admit + Dept + Gender, shade=TRUE, data=UCBAdmissions)
+```
+
+```{r}
+# # glm() fitted values are the same as loglm() ones
+
+glmFitT <- glm(Freq ~ Admit + Dept + Gender, family=poisson(link="log"), data=UCBAdf)
+coef(summary(glmFitT))
+```
+*interpret: *With glm(), the default coding scheme for categorical variables is treatment coding where the first group in a factor is the reference level, and the respective parameter of each remaining group is its difference to this reference. The (Intercept) estimate is for the cell with all groups = reference level for their factor. glm() does not list those parameter estimates that are fully determined (aliased) through the sum-to-zero constraint for the parameters for one factor.
+
+With loglm(), the parameters are for deviation coding, meaning that each group gets its own parameter, and the parameters for one factor sum to zero. (Intercept) is the grand mean that gets added to all group effects.
+
+```{r}
+# glm() can directly use effect coding to get the same paramter estimates as loglm(), but also standard errors.
+
+glmFitE <- glm(Freq ~ Admit + Dept + Gender, family=poisson(link="log"),
+               contrasts=list(Admit=contr.sum,
+                               Dept=contr.sum,
+                             Gender=contr.sum), data=UCBAdf)
+coef(summary(glmFitE))
+```
+
+
+
+
+```{r}
+## Independence model of hair and eye color and sex.  
+hec.1 <- MASS::loglm(~Hair+Eye+Sex, data=HairEyeColor)
+hec.1
+```
+```{r}
+## Conditional independence
+hec.2 <- MASS::loglm(~(Hair + Eye) * Sex, data=HairEyeColor)
+hec.2
+```
+
+
+```{r}
+## Joint independence model.  
+hec.3 <- loglm(~Hair*Eye + Sex, data=HairEyeColor)
+hec.3
+```
+
+Note that printing the model gives a brief summary of the goodness of fit. A set of models can be compared using the anova() function.
+```{r}
+anova(hec.1, hec.2, hec.3)
+```
+
+
+
+```{r}
+indep <- glm(Freq ~ mental + ses, family = poisson, data = Mental)  # independence model
+```
+
+
+
+```{r}
+vcdExtra::CMHtest(xtabs(Freq~ses+mental, data=Mental))
+```
+
+
+
+
+
+
