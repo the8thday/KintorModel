@@ -6,13 +6,26 @@ date: 2023-05-18
 
 ## 重新整理logistic回归的笔记
 
+> https://cscu.cornell.edu/wp-content/uploads/91_ordlogistic.pdf
+> https://cscu.cornell.edu/workshop/logisic_regression_analysis
+> https://stats.oarc.ucla.edu/r/faq/ologit-coefficients/
+> https://stats.oarc.ucla.edu/r/dae/ordinal-logistic-regression/
+> https://stats.oarc.ucla.edu/r/dae/multinomial-logistic-regression/
+> https://bookdown.org/chua/ber642_advanced_regression/
+
+
 在此处重新记录一下罗辑回归的相关内容。
+
+
+*Statistical Software: What You Need to Know: *There are several ways in which an ordinal regression model can be parameterized and different statistical software packages use different parameterizations. Thus, great care should be taken when interpreting the output from `ordinal regression models`.
+
 
 
 
 ```{r, include=FALSE}
 library(tidyverse)
 library(easystats)
+library(MASS)
 ```
 
 
@@ -27,6 +40,103 @@ data(bivariate, package = 'modeldata')
 head(bivariate_train)
 ```
 
+```{r}
+fit1 <- stats::glm(Class ~ ., data = bivariate_train, family = binomial(link = 'logit'))
+
+summary(fit1)
+```
+
+```{r}
+## odds ratios and 95% CI
+exp(cbind(OR = coef(fit1), confint(fit1)))
+```
+
+
+
+We can test for an overall effect of rank using the wald.test function of the aod library. 
+```{r}
+# Run a wald.test
+aod::wald.test(b=coef(fit1),Sigma=vcov(fit1), Terms = 2:3)
+```
+The chi-squared test statistic of 20.9, with three degrees of freedom is associated with a p-value of 0.00011 indicating that the overall effect of rank is statistically significant.
+
+
+The likelihood ratio test is based on -2LL ratio. It is a test of the significance of the difference between the likelihood ratio (-2LL) for the researcher’s model with predictors (called model chi square) minus the likelihood ratio for baseline model with only a constant in it.
+
+
+
+#### Multinomial Logistic Regression
+
+除二分类问题外，logistic可以拟合多分类问题，此处记录为无序多分类问题的笔记。
+
+```{r}
+require(nnet)
+```
+
+
+```{r}
+d <- haven::read_sav('~/Downloads/有序多分类Logistic回归【详】-SPSS教程-医咖会/26 有序Logistic回归.sav') %>% 
+  labelled::unlabelled()
+
+glimpse(d)
+```
+
+```{r}
+fit_norminal <- nnet::multinom(formula = patient_satisfaction ~ ., data = d, model = TRUE)
+
+summary(fit_norminal)
+```
+
+```{r}
+# extract the coefficients from the model and exponentiate
+exp(coef(fit_norminal))
+```
+
+```{r}
+car::Anova(fit_norminal)
+```
+
+Calculate the Goodness of fit
+```{r}
+chisq.test(d$patient_satisfaction,predict(fit_norminal))
+```
+
+Calculate the Pseudo R-Square
+```{r}
+# 有一个很神奇的报错，nnet::multinom，不识别这种格式。。
+DescTools::PseudoR2(fit_norminal, which = c("CoxSnell","Nagelkerke","McFadden"))
+```
+Interpretation of the R-Square:
+
+These are three pseudo R squared values. Logistic regression does not have an equivalent to the R squared that is found in OLS regression; however, many people have tried to come up with one. These statistics do not mean exactly what R squared means in OLS regression (the proportion of variance of the response variable explained by the predictors), we suggest interpreting them with great caution.
+
+Cox and Snell’s R-Square imitates multiple R-Square based on ‘likelihood’, but its maximum can be (and usually is) less than 1.0, making it difficult to interpret. Here it is indicating that there is the relationship of 31% between the dependent variable and the independent variables. Or it is indicating that 31% of the variation in the dependent variable is explained by the logistic model.
+
+The Nagelkerke modification that does range from 0 to 1 is a more reliable measure of the relationship. Nagelkerke’s R2 will normally be higher than the Cox and Snell measure. In our case it is 0.357, indicating a relationship of 35.7% between the predictors and the prediction.
+
+McFadden = {LL(null) – LL(full)} / LL(null). In our case it is 0.182, indicating a relationship of 18.2% between the predictors and the prediction.
+
+
+*Likelihood Ratio Tests*
+```{r}
+lmtest::lrtest(fit_norminal)
+```
+```{r}
+lmtest::lrtest(fit_norminal, 'gender')
+```
+The results of the likelihood ratio tests can be used to ascertain the significance of predictors to the model.
+These likelihood statistics can be seen as sorts of overall statistics that tell us which predictors significantly enable us to predict the outcome category, but they don’t really tell us specifically what the effect is. To see this we have to look at the individual parameter estimates.
+
+
+*Build a classification table*
+```{r}
+# Load the summarytools package to use the classification function
+library(summarytools)
+# Build a classification table by using the ctable function
+ctable <- table(d$patient_satisfaction, predict(fit_norminal))
+ctable
+```
+
 
 
 #### 有序多分类问题
@@ -36,6 +146,99 @@ head(bivariate_train)
 - 假设2：存在一个或多个自变量，可为连续、有序多分类或无序分类变量。
 - 假设3：自变量之间无多重共线性。
 - 假设4：模型满足比例优势假设。意思是无论因变量的分割点在什么位置，模型中各个自变量对因变量的影响不变，也就是自变量对因变量的回归系数与分割点无关。有序多分类的Logistic回归原理是将因变量的多个分类依次分割为多个二元的Logistic回归，例如本例中因变量患者满意度有4个等级，分析时拆分为三个二元Logistic回归，分别为(0 vs 1+2+3) 、(0+1 vs 2+3)和(0+1+2 vs 3)，均是较低级与较高级对比。在有序多分类Logistic回归中，假设几个二元Logistic回归的自变量系数相等，仅常数项不等，结果也只输出一组自变量的系数。因此，有序多分类的Logistic回归模型，必须对自变量系数相等的假设（即比例优势假设）进行检验（又称平行线检验）。如果不满足该假设，则考虑使用无序多分类Logistic回归。
+
+
+虽然利用软件做有序逻辑回归还是较为简单的，但是interpret结果就显得有些麻烦了，非常值得做一个记录笔记。
+A cumulative logit parameterization is used in ordinal logistic regression models. 所以在结果中可以看到对于除reference外
+的全部level都给出了一个Estimate值。比如SPSS里的Threshold值。
+
+
+*不同软件给出的结果的不同：*SPSS和`MASS::polr`采用第一种parameterizations方法，其给出的参数为正数，在书写公式时需要加上-负号。JMP和SAS采用的是第二种方法，可以看到其给出的参数带有负号，同时JMP的分类变量采用Effect而不是Dummy。R中的`VGAM::vglm`,`rms::lrm`分别可以实现第二种和第三种参数化方法，具体的内容见参考链接1.
+R, Stata, SPSS, and SAS (using proc genmod) use dummy coding, while JMP and SAS (using proc logistic) use effect coding (see Statnews #72 for more information on these two coding schemes). Both R and Stata use the first level alphanumerically as the reference level, whereas SAS, JMP, and SPSS use the last level as the reference level.
+However, it is possible to customize the reference level in each of these programs.
+JMP对于分类变量采用的编码方式和SPSS以及R不同。
+
+
+```{r}
+library(ordinal)
+```
+
+
+```{r}
+library(labelled)
+
+dd <- haven::read_sav('~/Downloads/有序多分类Logistic回归【详】-SPSS教程-医咖会/26 有序Logistic回归.sav') %>% 
+  labelled::unlabelled()
+
+glimpse(dd)
+
+dd <- dd %>% mutate(gender = factor(gender, levels = c('女性','男性')),
+                    treatment = fct_rev(treatment),
+                    patient_satisfaction = factor(patient_satisfaction,
+                                                  levels = c('不满意','一般','满意','非常满意'), 
+                                                  ordered = TRUE
+                                                  )
+                    )
+
+paint::paint(dd)
+```
+
+
+```{r}
+# The command name comes from proportional odds logistic regression, highlighting the proportional odds assumption in our model. 
+fit_ordinal <- MASS::polr(formula = patient_satisfaction ~ ., data = dd, Hess = T)
+
+# same as SPSS
+summary(fit_ordinal)
+```
+*interpret: *Call, this is R reminding us what type of model we ran, what options we specified, etc.
+Next we see the usual regression output coefficient table including the value of each coefficient, standard errors, and t value, which is simply the ratio of the coefficient to its standard error. There is no significance test by default.
+Next we see the estimates for the two intercepts, which are sometimes called cutpoints. The intercepts indicate where the latent variable is cut to make the three groups that we observe in our data. Note that this latent variable is continuous. In general, these are not used in the interpretation of the results. The cutpoints are closely related to thresholds, which are reported by other statistical packages.
+Finally, we see the residual deviance, -2 * Log Likelihood of the model as well as the AIC. Both the deviance and AIC are useful for model comparison.
+
+
+男性认为“治疗满意度高”的OR值是女性的1.976倍（95%CI：1.112-3.511），χ2=5.389，P=0.020。
+
+得到上述结果后，依据SPSS使用的模型，可以得到三个方程。
+Ln（patient_satisfaction=0）= 9.175-0.231*age-0.007*fee-0.681gender男性-0.032*treatmentdrug1-1.142* treatmentdrug2
+Ln（patient_satisfaction=1）= 10.998-0.231*age-0.007*fee-0.681gender男性-0.032*treatmentdrug1-1.142* treatmentdrug2
+Ln（patient_satisfaction=2）= 13.984-0.231*age-0.007*fee-0.681gender男性-0.032*treatmentdrug1-1.142* treatmentdrug2
+可以看到，SPSS得到的方程中，除了截距项之外，所有效应值要在Parameter Estimates表格中的原始值基础上加上负号。
+
+
+```{r}
+(ci <- confint(fit_ordinal)) # default method gives profiled CIs
+```
+
+```{r}
+## OR and CI
+exp(cbind(OR = coef(fit_ordinal), ci))
+```
+These coefficients are called proportional odds ratios and we would interpret these pretty much as we would odds ratios from a binary logistic regression.
+
+
+```{r}
+car::Anova(fit_ordinal, type='III')
+```
+
+*goodness of fit*
+```{r}
+chisq.test(dd$patient_satisfaction, predict(fit_ordinal))
+```
+
+*Calculating the Pseudo R-Square*
+Measuring Strength of Association
+```{r}
+DescTools::PseudoR2(fit_ordinal, which = c("CoxSnell","Nagelkerke","McFadden"))
+```
+
+They are not as useful as the statistic in multiple regression, since their interpretation is not straightforward.
+
+
+
+```{r}
+
+```
 
 
 ### 作为预测模型的分析
