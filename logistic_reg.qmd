@@ -17,6 +17,11 @@ date: 2023-05-18
 在此处重新记录一下罗辑回归的相关内容。
 
 
+首先是logistic分布，逻辑分布的CDF在生存分析时已经有所了解。在分析概率问题时，可以将其理解为两参数模型，最大和最小值分别为1和0。
+
+逻辑回归假设数据服从伯努利分布（因变量），通过极大化似然函数的方法，运用梯度下降来求解参数，来达到二分类的目的。在
+
+
 *Statistical Software: What You Need to Know: *There are several ways in which an ordinal regression model can be parameterized and different statistical software packages use different parameterizations. Thus, great care should be taken when interpreting the output from `ordinal regression models`.
 
 
@@ -26,6 +31,7 @@ date: 2023-05-18
 library(tidyverse)
 library(easystats)
 library(MASS)
+library(car)
 ```
 
 
@@ -46,22 +52,154 @@ fit1 <- stats::glm(Class ~ ., data = bivariate_train, family = binomial(link = '
 summary(fit1)
 ```
 
+
 ```{r}
-## odds ratios and 95% CI
-exp(cbind(OR = coef(fit1), confint(fit1)))
+# 和SPSS以及JMP做对比
+dat <- haven::read_spss('~/Downloads/二分类Logistic回归【简】-SPSS教程-医咖会/Logistic回归.sav') %>% 
+  labelled::unlabelled()
+
+dat
+
+fit1 <- glm(cancer ~ sex + age + BMI + COPD + smoke, data = dat,
+            family = binomial(link = 'logit')
+            )
+
+summary(fit1)
 ```
 
+```{r}
+## odds ratios and 95% CI
+## CIs using profiled log-likelihood
+exp(cbind(OR = coef(fit1), confint(fit1)))
+```
+*那么依据这些结果怎么分析危险因素呢：*首先是A/B变量的OR值，per unit change in regressor.
+Note that while R produces it, the odds ratio for the intercept is not generally interpreted.
 
 
-We can test for an overall effect of rank using the wald.test function of the aod library. 
+
+*We can test for an overall effect of rank using the wald.test function of the aod library. *
 ```{r}
 # Run a wald.test
-aod::wald.test(b=coef(fit1),Sigma=vcov(fit1), Terms = 2:3)
+# 似乎一次只能run一个term，怎么run全部呢
+aod::wald.test(b=coef(fit1),Sigma=vcov(fit1), Terms = 3)
+
+# car::Anova 就可以
 ```
 The chi-squared test statistic of 20.9, with three degrees of freedom is associated with a p-value of 0.00011 indicating that the overall effect of rank is statistically significant.
 
 
+*Likelihood Ratio Tests: *
+```{r}
+# Whole model test
+lmtest::lrtest(fit1)
+
+# logLik(fit1)
+
+# Effect Likelihood Ratio Test
+# for every term
+# same as SAS/JMP
+car::Anova(fit1, type = 'III', test.statistic='LR')
+```
 The likelihood ratio test is based on -2LL ratio. It is a test of the significance of the difference between the likelihood ratio (-2LL) for the researcher’s model with predictors (called model chi square) minus the likelihood ratio for baseline model with only a constant in it.
+
+
+*anova, table of deviance*
+```{r}
+anova(fit1, test="Chisq")
+
+car::Anova(fit1, type='III',test.statistic='Wald')
+```
+*anova*得到的每个变量的P值，其可以解释为和null model相比Deviance值越大越好，The difference between the null deviance and the residual deviance shows how our model is doing against the null model (a model with only the intercept). The wider this gap, the better. Analyzing the table we can see the drop in deviance when adding each variable one at a time. Again, adding B significantly reduces the residual deviance. A large p-value here indicates that the model without the variable explains more or less the same amount of variation.
+
+
+```{r}
+# Box–Tidwell
+car::boxTidwell(fit1)
+```
+
+
+*easystats系列提供的一系列方便的函数：*
+```{r}
+parameters(fit1, exponentiate = TRUE)
+```
+```{r}
+performance::performance(fit1)
+
+pscl::pR2(fit1)
+```
+和线性回归不同，对于逻辑回归没有一个确切的R2，可以采用Tjur's R2或者McFadden R2进行阐释。
+
+
+
+*模型评价和预测：*
+```{r}
+# ?predict.glm
+# 默认为link，log-odds (probabilities on logit scale) 
+predict(fit1) |> head()
+
+# 返回的为probabilities in the form of P(y=1|X). 
+# Our decision boundary will be 0.5. If P(y=1|X) > 0.5 then y = 1 otherwise y=0. 
+p <- predict(fit1, type = 'response') 
+p |> head()
+```
+
+
+```{r}
+broom::augment(fit1,type.predict='response')
+```
+
+
+*变量重要性：*
+```{r}
+vip::vi(fit1)
+
+caret::varImp(fit1)
+```
+Higher values indicate more importance.
+
+
+
+*绘制对应的图表：*
+```{r}
+gtsummary::tbl_regression(fit1, exponentiate = TRUE)
+```
+
+
+*ROC*
+```{r}
+# 感觉这个包不如pROC
+require(ROCR)
+
+
+pr <- prediction(p, dat$cancer, label.ordering=c('非肺癌', '肺癌'))
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+*ROC plot by pROC*
+```{r}
+# library(pROC)
+
+roc1 <- pROC::roc(dat$cancer, p,
+  percent = TRUE,
+  # arguments for auc
+  # partial.auc = c(100, 90), partial.auc.correct = TRUE,
+  # partial.auc.focus = "sens",
+  # arguments for ci
+  ci = TRUE, boot.n = 100, ci.alpha = 0.9, stratified = FALSE,
+  # arguments for plot
+  plot = TRUE, auc.polygon = TRUE, max.auc.polygon = TRUE, grid = TRUE,
+  print.auc = TRUE, show.thres = TRUE
+)
+```
+```{r}
+coords(roc1, "best", ret=c("threshold", "specificity", "1-npv"))
+coords(roc1, "local maximas", ret=c("threshold", "sens", "spec", "ppv", "npv"))
+```
 
 
 
@@ -253,8 +391,14 @@ library(rms)
 
 #### 作为临床预测模型的分析
 
+详细内容见`clinical_prediction_model.Rmd`
+
 
 #### 作为机器学习预测模型
+
+逻辑回归的超参数，
+
+mixture = tune(), penalty = tune()
 
 
 
