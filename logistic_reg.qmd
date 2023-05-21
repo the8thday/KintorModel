@@ -273,12 +273,33 @@ These likelihood statistics can be seen as sorts of overall statistics that tell
 *Build a classification table*
 ```{r}
 # Load the summarytools package to use the classification function
-library(summarytools)
+# library(summarytools)
 # Build a classification table by using the ctable function
 ctable <- table(d$patient_satisfaction, predict(fit_norminal))
 ctable
 ```
 
+
+*ROC曲线：*
+```{r}
+library(pROC)
+
+p <- predict(fit_norminal, type = 'probs')
+
+roc.multi <- pROC:::multiclass.roc(d$patient_satisfaction, p,
+  plot = TRUE, auc.polygon = TRUE, max.auc.polygon = TRUE, grid = TRUE,
+  print.auc = TRUE, show.thres = TRUE
+)
+
+auc(roc1)
+```
+
+
+```{r}
+rs <- roc.multi[['rocs']]
+plot.roc(rs[[1]])
+sapply(2:length(rs),function(i) lines.roc(rs[[i]],col=i))
+```
 
 
 #### 有序多分类问题
