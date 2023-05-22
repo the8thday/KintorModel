@@ -12,6 +12,7 @@ date: 2023-05-18
 > https://stats.oarc.ucla.edu/r/dae/ordinal-logistic-regression/
 > https://stats.oarc.ucla.edu/r/dae/multinomial-logistic-regression/
 > https://bookdown.org/chua/ber642_advanced_regression/
+> https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
 
 
 在此处重新记录一下罗辑回归的相关内容。
@@ -153,6 +154,17 @@ broom::augment(fit1,type.predict='response')
 ```
 
 
+*马修斯相关系数, matthews correlation coefficient(phi coefficient)*
+```{r}
+Logistic_Predictions = predict(fit1, type = 'response')
+Logistic_Predictions_binomial=ifelse(Logistic_Predictions>0.5,1,0)
+con_Logistic <- caret::confusionMatrix(factor(Logistic_Predictions_binomial), factor(dat$cancer))
+
+yardstick::mcc(con_Logistic$table)
+```
+
+
+
 *变量重要性：*
 ```{r}
 vip::vi(fit1)
@@ -211,12 +223,18 @@ coords(roc1, "local maximas", ret=c("threshold", "sens", "spec", "ppv", "npv"))
 
 除二分类问题外，logistic可以拟合多分类问题，此处记录为无序多分类问题的笔记。
 
+对于多分类问题，常用的方法包括`log-linear`, `Discriminant Analysis`等，当然还有多种机器学习的方法可供选择。
+其中`log-linear`的详细笔记见`log_linear_model.qmd`文档。判别分析的脚本见`CA_DA.Rmd`。
+
+
 ```{r}
 require(nnet)
 ```
 
 
+在无序多分类逻辑回归中，需要注意对于因变量reference的设置，也就是你欲做对比的那个level。
 ```{r}
+# 假设此数据集为无序多分类，虽则其实为有序多分类。
 d <- haven::read_sav('~/Downloads/有序多分类Logistic回归【详】-SPSS教程-医咖会/26 有序Logistic回归.sav') %>% 
   labelled::unlabelled()
 
@@ -235,11 +253,13 @@ exp(coef(fit_norminal))
 ```
 
 ```{r}
-car::Anova(fit_norminal)
+# JMP or SAS produce LR & Wald, here we only show the LR
+car::Anova(fit_norminal, type = 'III')
 ```
 
-Calculate the Goodness of fit
+*Calculate the Goodness of fit: *
 ```{r}
+# chiseq 对于多分类问题不是很合适
 chisq.test(d$patient_satisfaction,predict(fit_norminal))
 ```
 
@@ -260,14 +280,34 @@ McFadden = {LL(null) – LL(full)} / LL(null). In our case it is 0.182, indicati
 
 
 *Likelihood Ratio Tests*
+Whole model test: 此处的结果即是JMP/SPSS中
 ```{r}
 lmtest::lrtest(fit_norminal)
 ```
+
 ```{r}
 lmtest::lrtest(fit_norminal, 'gender')
 ```
 The results of the likelihood ratio tests can be used to ascertain the significance of predictors to the model.
 These likelihood statistics can be seen as sorts of overall statistics that tell us which predictors significantly enable us to predict the outcome category, but they don’t really tell us specifically what the effect is. To see this we have to look at the individual parameter estimates.
+
+
+```{r}
+# we can also use the performance package
+performance::performance(fit_norminal)
+```
+
+*calculate p-value based on z-value*
+```{r}
+# Calculate z-values
+zvalues <- summary(fit_norminal)$coefficients / summary(fit_norminal)$standard.errors
+
+# Remember that the normal distribution doesn’t depend on degrees of freedom.
+pnorm(abs(zvalues), lower.tail=FALSE)*2
+# 2-tailed z test
+# (1 - pnorm(abs(zvalues), 0, 1)) * 2
+```
+
 
 
 *Build a classification table*
@@ -281,25 +321,183 @@ ctable
 
 
 *ROC曲线：*
+
+在多分类问题中，TPR和FPR需要将问题转为二分类问题后再进行计算。转换的方式有两种：
+- the One-vs-Rest scheme compares each class against all the others (assumed as one);
+- the One-vs-One scheme compares every unique pairwise combination of classes.
+
+Accuracy and Kappa use the same definitions as their binary counterpart, Matthews correlation coefficient (MCC) has a known multiclass generalization as well, sometimes called the 𝑅𝐾 statistic.
+
+`Macro averaging`, reduces your multiclass predictions down to multiple sets of binary predictions, calculates the corresponding metric for each of the binary cases, and then averages the results together. macro averaging reduces the problem to multiple one-vs-all comparisons. 
+`Micro averaging` treats the entire set of data as an aggregate result, and calculates 1 metric rather than k metrics that get averaged together.
+
+
+*One-vs-One*
+
 ```{r}
 library(pROC)
 
+# same as fitted(fit_norminal)
 p <- predict(fit_norminal, type = 'probs')
 
 roc.multi <- pROC:::multiclass.roc(d$patient_satisfaction, p,
   plot = TRUE, auc.polygon = TRUE, max.auc.polygon = TRUE, grid = TRUE,
-  print.auc = TRUE, show.thres = TRUE
+  print.auc = TRUE, show.thres = TRUE, 
+  # add = TRUE
 )
 
-auc(roc1)
+auc(roc.multi)
 ```
 
 
 ```{r}
-rs <- roc.multi[['rocs']]
-plot.roc(rs[[1]])
-sapply(2:length(rs),function(i) lines.roc(rs[[i]],col=i))
+# individual roc curve info for each classes
+# 也就是四个分组两两组和，不能重复的排列，共有6种组合，其中每个组合又有两个control和test组相反的情况，共12种情况
+roc.multi['rocs'] |> lengths()
 ```
+
+
+```{r}
+pROC:::multiclass.roc(d$patient_satisfaction, p, levels=c('不满意', '非常满意'), 
+                      plot=T,
+                      direction='>',
+                      print.auc = TRUE, show.thres = TRUE
+                      )
+```
+
+```{r}
+# plot 6种组合中的第一种
+rs <- roc.multi[['rocs']]
+plot.roc(rs[[1]][[1]])
+sapply(2:length(rs),function(i) lines.roc(rs[[i]][[1]],col=i))
+```
+
+
+*One-vs-Rest multiclass ROC*
+
+In each step, a given class is regarded as the positive class and the remaining classes are regarded as the negative class as a bulk.
+```{r}
+# 在R里面实现起来似乎还有些困难
+# 似乎要fit好几次
+
+library(multiROC)
+# 发现了一个R包，虽然用起来不是很方便
+```
+
+```{r}
+p1 <- as.data.frame(p)
+p1$patient_satisfaction <- d$patient_satisfaction
+
+p2 <- fastDummies::dummy_cols(p1, select_columns = 'patient_satisfaction') %>% 
+  dplyr::select(starts_with('patient_satisfaction'), everything()) %>% 
+  dplyr::select(-patient_satisfaction) %>% 
+  dplyr::rename('不满意_true'='patient_satisfaction_不满意',
+                '一般_true'='patient_satisfaction_一般',
+                '满意_true'='patient_satisfaction_满意',
+                '非常满意_true'='patient_satisfaction_非常满意',
+                '不满意_pred_multinom'='不满意',
+                '一般_pred_multinom'='一般',
+                '满意_pred_multinom'='满意',
+                '非常满意_pred_multinom'='非常满意'
+                )
+
+res <- multiROC::multi_roc(p2, force_diag=T)
+
+# same as JMP
+unlist(res$AUC)
+```
+
+```{r}
+n_method <- length(unique(res$Methods))
+n_group <- length(unique(res$Groups))
+res_df <- data.frame(Specificity = numeric(0), Sensitivity = numeric(0), 
+                     Group = character(0), AUC = numeric(0), Method = character(0))
+for (i in 1:n_method) {
+  for (j in 1:n_group) {
+    temp_data_1 <- data.frame(
+      Specificity = res$Specificity[[i]][j],
+      Sensitivity = res$Sensitivity[[i]][j],
+      Group = unique(res$Groups)[j],
+      AUC = res$AUC[[i]][j],
+      Method = unique(res$Methods)[i]
+    )
+    colnames(temp_data_1) <- c("Specificity", "Sensitivity", "Group", "AUC", "Method")
+    res_df <- rbind(res_df, temp_data_1)
+  }
+  temp_data_2 <- data.frame(
+    Specificity = res$Specificity[[i]][n_group + 1],
+    Sensitivity = res$Sensitivity[[i]][n_group + 1],
+    Group = "Macro",
+    AUC = res$AUC[[i]][n_group + 1],
+    Method = unique(res$Methods)[i]
+  )
+  temp_data_3 <- data.frame(
+    Specificity = res$Specificity[[i]][n_group + 2],
+    Sensitivity = res$Sensitivity[[i]][n_group + 2],
+    Group = "Micro",
+    AUC = res$AUC[[i]][n_group + 2],
+    Method = unique(res$Methods)[i]
+  )
+  colnames(temp_data_2) <- c("Specificity", "Sensitivity", "Group", "AUC", "Method")
+  colnames(temp_data_3) <- c("Specificity", "Sensitivity", "Group", "AUC", "Method")
+  res_df <- rbind(res_df, temp_data_2)
+  res_df <- rbind(res_df, temp_data_3)
+}
+
+ggplot2::ggplot(res_df, ggplot2::aes(x = 1 - Specificity, y = Sensitivity)) +
+  ggplot2::geom_path(ggplot2::aes(color = Group, linetype = Method)) +
+  ggplot2::geom_segment(ggplot2::aes(x = 0, y = 0, xend = 1, yend = 1), colour = "grey", linetype = "dotdash") +
+  ggplot2::theme_bw() +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5), legend.justification = c(1, 0), 
+                 legend.position = c(.95, .05), legend.title = ggplot2::element_blank(), 
+                 legend.background = ggplot2::element_rect(fill = NULL, size = 0.5, linetype = "solid", 
+                                                           colour = "black"))
+```
+
+
+```{r}
+library(yardstick)
+```
+
+```{r}
+p1$predict <- predict(fit_norminal, type = 'class')
+
+# # Macro averaged multiclass precision
+yardstick::accuracy(p1, patient_satisfaction, predict)
+```
+```{r}
+# method from Hand, Till, (2001). 
+yardstick::roc_auc(data = p1,
+                   truth = patient_satisfaction,
+                   `不满意`:`非常满意`
+                   )
+
+# 如何得到每一个分类的auc，即下图中AUC曲线下的面积
+
+```
+```{r}
+# If a multiclass truth column is provided, a one-vs-all approach will be taken to calculate multiple curves, one per level.
+# p1 %>% roc_curve(truth = patient_satisfaction,
+#                  `不满意`:`非常满意`
+#                  ) %>% 
+#   autoplot()
+
+# a much more beautiful plot
+roc_curve(p1, patient_satisfaction, `不满意`:`非常满意`) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color = .level)) +
+  geom_path() +
+  geom_abline(lty = 3) +
+  coord_equal() +
+  theme_bw()
+```
+
+```{r}
+yardstick::lift_curve(p1, truth = patient_satisfaction,
+                      `不满意`:`非常满意`
+                      ) %>% 
+  autoplot()
+```
+
 
 
 #### 有序多分类问题
@@ -389,6 +587,12 @@ car::Anova(fit_ordinal, type='III')
 chisq.test(dd$patient_satisfaction, predict(fit_ordinal))
 ```
 
+
+```{r}
+lmtest::lrtest(fit_ordinal)
+```
+
+
 *Calculating the Pseudo R-Square*
 Measuring Strength of Association
 ```{r}
@@ -398,13 +602,37 @@ DescTools::PseudoR2(fit_ordinal, which = c("CoxSnell","Nagelkerke","McFadden"))
 They are not as useful as the statistic in multiple regression, since their interpretation is not straightforward.
 
 
-
+*test proportional odds assumption*
 ```{r}
+# Load the library
+library(brant)
+# Run the Brant test on the model
+brant(fit_ordinal)
+```
+Each of the probabilities refers to the null hypothesis that the parallel regression assumption holds, or that the value of the coefficients don’t differ across different cutpoints in the outcome variable. 
 
+
+*ROC curve:*
+这里涉及到和无序多分类一样的问题，推荐直接使用`rms` package.
+```{r}
+library(pROC)
+
+p <- predict(fit_ordinal, type = 'probs')
+
+roc.ordi <- pROC:::multiclass.roc(dd$patient_satisfaction, p,
+  plot = TRUE,
+  print.auc = TRUE, show.thres = TRUE
+)
+
+auc(roc.ordi)
 ```
 
 
+
+
 ### 作为预测模型的分析
+
+下面两个分析的主要目的，在于构建预测模型。
 
 
 ```{r}
