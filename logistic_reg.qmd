@@ -628,6 +628,18 @@ auc(roc.ordi)
 ```
 
 
+```{r}
+p1$predict <- predict(fit_ordinal, type = 'class')
+
+
+yardstick::roc_curve(p1, patient_satisfaction, `不满意`:`非常满意`) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color = .level)) +
+  geom_path() +
+  geom_abline(lty = 3) +
+  coord_equal() +
+  theme_bw()
+```
+
 
 
 ### 作为预测模型的分析
