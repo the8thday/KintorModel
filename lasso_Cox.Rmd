@@ -11,6 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## lasso cox 回归
 
+> https://glmnet.stanford.edu/articles/Coxnet.html
+
+
 lasso cox 回归主要是用于对cox回归中的系数进行筛选，并在此基础之上进一步建模分析。在对于变量间的多重共线性，以及变量多于样本的情况下，可以发挥较好的作用。
 
 The glmnet package provides procedures for fitting the entire lasso or elastic-net regularization path for Cox models. The glmpath package implements a L1 regularised Cox proportional hazards model. An L1 and L2 penalised Cox models are available in penalized.
@@ -18,11 +21,13 @@ The glmnet package provides procedures for fitting the entire lasso or elastic-n
 复现文献：https://bmccancer.biomedcentral.com/articles/10.1186/s12885-021-07916-3
 
 
-```{r}
+```{r, include=FALSE}
 library(ggplot2)
 library(glmnet)
 library(survival)
+```
 
+```{r}
 
 lung <- na.omit(lung)
 X <- model.matrix(~sex+age+ph.ecog+ph.karno+pat.karno+meal.cal+wt.loss,
@@ -40,16 +45,19 @@ y <- CoxExample$y
 常见的用法似乎是通过cv进行变量筛选后，再进行常规的cox回归。包括单变量Cox和多变量Cox。
 ```{r}
 # cross-validation
+# type.measure only supports "deviance" (also default) which gives the partial-likelihood, and "C", which gives the Harrell C index. 
 fitcv <- cv.glmnet(X,
                    y,
                    family="cox", 
                    alpha=1,
                    type.measure = 'C',
-                   nfolds=10)
+                   nfolds=10
+                   )
 
 plot(fitcv)
 plot(fitcv$glmnet.fit, xvar="lambda")
 
+# 下面两个哪个做为最佳的lambda都是可以的
 best_lambda <- fitcv$lambda.min # find optimal lambda value that minimizes test MSE,或者此处的c-index
 fitcv$lambda.1se
 
@@ -64,7 +72,7 @@ broom::tidy(fitcv)
 
 对于上图的解读：第一幅图，the left vertical line in our plot shows us where the CV-error curve hits its minimum.
 The right vertical line shows us the most regularized model with CV-error within 1 standard deviation of the
-minimum。两条线所对应的数值可以分别选择作为选择变量的不同阈值。
+minimum。两条线所对应的数值可以分别选择作为选择变量的不同阈值。Note that unlike most error measures, a higher C index means better prediction performance.
 第二幅图，为随着lamda变化变量系数的变化。
 从上述结果可以看到共有10个变量被保留了下来。
 
@@ -104,7 +112,8 @@ ggplot(tidy_covariates, aes(x=lambda, y=estimate, color=as.factor(term)))+
 以下best_lambda似乎有问题。原来并非有问题，解释见下文。
 ```{r}
 #find coefficients of best model
-best_model <- glmnet(X, y, family="cox", 
+best_model <- glmnet(X, y, 
+                     family="cox", 
                      alpha = 1, # alpha=1 is the lasso penalty, and alpha=0 the ridge penalty
                      lambda = best_lambda
                      )
@@ -130,6 +139,14 @@ fit <- glmnet(X, y,
               )
 
 plot(fit)
+```
+
+*Plotting survival curves: *
+
+Class "coxnet" objects have a survfit method which allows the user to visualize the survival curves from the model.
+
+```{r}
+survival::survfit(best_model, s = best_lambda, x = X, y = y)
 ```
 
 
