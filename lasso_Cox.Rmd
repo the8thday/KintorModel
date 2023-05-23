@@ -19,10 +19,9 @@ The glmnet package provides procedures for fitting the entire lasso or elastic-n
 
 
 ```{r}
+library(ggplot2)
 library(glmnet)
 library(survival)
-
-data(lung, package = 'survival')
 
 
 lung <- na.omit(lung)
@@ -51,7 +50,7 @@ fitcv <- cv.glmnet(X,
 plot(fitcv)
 plot(fitcv$glmnet.fit, xvar="lambda")
 
-best_lambda <- fitcv$lambda.min # find optimal lambda value that minimizes test MSE
+best_lambda <- fitcv$lambda.min # find optimal lambda value that minimizes test MSE,或者此处的c-index
 fitcv$lambda.1se
 
 # extract the coefficients at certain values of λ
@@ -70,10 +69,13 @@ minimum。两条线所对应的数值可以分别选择作为选择变量的不�
 从上述结果可以看到共有10个变量被保留了下来。
 
 
+
+*ggplot2 DIY 上面两幅图：*
 ```{r}
 cv.fit <- fitcv
 
 tidied_cv = broom::tidy(cv.fit)
+
 ggplot(tidied_cv, aes(lambda, estimate)) +
  geom_line(color = "red") +
  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .3) +
@@ -83,7 +85,9 @@ ggplot(tidied_cv, aes(lambda, estimate)) +
  # ylim(0, 200) +
  ggthemes::theme_excel()
  
+
 tidy_covariates = broom::tidy(cv.fit$glmnet.fit)
+
 cols = colors()[!grepl("grey", colors()) & ! grepl("gray", colors())]
 col_sam = sample(cols, length(unique(tidy_covariates$term)))
 ggplot(tidy_covariates, aes(x=lambda, y=estimate, color=as.factor(term)))+
@@ -97,7 +101,7 @@ ggplot(tidy_covariates, aes(x=lambda, y=estimate, color=as.factor(term)))+
 ```
 
 
-以下best_lambda似乎有问题, 并非有问题，解释见下文。
+以下best_lambda似乎有问题。原来并非有问题，解释见下文。
 ```{r}
 #find coefficients of best model
 best_model <- glmnet(X, y, family="cox", 
