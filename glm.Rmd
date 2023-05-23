@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, include=FALSE}
+library(tidyverse)
 library(easystats)
 library(glmnet)
 library(glm2)
@@ -363,7 +364,7 @@ plot(cooks.distance(l_reg))
 
 
 
-### modified Poisson regression
+### modified Poisson regression & Poisson distribution
 
 Modified Poisson regression, which combines a log Poisson regression model with robust variance estimation, is a useful alternative to log binomial regression for estimating relative risks.
 
@@ -445,6 +446,95 @@ cbind(
   OddsRatio = exp(coef(mp0))
 )
 ```
+
+
+#### Poisson distribution
+
+泊松分布，poisson回归主要用于结局资料是计数资料的情况，与线性回归和logistic回归又不同。注意计数资料不同于连续资料，不要弄混。比如咳嗽次数、哮喘发作次数，等等变量，这是计数资料，需要考虑poisson回归，不能用线性回归。
+logistic回归通常认为服从二项分布，而二项分布一般认为发生率不应该太低。poisson回归服从poisson分布，一般用于发生率特别低的情形。
+
+
+```{r}
+dpois(x, lambda)#：计算 Poisson 分布的概率密度函数在 x 处的取值，其中 lambda 是 Poisson 分布的参数。
+ppois(q, lambda)#：计算 Poisson 分布的累积分布函数在 q 处的取值。
+qpois(p, lambda)#：计算 Poisson 分布的分位数，即满足 P(X ≤ q) = p 的最小整数 q。
+rpois(n, lambda)#：生成 n 个服从 Poisson 分布的随机数，其中 lambda 是 Poisson 分布的参数。
+```
+
+
+```{r}
+# Diplo_intensity 为计数资料
+dat <- read_csv('./datasets/Lab_exp.csv')
+```
+
+```{r}
+ggplot(dat,aes(x=Diplo_intensity)) +
+  geom_histogram() +
+  theme_bw()
+```
+
+```{r}
+# 
+pos_m <- glm(Diplo_intensity~Treatment + Initial_weight_g, 
+             data = dat, family = 'poisson')
+
+summary(pos_m)
+```
+
+Change factors for rate parameter lambda:
+
+```{r}
+exp(coef(pos_m))
+```
+
+```{r}
+# 重新计算系数，但标准误所使用方法不同
+# Cameron and Trivedi (2009) recommended using robust standard errors for the parameter estimates to control for mild violation of the distribution assumption that the variance equals the mean. 
+cov.m1 <- sandwich::vcovHC(pos_m, type="HC0")
+std.err <- sqrt(diag(cov.m1))
+r.est <- cbind(
+  Estimate = coef(pos_m), "Robust SE" = std.err,
+  "Pr(>|z|)" = 2 * pnorm(abs(coef(pos_m) / std.err), lower.tail = FALSE),
+  LL = coef(pos_m) - 1.96 * std.err,
+  UL = coef(pos_m) + 1.96 * std.err
+)
+
+r.est
+
+
+lmtest::coeftest(pos_m, 
+                 vcov=cov.m1
+                 )
+```
+
+```{r}
+parameters::parameters(pos_m, exponentiate = TRUE)
+```
+
+
+```{r}
+check_model(pos_m)
+```
+
+```{r}
+performance(pos_m)
+```
+
+
+```{r}
+# Adjusted Poisson-regression
+# Same parameter estimates as in Poisson model, but different standard errors, hence different p-values
+pos_m2 <- glm(Diplo_intensity~Treatment + Initial_weight_g, 
+             data = dat, 
+             family = quasipoisson(link="log")
+             )
+
+summary(pos_m2)
+```
+
+
+
+
 
 
 
