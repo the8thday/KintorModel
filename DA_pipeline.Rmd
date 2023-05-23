@@ -1,0 +1,121 @@
+---
+title: "判别分析"
+author: "liuc"
+date: "2023-05-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 判别分析
+
+
+> http://www.sthda.com/english/articles/36-classification-methods-essentials/146-discriminant-analysis-essentials-in-r/
+
+Discriminant Analysis(DA) is more stable than logistic regression for multi-class 
+
+判别分析包括有多个变种，包括线性判别分析、mixture DA, Flexible DA....
+常用于多分类问题。
+
+通过已知类别的观测值特征，建立一个分类模型，从而对新的未知观测值进行分类。它通常用于处理有标签的数据，其中每个样本都已经被分为特定的类别。
+LDA假设不同类别的观测值具有相同的协方差矩阵，它试图找到一个投影，使得类别之间的距离最大，类别内部的散布最小。这样的投影是通过计算类别之间的散布矩阵和类别内部的散布矩阵，然后进行特征值分解来获得的。
+
+下面为*lda*线性判别分析的一般过程:
+
+```{r}
+library(tidymodels)
+library(MASS)
+library(discrim)
+```
+
+
+```{r}
+# preprocess the data
+set.seed(42)
+df_split <- initial_split(iris, prop = 0.8)
+X_train <- training(df_split)
+X_test <- testing(df_split)
+# lda 可以考虑对输入矩阵进行标准化scale
+```
+
+
+```{r}
+# use tidymodels to build a model
+
+# build model
+discrim_linear_MASS_spec <-
+  discrim_linear() %>%
+  set_engine('MASS')
+
+discrim_fit <- discrim_linear_MASS_spec %>% 
+  fit(Species ~ ., data = X_train)
+
+fit_res <- X_test %>% 
+  dplyr::select(Species) %>% 
+  bind_cols(predict(discrim_fit, X_test))
+
+predict(discrim_fit$fit)
+```
+
+metrics, 以及提取模型本身的参数
+
+```{r}
+conf_mat(fit_res, truth = Species, estimate = .pred_class)
+```
+
+
+### use MASS for lda analysis
+
+tidymodels 似乎还没有特别成熟, 下面采用MASS的自身函数进行，还是利用MASS.
+
+```{r}
+model <- MASS::lda(
+  Species ~ ., data = X_train
+  )
+
+model # 和discrim_fit$fit 一致
+
+```
+
+
+```{r}
+p <- predict(model)
+
+p$x |> head()
+```
+
+```{r}
+ggplot(cbind(X_train, predict(model)$x), aes(LD1, LD2, color = Species)) +
+  geom_point() +
+  stat_ellipse(level = 0.95, show.legend = FALSE) + 
+  theme_bw()
+```
+
+
+*结果解读：*
+
+
+
+### 二次判别分析
+
+二次判别分析由于不假定各类别的协方差相等，因此比lda较为灵活一些，对于样本量较大的数据可以采用qda.
+QDA试图找到一个投影，使得每个类别的观测值在新的空间中形成一个多元正态分布。QDA的参数估计通常涉及计算每个类别的均值向量和协方差矩阵。
+
+```{r}
+pda_moodel <- MASS::qda(
+  Species ~ ., data = X_train
+)
+
+```
+
+
+### 混合判别分析
+
+```{r}
+library(mda)
+```
+
+
+
