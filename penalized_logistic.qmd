@@ -7,7 +7,9 @@ format: html
 
 > https://www.tidymodels.org/start/case-study/
 
-Since our outcome variable children is categorical, logistic regression would be a good first model to start. Let’s use a model that can perform feature selection during training. The `glmnet` R package fits a generalized linear model via penalized maximum likelihood. 
+Since our outcome variable children is categorical, logistic regression would be a good first model to start. Let’s use a model that can perform feature selection during training. The `glmnet` R package fits a generalized linear model via penalized maximum likelihood. It fits linear, logistic and multinomial, poisson, and Cox regression models. It can also fit multi-response linear regression, generalized linear models for custom families, and relaxed lasso regression models. 
+
+和LASSO类似，对应于outcome位二分类变量的情况。
 
 
 
@@ -35,6 +37,9 @@ val_set <- validation_split(hotel_other,
                             strata = children, 
                             prop = 0.80)
 ```
+
+
+### 基于tidymodels的实现
 
 
 建个模型：
@@ -133,6 +138,11 @@ autoplot(lr_auc)
 ```
 
 
+### 基于glmnet的实现
+
+```{r}
+library(glmnet)
+```
 
 
 
