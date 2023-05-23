@@ -19,8 +19,16 @@ Screening the Influence of Biomarkers for Metabolic Syndrome in Occupational Pop
 Ridge regression shrinks all coefficients towards zero, but lasso regression has the potential to remove predictors from the model by shrinking the coefficients completely to zero.
 
 
+LASSO（Least Absolute Shrinkage and Selection Operator）回归是一种用于特征选择和回归分析的统计方法。它结合了岭回归（Ridge Regression）和逐步回归（Stepwise Regression）的特点，通过对回归系数进行约束，实现模型的参数收缩和变量选择。
 
-```{r}
+LASSO回归的目标是在给定预测变量（自变量）的情况下，寻找最佳的线性回归模型。与传统的最小二乘回归不同，LASSO回归引入了L1正则化惩罚项，即对回归系数的绝对值进行惩罚。这种惩罚机制促使某些回归系数变为零，从而实现了特征选择的效果，即可以自动地从给定的特征集中选择对目标变量具有显著影响的变量，同时排除对目标变量影响较小的变量。
+
+
+*LASSO回归需要对变量进行标准化吗？*似乎不是必要的。
+
+
+
+```{r, include=FALSE}
 library(tidyverse)
 library(tidymodels)
 library(glmnet)
@@ -96,7 +104,9 @@ office
 
 特征工程，利用tidymodels会很简单。此处暂时不涉及特征工程的部分。
 *lasso回归如何处理无须多分类变量：*lasso不可以处理无序多分类变量，连续变量可以直接纳入，等级变量按照等级处理也可以直接纳入。对于无序多分类变量既不可以设置dummy变量也不可以按照无序多分类处理的等级变量纳入模型中，而是要拆成多个二分类变量纳入，注意这里拆成多个二分类变量和dummy变量的不同。如血型（A、B、O、AB），在进行LASSO时，则需要拆分为A/非A、B/非B、O/非O、AB/非AB共4个二分类变量纳入。在进行线性回归、Logistic回归、COX回归时，设置的哑变量要遵守“同进同出”的原则，即只要一个哑变量有统计学意义，则其他几个哑变量必须都要留在模型；然而，对于LASSO回归，上述血型拆分的4个二分类变量，则是单独的，孤立的，单独4个不同的变量进行分析，有能力则留在模型，没能力则被提出模型；因为，LASSO回归重要目的之一，就是筛选因子，它不管你纳入模型X的专业合理性，重在得到的模型要达到最佳的预测效果。
+
 一是：利用LASSO筛选变量，筛选好之后，在利用logisitc回归，或者COX回归进行多因素分析，此时，研究者也可以将有意义的某个拆分后二分类变量的整体无序多分类变量再纳入模型（意思是：比如上述血型，只有A/非A是有意义的，其他3个没有意义，那么在后多分析时，再将血型变量纳入先进哑变量设置即可），去构建模型，然后预测概率(P1)即可；二是：直接利用LASSO回归的系数，构建方程，也可以直接利用LASSO构建的方程去预测结局概率（P2）即可。
+
 ```{r}
 dat <- office %>% select(-episode_name) %>% 
   as.data.frame()
@@ -110,7 +120,7 @@ dim(test)
 
 # scale the data 
 cols = c('andy', 'angela', 'darryl', 'dwight')
-pre_proc_val <- preProcess(train[,cols], method = c("center", "scale"))
+pre_proc_val <- caret::preProcess(train[,cols], method = c("center", "scale"))
 
 train[,cols] = predict(pre_proc_val, train[,cols])
 test[,cols] = predict(pre_proc_val, test[,cols])
@@ -127,13 +137,20 @@ Y <- dat[,"imdb_rating"]
 
 
 First we need to find the amount of penalty,  λ by cross-validation.
+
+`glmnet`所需要的输入格式也是奇怪了。
+
+`family`所支持的回归模型有，'gaussian','poisson','binomial','multinomial','cox'等，似乎`glm`支持的family其都支持。
+
+
 ```{r}
 #Penalty type (alpha=1 is lasso 
 #and alpha=0 is the ridge)
-cv.lambda.lasso <- cv.glmnet(x=X, 
+cv.lambda.lasso <- glmnet::cv.glmnet(x=X, 
                              y=Y, 
                              nfolds = 10,
-                             alpha = 1) 
+                             alpha = 1
+                             ) 
 
 plot(cv.lambda.lasso)#MSE for several lambdas
 
@@ -141,30 +158,52 @@ plot(cv.lambda.lasso)#MSE for several lambdas
 plot(cv.lambda.lasso$glmnet.fit, 
      "lambda", label=FALSE)
 ```
-
+*interpret：*由左图可以看到20个变量时MSE值最小。右图为随着lambda值增大变量系数的变化，前面那些系数为0的变量自然就是被惩戒掉的。
 
 
 ```{r}
 #find coefficients of best model
 best_lambda <- cv.lambda.lasso$lambda.min
+cat("Best lambda selected by cross-validation:", best_lambda, "\n")
 
+# 然后利用最佳lambda参数构建最佳函数
 best_model <- glmnet(X, Y,
                      alpha = 1, # alpha=1 is the lasso penalty, and alpha=0 the ridge penalty
                      lambda = best_lambda,
                      family='gaussian',
                      )
+
+# the two below return same result
 coef(best_model)
 best_model$beta #Coefficients
 
 
+```
+
+
+```{r}
 plot(best_model)
+
+# 因为lambda就一个值了
 plot(best_model, xvar='lambda', label = TRUE)
 ```
+*interpret：*图上的数字为剩下的变量的编号。
+
+
+```{r}
+# 算是提取了剩下的变量
+
+broom::tidy(best_model)
+```
+
 
 
 在得到*best_model*后，再进行变量重要性的展示：
 ```{r}
+# 将返回全部变量的Importance值
+# Importance 为0的值和Sign并非一一对应的关系
 vi_model(best_model)
+
 vip::vip(best_model)
 ```
 
@@ -172,6 +211,12 @@ visreg似乎不适用于glmnet的结果
 ```{r}
 visreg::visreg(best_model, 'andy')
 ```
+
+
+```{r}
+predict(best_model, newx = X |> head())
+```
+
 
 DCA曲线：对于回归问题
 ```{r}
