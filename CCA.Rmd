@@ -138,7 +138,12 @@ A usefull extension to the classical canonical correlation approach is the regul
 
 ### use vegan package
 
-Function cca performs correspondence analysis, or optionally constrained correspondence analysis (a.k.a. canonical correspondence analysis), or optionally partial constrained correspondence analysis. Function rda performs redundancy analysis, or optionally principal components analysis. These are all very popular ordination techniques in community ecology.
+cca所指的两种方法，似乎并不一致。
+
+`Canonical Correlation Analysi`s resembles `Canonical Correspondence Analysis` in that it searches for the multivariate relationships between two data sets (e.g. an environmental data set and a species abundance data set); however, Canonical Correlation Analysis assumes linear responses of species to environmental variables. This assumption is likely to be violated in nature. Canonical Correspondence Analysis, like other correspondence analysis methods, assumes a more reasonable unimodal response curve (ter Braak and Prentice 1988).
+Canonical correlation analysis (CCA) is a general multivariate method that is mainly used to study relationships when both sets of variables are quantitative. When the variables are qualitative (categorical), a technique called correspondence analysis (CA) is used.Canonical correspondence analysis (CCPA) is used to deal with the case when one set of variables is categorical and the other set is quantitative. 
+
+Function `cca` performs correspondence analysis, or optionally constrained correspondence analysis (a.k.a. canonical correspondence analysis), or optionally partial constrained correspondence analysis. Function `rda` performs redundancy analysis, or optionally principal components analysis. These are all very popular ordination techniques in community ecology.
 
 CCA is a multivariate statistical technique commonly used in ecological and environmental studies. It explores the relationship between a set of environmental variables (e.g., habitat characteristics, climate variables) and a set of species abundances or community data. CCA determines linear combinations of environmental variables that best explain the variation in species abundances or community data. It provides insights into how environmental factors influence species distribution or community composition.
 
