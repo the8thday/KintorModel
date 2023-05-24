@@ -17,11 +17,14 @@ Canonical correlation analysis is used to identify and measure the associations 
 
 典型相关可以理解为一组变量和另外一组变量间的关系的方法。比如我们可以把多重线性回归看成是一个变量和一组变量间关系的描述，而CCA则是一组和一组，即是有多个因变量。这些一组变量间一般会归属于一类，nest。 根据变量间的关系，寻找少数几个关系简单的综合变量对，替代关系复杂的实际观察变量。这些综合变量被称为‘典型变量’。
 
+*The main purpose of the canonical correlation approach is the exploration of sample correlations between two sets of quantitative variables observed on the same experimental units.*
+
 *Examples of canonical correlation analysis* Example 1. A researcher has collected data on three psychological variables, four academic variables (standardized test scores) and gender for 600 college freshman. She is interested in how the set of psychological variables relates to the academic variables and gender. In particular, the researcher is interested in how many dimensions (canonical variables) are necessary to understand the association between the two sets of variables.
 
 Example 2. A researcher is interested in exploring associations among factors from two multidimensional personality tests, the MMPI and the NEO. She is interested in what dimensions are common between the tests and how much variance is shared between them. She is specifically interested in finding whether the neuroticism dimension from the NEO can account for a substantial amount of shared variance between the two tests.
 
-```{r}
+
+```{r, include=FALSE}
 require(ggplot2)
 require(GGally)
 require(CCA)
@@ -41,27 +44,59 @@ colnames(mm) <- c("Control", "Concept", "Motivation", "Read", "Write", "Math",
 psych <- mm[, 1:3]
 acad <- mm[, 4:8]
 
-# cancor()
-cc1 <- CCA::cc(psych, acad)
-cc1[3:4]
 
-
-# compute canonical loadings
-cc2 <- comput(psych, acad, cc1)
-# display canonical loadings
-cc2[3:6]
-
-
-CCA::matcor(psych, acad)
 ```
 
 
-interpret results: cc1的结果和回归系数的情况是很像的，i.e., for the variable read, a one unit increase in reading leads to a .0446 decrease in the first canonical variate of set 2 when all of the other variables are held constant.
+```{r}
+# stats 包中的函数
+cc <- stats::cancor(x = psych,
+                    y = acad
+                    )
+
+str(cc)
+```
+
+```{r}
+
+# 变量间的相关性
+correl <- CCA::matcor(psych, acad)
+
+img.matcor(correl, type = 2)
+```
+
+
+In general, the number of canonical dimensions is equal to the number of variables in the smaller set; however, the number of significant dimensions may be even smaller. 
+
+```{r}
+# stats::cancor() has the same result
+cc1 <- CCA::cc(psych, acad)
+
+# raw canonical coefficients
+cc1[3:4]
+# display the canonical correlations
+cc1$cor
+
+
+# compute canonical loadings
+# These loadings are correlations between variables and the canonical variates.
+cc2 <- CCA::comput(psych, acad, cc1)
+# display canonical loadings
+cc2[3:6]
+
+```
+*interpret results:* cc1的结果和回归系数的情况是很像的，i.e., for the variable read, a one unit increase in reading leads to a .0446 decrease in the first canonical variate of set 2 when all of the other variables are held constant.
 The above correlations are between observed variables and canonical variables which are known as the canonical loadings. 
 
 
+```{r}
+plt.cc(cc1, var.label = TRUE, 
+       # ind.names = mm[,1]
+       )
+```
 
-Canonical dimensions, also known as canonical variates, are latent variables that are analogous to factors obtained in factor analysis. For this particular model there are three canonical dimensions of which only the first two are statistically significant. For statistical test we use R package "CCP".
+
+`Canonical dimensions`, also known as canonical variates, are latent variables that are analogous to factors obtained in factor analysis. *For this particular model there are three canonical dimensions of which only the first two are statistically significant*. For statistical test we use R package "CCP".
 ```{r}
 # tests of canonical dimensions
 rho <- cc1$cor
@@ -73,9 +108,9 @@ q <- length(acad)
 ## Calculate p-values using the F-approximations of different test statistics:
 p.asym(rho, n, p, q, tstat = "Wilks")
 
-p.asym(rho, n, p, q, tstat = "Hotelling")
+p.asym(rho, n, p, q, tstat = "Hotelling") # Pillai, Roy
 ```
-
+*interpret: *As shown in the table above, the first test of the canonical dimensions tests whether all three dimensions are significant (they are, F = 11.72), the next test tests whether dimensions 2 and 3 combined are significant (they are, F = 2.94). Finally, the last test tests whether dimension 3, by itself, is significant (it is not). Therefore dimensions 1 and 2 must each be significant while dimension three is not.
 
 
 When the variables in the model have very different standard deviations, the standardized coefficients allow for easier comparisons among the variables. Next, we’ll compute the standardized canonical coefficients.
@@ -88,10 +123,34 @@ s1 %*% cc1$xcoef
 s2 <- diag(sqrt(diag(cov(acad))))
 s2 %*% cc1$ycoef
 ```
+*interpret: *For example, consider the variable read, a one standard deviation increase in reading leads to a 0.45 standard deviation decrease in the score on the first canonical variate for set 2 when the other variables in the model are held constant.
 
 
+### regularized canonical correlation
+
+A usefull extension to the classical canonical correlation approach is the regularized version - so called regularized canonical correlation analysis. It is mean for scenarios where the number of parameters p∈ℕ is greater than the sample size n∈𝕟(usually p≫n). There is R function `rcc()` available in the R package ‘CCA’.
 
 
+```{r}
 
+```
+
+
+### use vegan package
+
+Function cca performs correspondence analysis, or optionally constrained correspondence analysis (a.k.a. canonical correspondence analysis), or optionally partial constrained correspondence analysis. Function rda performs redundancy analysis, or optionally principal components analysis. These are all very popular ordination techniques in community ecology.
+
+CCA is a multivariate statistical technique commonly used in ecological and environmental studies. It explores the relationship between a set of environmental variables (e.g., habitat characteristics, climate variables) and a set of species abundances or community data. CCA determines linear combinations of environmental variables that best explain the variation in species abundances or community data. It provides insights into how environmental factors influence species distribution or community composition.
+
+```{r}
+library(vegan)
+
+cc3 <- vegan::cca(psych, acad)
+```
+
+
+```{r}
+plot(cc3)
+```
 
 
