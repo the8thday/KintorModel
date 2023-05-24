@@ -7,45 +7,164 @@ format: html
 
 此处做一个table类数据分析的记录。
 
+table类数据集，或者说列联表，或是多个分类变量间的关系，不论是二分类还是多分类等。对其的分析都放在本笔记中。
+
+一般的，proportion指的是分子在分母中，ratio是两个数的对比。
 
 
-```{r}
+```{r, include=FALSE}
 library(vcd)
+library(vcdExtra)
 library(gmodels)
 ```
 
 table类数据此处主要记录，诸如Frequency and contingency tables。
 
 ```{r}
-mytable1 <- xtabs(~ Treatment + Improved + Sex, data = Arthritis)
+head(Arthritis)
+```
 
-mytable2 <- xtabs(~ Treatment + Improved, data = Arthritis)
+### one-way table 
+
+`xtabs`的用法可以记成`table`函数的公式化版本。右边为需要cross-classified的变量，左边为频数（如果有的话）
+
+```{r}
+# one-way table
+mytable <- xtabs(~ Improved, data = Arthritis)
+
+with(Arthritis, table(Improved))
+
+# 求proportion
+prop.table(mytable)
+```
+
+```{r}
+plot(mytable)
+```
+
+```{r}
+DescTools::BinomCI()
 ```
 
 
 
+### two-way table
+
 ```{r}
-class(mytable2)
+# 常见的2x2
+# two-way table
+mytable1_2 <- xtabs(~ Treatment + Sex, data = Arthritis)
+
+mytable1 <- xtabs(~ Treatment + Improved, data = Arthritis)
+
+mytable1
+
+mytable1_2
+```
+
+```{r}
+summary(mytable1)
+
+```
+
+```{r}
+vcd::mosaic(mytable1, shade = T, legend=T)
+```
+
+
+```{r}
+# xtabs 类
+class(mytable1)
 
 class(with(Arthritis, table(Treatment, Improved)))
 ```
 
-
-
+将Contingency table转变成data.frame在R中还是简单的：
+不过这种转换和原始数据的格式还是不一样的。
 ```{r}
-vcd::mosaic(mytable1, shade=TRUE, legend=TRUE)
+as.data.frame(mytable1)
 ```
 
 
 ```{r}
-mytable1 |> mantelhaen.test()
+# 按照行求百分比
+prop.table(mytable1,1)
+
+# 求行的和
+margin.table(mytable1, 1)
+```
+```{r}
+addmargins(mytable1)
+```
+
+*一个不错的包，这个作者似乎有系列包*
+得到的结果和SAS PROC FREQ类似。
+```{r}
+gmodels::CrossTable(Arthritis$Improved, Arthritis$Treatment)
+```
+
+
+fisher不只能用于2X2的列联表形式，只要是two-way的形式，其都可以。
+```{r}
+mytable1 |> fisher.test()
+```
+
+```{r}
+chisq.test(mytable1)
+```
+*interpret: *P值小于0.05，两个变量之间相关。
+
+
+*association 分析*
+```{r}
+vcd::assocstats(mytable1)
+```
+*interpret: *下面三个的值越大，说明association much stronger。
+
+
+*Relative Risk:*
+```{r}
+DescTools::RelRisk(mytable1_2, conf.level=0.95)
+```
+
+```{r}
+DescTools::OddsRatio(mytable1_2, conf.level = 0.95)
+```
+
+*Two Sample test for Proportion: *
+```{r}
+prop.test(mytable1_2)
+```
+
+
+
+### three-way table 
+
+```{r}
+# 一个三个分类变量组成的列联表
+# three-way table
+mytable2 <- xtabs(~ Treatment + Improved + Sex, data = Arthritis)
 ```
 
 
 ```{r}
-mytable2 |> fisher.test()
+vcd::mosaic(mytable2, shade=TRUE, legend=TRUE)
 ```
 
+```{r}
+# print more beautiful
+ftable(mytable2)
+
+# 自然也是可以增加sum和百分比的
+```
+
+
+Cochran-Mantel-Haenszel test, 分层卡方检验。用于比较两个分类变量在控制一个或多个混杂变量的条件下是否存在相关性。
+```{r}
+# 注意输入数据中，哪个变量做为stratum，一般公式中最后一个变量为stratum
+# 比如本例中，sex即为stratum
+mytable2 |> mantelhaen.test()
+```
 
 
 ```{r}
