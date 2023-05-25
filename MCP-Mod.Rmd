@@ -1,0 +1,173 @@
+---
+title: "MCP-Mod"
+author: "liuc"
+date: "2023-05-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## MCP-Mod
+
+> https://www.fda.gov/media/99313/download
+> https://cran.r-project.org/web/packages/DoseFinding/vignettes/faq.html
+> https://cran.r-project.org/web/packages/DoseFinding/vignettes/analysis_normal.html
+
+
+
+MCP-Mod (Multiple Comparisons Procedure - Modelling) is an increasingly popular statistical methodology. It can generate superior statistical evidence from Phase II trials with regards to dose selection. The FDA & EMA both recently approved this as fit-for-purpose (FFP).
+
+It is noteworthy that the power of the MCP-Mod method was shown to be sensitive to the initial ‘guesses’ of model shapes. A minimum of 2 doses in addition to placebo is proposed but more than the minimum is desired.
+
+
+*一般的理解：*
+一个二期临床试验，一般的目的在于：
+1.  Establish that the drug works as intended
+2. Determine the appropriate doses for Phase III testing
+MCP-Mod方法，可以通过多重比对的方法，evaluate dose-response的信号是否存在(传统上多采用趋势检验、Bonferroni检验)；
+然后用最优的模型去拟合一个参数分布，找到对与III期而言最好的dose，或者最efficacy的dose。
+
+
+*MCP-Mod trial design: *
+
+
+
+
+```{r}
+library(DoseFinding)
+```
+
+
+### 官网示例，小小的模仿一下
+
+
+```{r}
+data(IBScovars)
+```
+
+
+#### 第一步：
+
+确定模型和猜测对应的模型的参数。
+
+对于placebo的Eff值，可以考虑通过散点图查看其的中位值，或是均值来确定。
+而对于每一个函数的参数的猜测，一般的：
+- 对于Emax模型
+
+```{r}
+ggplot(IBScovars, aes(factor(dose), resp)) + 
+  geom_boxplot() +
+  geom_jitter() +
+  labs(title = "resp by dose (jittered horizontally)") +
+  xlab("dose [μg]") + ylab("response [l]")
+```
+
+
+```{r}
+## ?Mods
+## perform (model based) multiple contrast test
+## define candidate dose-response shapes
+## 首先是设定你所欲考虑的模型。这里的问题在于the guesstimates for the theta2 parameters的值怎么去猜测？
+## 还有关于placebo的部分需要注意，其默认的；两个值为0，1, placEff=0, maxEff=1
+models <- Mods(linear = NULL, 
+               emax = c(0.2, 1), 
+               quadratic = -0.17,
+               doses = c(0, 1, 2, 3, 4) # 需要加上placebo
+               )
+
+
+## plot models
+## It’s always a good idea to perform a visual sanity check of the functional relationships implied by the guesstimates.
+plotMods(models)
+```
+
+Calculate optimal contrasts
+```{r}
+optC <- optContr(models, w=1)
+print(optC)
+
+plot(optC)
+```
+
+#### 第二步：
+
+进行多重比对检验。
+
+Note that the type parameter defaults to type="normal", which means that we assume a homoscedastic ANOVA model for resp.
+
+```{r}
+## perform multiple contrast test
+## functions powMCT and sampSizeMCT provide tools for sample size
+## calculation for multiple contrast tests
+## 对所定义的每个模型都做一遍多重比对检验
+## 对于此例而言，依照t值来说emax模型似乎拟合的最好。
+test <- MCTtest(dose = dose, resp = resp, data = IBScovars, 
+                models=models,# 上文定义的模型
+                addCovars = ~ gender,# 协变量
+                type = 'normal'
+                )
+
+test
+```
+
+
+
+```{r}
+fitlm <- lm(FEV1 ~ factor(dose) - 1, data = NVA)
+mu_hat <- coef(fitlm)
+S_hat <- vcov(fitlm)
+anova_df <- fitlm$df.residual
+
+
+test_general <- MCTtest(dose = doses, resp = mu_hat, 
+                        S = S_hat, df = anova_df,
+                        models = mods, 
+                        type = "general"
+                        )
+print(test_general)
+```
+
+
+
+#### 第三步：
+
+下面选择Emax模型进行拟合，最小二乘法，
+```{r}
+## ?fitMod
+fitemax <- fitMod(dose = dose, resp = resp, data=IBScovars, 
+                  model="emax",
+                  bnds = c(0.01,5)# upper and lower bound
+                  )
+
+## display fitted dose-effect curve
+plot(fitemax, CI=TRUE, plotData="meansCI")
+```
+*interpret: *从图上的结果来看的话dose等于2的时候，resp就可以了。
+
+
+```{r}
+fitemax |> summary()
+```
+
+
+
+```{r}
+
+```
+
+
+### kx826 1002 实战
+
+
+```{r}
+
+```
+
+
+
+
+
+
