@@ -15,28 +15,44 @@ knitr::opts_chunk$set(echo = TRUE)
 > https://www.fda.gov/media/99313/download
 > https://cran.r-project.org/web/packages/DoseFinding/vignettes/faq.html
 > https://cran.r-project.org/web/packages/DoseFinding/vignettes/analysis_normal.html
+> https://blog.statsols.com/mcp-mod
+> https://www.lexjansen.com/pharmasug-cn/2019/CC/Pharmasug-China-2019-CC26.pdf
 
 
 
 MCP-Mod (Multiple Comparisons Procedure - Modelling) is an increasingly popular statistical methodology. It can generate superior statistical evidence from Phase II trials with regards to dose selection. The FDA & EMA both recently approved this as fit-for-purpose (FFP).
 
 It is noteworthy that the power of the MCP-Mod method was shown to be sensitive to the initial ‘guesses’ of model shapes. A minimum of 2 doses in addition to placebo is proposed but more than the minimum is desired.
+Minimum: 2 active doses (for the MCP-step), 3 active doses (Mod step);
+Recommendations (rules of thumb): 4-7 active doses, >10-fold dose range;
+To gain most information on the compound, one should evaluate a dose-range that is as large as feasible in terms of lowest and highest dose. As a rule of thumb at minimum a dose-range of > 10-fold should be investigated (i.e., the ratio of highest versus lowest dose should be > 10).
 
 
 *一般的理解：*
 一个二期临床试验，一般的目的在于：
-1.  Establish that the drug works as intended
+1. Establish that the drug works as intended
 2. Determine the appropriate doses for Phase III testing
 MCP-Mod方法，可以通过多重比对的方法，evaluate dose-response的信号是否存在(传统上多采用趋势检验、Bonferroni检验)；
 然后用最优的模型去拟合一个参数分布，找到对与III期而言最好的dose，或者最efficacy的dose。
 
+MCP: Rust, 但是受限于dose as nominal变量；
+Mod: 灵活，但是受限于模型的选择；
+而，MCP-Mod将此二者结合起来，一般的，其分析过程分为三个阶段：1，Design Stage，选择备选的模型，并为其的参数设置一个初始值
+，以及生成optimal test；2，MCP Stage，选择最优模型，合适的contrasts，是否存在dose response这一趋势；3，Mod Stage，构建最优模型并find target dose.
+
 
 *MCP-Mod trial design: *
+首先是一般的二期试验的设计内容，包括受试人群的选择、研究终点的设置等等；依据相似化合物、mode of action等选择预设的 dose-response 曲线模型，优化模型shape；样本量计算、dose determination；然后一句trail得到的数据进行MCP-Mod分析。
+
+- Define a suitable study population to represent the underlying true dose-response shape.
+- Pre-Specify the candidate dose response models based on available information. These are based on assessment of relevant metrics such as type I error rate, power to detect a significant dose-response shape, and the power to find the minimal effective dose.
+- Dose determination and sample size calculation to achieve targeted performance characteristics.
 
 
 
 
-```{r}
+```{r, include=FALSE}
+library(tidyverse)
 library(DoseFinding)
 ```
 
@@ -46,6 +62,8 @@ library(DoseFinding)
 
 ```{r}
 data(IBScovars)
+
+str(IBScovars)
 ```
 
 
@@ -67,15 +85,23 @@ ggplot(IBScovars, aes(factor(dose), resp)) +
 
 
 ```{r}
+# The function “guesst” will pass the parameters of each model to function “Mods”, which will then produce a list that contains all information about candidate models.
+?guesst
+
+quad <- guesst(d= 1, p = 0.9, model = 'quadratic')
+```
+
+```{r}
 ## ?Mods
 ## perform (model based) multiple contrast test
 ## define candidate dose-response shapes
 ## 首先是设定你所欲考虑的模型。这里的问题在于the guesstimates for the theta2 parameters的值怎么去猜测？
 ## 还有关于placebo的部分需要注意，其默认的；两个值为0，1, placEff=0, maxEff=1
 models <- Mods(linear = NULL, 
+               linlog = NULL,
                emax = c(0.2, 1), 
                quadratic = -0.17,
-               doses = c(0, 1, 2, 3, 4) # 需要加上placebo
+               doses = c(0, 1, 2, 3, 4) # 需要加上placebo，也就是0
                )
 
 
@@ -94,9 +120,11 @@ plot(optC)
 
 #### 第二步：
 
-进行多重比对检验。
+进行多重比对检验。Detect a significant dose response signal using a trend test.
 
 Note that the type parameter defaults to type="normal", which means that we assume a homoscedastic ANOVA model for resp.
+
+Model-specific contrast tests with null hypotheses of a flat dose-response curve is performed by 'MCTtest' function.
 
 ```{r}
 ## perform multiple contrast test
@@ -114,17 +142,24 @@ test
 ```
 
 
-
+*general test*
+Generalization to non-normal data
 ```{r}
-fitlm <- lm(FEV1 ~ factor(dose) - 1, data = NVA)
+# fit a anova
+fitlm <- lm(resp ~ factor(dose) - 1, data = IBScovars)
+# get anova results
 mu_hat <- coef(fitlm)
 S_hat <- vcov(fitlm)
 anova_df <- fitlm$df.residual
 
+doses <- c(0,1,2,3,4)
 
-test_general <- MCTtest(dose = doses, resp = mu_hat, 
-                        S = S_hat, df = anova_df,
-                        models = mods, 
+
+test_general <- MCTtest(dose = doses, 
+                        resp = mu_hat, 
+                        S = S_hat, 
+                        df = anova_df,
+                        models = models, 
                         type = "general"
                         )
 print(test_general)
@@ -134,7 +169,7 @@ print(test_general)
 
 #### 第三步：
 
-下面选择Emax模型进行拟合，最小二乘法，
+下面选择Emax模型进行拟合，最小二乘法，Dose treated as continuous variable.
 ```{r}
 ## ?fitMod
 fitemax <- fitMod(dose = dose, resp = resp, data=IBScovars, 
@@ -143,7 +178,7 @@ fitemax <- fitMod(dose = dose, resp = resp, data=IBScovars,
                   )
 
 ## display fitted dose-effect curve
-plot(fitemax, CI=TRUE, plotData="meansCI")
+plot(fitemax, CI=TRUE, plotData="meansCI",level=0.95)
 ```
 *interpret: *从图上的结果来看的话dose等于2的时候，resp就可以了。
 
@@ -153,19 +188,245 @@ fitemax |> summary()
 ```
 
 
+*The `MCPMod` function simultaneously conducts both steps. *
+```{r}
+set.seed(42, "L'Ecuyer")
+
+res <- DoseFinding::MCPMod(dose = doses, resp = mu_hat, 
+                           # data = IBScovars,
+                           S = S_hat,
+                           models = models,
+                           type = 'general',
+                           critV = TRUE,
+                           alpha = 0.05,
+                           alternative = 'two.sided',
+                           Delta = 1,
+                           selModel = 'AIC'
+                           )
+
+res$selMod
+```
 
 ```{r}
-
+res$doseEst
 ```
+
+```{r}
+doseVec <- seq(1,10,by=1)
+
+
+pred <- predict(fitemax, se.fit = TRUE, predType = 'ls-means')
+
+pred |> str()
+```
+
 
 
 ### kx826 1002 实战
 
+很明显的，本二期临床试验采用的是传统的pairwise comparisons方法衡量的dose，而且其所设置的dose剃度仅为2+1个。 有一些模型不是很适合。
 
+对于MMRM类的数据，似乎可以通过MMRM分析，比如R包`mmrm::mmrm`或SAS`PROC Mixed`提取对应的协方差矩阵等。
+
+```{r, include=FALSE}
+final_data_wider <- read_csv(
+  '~/OneDrive/kintor/Daily_Work/KX826_CN1002/final_data_wider.csv') %>% 
+  mutate(dislevel = case_when(
+    dislevel == 'IIIvertex' ~ 'III',
+    dislevel == 'Ⅴ级' ~ 'V',
+    dislevel == 'Ⅳ级' ~  'IV'
+  ))
+```
+
+
+```{r}
+demo <- final_data_wider %>%
+  filter(arm %in% c('placeboBID', '2.5mgBID','5mgBID')) %>%
+  mutate(resp = dW24, dose = case_when(
+    arm == "placeboBID" ~ 0,
+    arm == "2.5mgBID" ~ 2.5,
+    arm == "5mgBID" ~ 5,
+    TRUE ~ NA_integer_
+  )) %>% 
+  drop_na(resp) %>% as.data.frame()
+
+demo
+```
+
+```{r}
+ggplot(demo, aes(factor(dose), resp)) + 
+  geom_boxplot() +
+  geom_jitter() +
+  labs(title = "resp by dose (jittered horizontally)") +
+  xlab("dose [μg]") + ylab("response [chg]")
+```
+
+
+```{r}
+quad <- guesst(d = 3, p = 0.9, model = 'quadratic')
+exp <- guesst(d = 3, p = 0.9, model = 'exponential', Maxd = 3)
+emax <- guesst(d = 3, p = 0.9, model = 'emax')
+sigemax <- guesst(d = c(2.5, 4), p = c(0.3, 0.9), model = 'sigEmax')
+logis <- guesst(d = c(2.5, 4), p = c(0.3, 0.9), model = 'logistic')
+```
+
+```{r}
+mods <- Mods(
+  linear = NULL,
+  linlog = NULL,
+  emax = c(emax, 2.5),
+  quadratic = quad,
+  exponential = exp,
+  # sigEmax = sigemax,
+  # logistic = logis,
+  doses = c(0, 2.5, 5)
+)
+
+plot(mods)
+```
+
+```{r}
+optC <- optContr(mods, w=1)
+print(optC)
+
+plot(optC)
+```
+
+```{r}
+test <- MCTtest(dose = dose, resp = resp, data = demo, 
+                models=mods,
+                # addCovars = ~ gender,# 协变量
+                type = 'normal'
+                )
+
+test
+```
+*结果不妙：*从设定好的p值来看的话，不具有计量的量效关系。
+
+
+```{r}
+fit_best <- fitMod(dose = dose, resp = resp, data=demo, 
+                  model="exponential"
+                  )
+
+## display fitted dose-effect curve
+plot(fit_best, CI=TRUE, plotData="meansCI",level=0.95)
+```
+
+```{r}
+# fit a anova
+fitlm <- lm(resp ~ factor(dose) - 1, data = demo)
+# get anova results
+mu_hat <- coef(fitlm)
+S_hat <- vcov(fitlm)
+anova_df <- fitlm$df.residual
+
+doses <- c(0, 2.5, 5)
+
+
+test_general <- MCTtest(dose = doses, 
+                        resp = mu_hat, 
+                        S = S_hat, 
+                        df = anova_df,
+                        models = mods, 
+                        type = "general"
+                        )
+print(test_general)
+```
+
+```{r}
+set.seed(42, "L'Ecuyer")
+
+res <- DoseFinding::MCPMod(dose = doses, resp = mu_hat, 
+                           # data = IBScovars,
+                           S = S_hat,
+                           models = mods,
+                           type = 'general',
+                           critV = TRUE,
+                           alpha = 0.025,
+                           alternative = 'one.sided',
+                           Delta = 1,
+                           selModel = 'AIC'
+                           )
+
+res$selMod
+```
+
+
+### kx826 cn1004
+
+
+```{r}
+fake_data <- read_csv(
+  '~/OneDrive/kintor/Daily_Work/KX826_CN1004/data_wider.csv'
+) %>% 
+  # filter(ARM %in% c('placeboQD','2.5mgQD','5mgQD')) %>% 
+  filter(ARM %in% c('placeboBID','2.5mgBID','5mgBID')) %>% 
+  mutate(resp = dW24, 
+         # dose = case_when(ARM == "placeboQD" ~ 0,
+         #                               ARM == "2.5mgQD" ~ 2.5,
+         #                               ARM == "5mgQD" ~ 5,
+         #                               TRUE ~ NA_integer_),
+         dose = case_when(ARM == "placeboBID" ~ 0,
+                                       ARM == "2.5mgBID" ~ 2.5,
+                                       ARM == "5mgBID" ~ 5,
+                                       TRUE ~ NA_integer_)
+         ) %>% drop_na(resp) %>% as.data.frame()
+
+fake_data
+```
+```{r}
+ggplot(fake_data, aes(factor(dose), resp)) + 
+  geom_boxplot() +
+  geom_jitter() +
+  labs(title = "resp by dose (jittered horizontally)") +
+  xlab("dose [μg]") + ylab("response [chg]")
+```
+
+```{r}
+quad <- guesst(d = 3, p = 0.9, model = 'quadratic')
+exp <- guesst(d = 3, p = 0.9, model = 'exponential', Maxd = 3)
+emax <- guesst(d = 3, p = 0.9, model = 'emax')
+sigemax <- guesst(d = c(2.5, 4), p = c(0.3, 0.9), model = 'sigEmax')
+logis <- guesst(d = c(2.5, 4), p = c(0.3, 0.9), model = 'logistic')
+
+mods <- Mods(
+  linear = NULL,
+  linlog = NULL,
+  emax = c(emax, 2.5),
+  quadratic = quad,
+  exponential = exp,
+  # sigEmax = sigemax,
+  # logistic = logis,
+  doses = c(0, 2.5, 5)
+)
+
+plot(mods)
+```
+
+```{r}
+test <- MCTtest(dose = dose, resp = resp, data = fake_data, 
+                models=mods,
+                # addCovars = ~ gender,# 协变量
+                type = 'normal'
+                )
+
+test
+```
+
+```{r}
+fit_best <- fitMod(dose = dose, resp = resp, data=fake_data, 
+                  model="emax"
+                  )
+
+## display fitted dose-effect curve
+plot(fit_best, CI=TRUE, plotData="meansCI",level=0.95)
+```
+
+由逆回归方法推估感兴趣的剂量:
 ```{r}
 
 ```
-
 
 
 
