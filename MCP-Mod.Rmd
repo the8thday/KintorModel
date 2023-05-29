@@ -314,7 +314,7 @@ plot(fit_best, CI=TRUE, plotData="meansCI",level=0.95)
 ```
 
 ```{r}
-# fit a anova
+# fit an anova
 fitlm <- lm(resp ~ factor(dose) - 1, data = demo)
 # get anova results
 mu_hat <- coef(fitlm)
@@ -360,21 +360,22 @@ res$selMod
 fake_data <- read_csv(
   '~/OneDrive/kintor/Daily_Work/KX826_CN1004/data_wider.csv'
 ) %>% 
-  # filter(ARM %in% c('placeboQD','2.5mgQD','5mgQD')) %>% 
-  filter(ARM %in% c('placeboBID','2.5mgBID','5mgBID')) %>% 
+  filter(ARM %in% c('placeboQD','2.5mgQD','5mgQD')) %>%
+  # filter(ARM %in% c('placeboBID','2.5mgBID','5mgBID')) %>%
   mutate(resp = dW24, 
-         # dose = case_when(ARM == "placeboQD" ~ 0,
-         #                               ARM == "2.5mgQD" ~ 2.5,
-         #                               ARM == "5mgQD" ~ 5,
-         #                               TRUE ~ NA_integer_),
-         dose = case_when(ARM == "placeboBID" ~ 0,
-                                       ARM == "2.5mgBID" ~ 2.5,
-                                       ARM == "5mgBID" ~ 5,
-                                       TRUE ~ NA_integer_)
+         dose = case_when(ARM == "placeboQD" ~ 0,
+                                       ARM == "2.5mgQD" ~ 2.5,
+                                       ARM == "5mgQD" ~ 5,
+                                       TRUE ~ NA_integer_),
+         # dose = case_when(ARM == "placeboBID" ~ 0,
+         #                               ARM == "2.5mgBID" ~ 2.5,
+         #                               ARM == "5mgBID" ~ 5,
+         #                               TRUE ~ NA_integer_)
          ) %>% drop_na(resp) %>% as.data.frame()
 
 fake_data
 ```
+
 ```{r}
 ggplot(fake_data, aes(factor(dose), resp)) + 
   geom_boxplot() +
@@ -384,7 +385,7 @@ ggplot(fake_data, aes(factor(dose), resp)) +
 ```
 
 ```{r}
-quad <- guesst(d = 3, p = 0.9, model = 'quadratic')
+quad <- guesst(d = c(2.5, 5), p = 0.9, model = 'quadratic')
 exp <- guesst(d = 3, p = 0.9, model = 'exponential', Maxd = 3)
 emax <- guesst(d = 3, p = 0.9, model = 'emax')
 sigemax <- guesst(d = c(2.5, 4), p = c(0.3, 0.9), model = 'sigEmax')
@@ -414,17 +415,86 @@ test <- MCTtest(dose = dose, resp = resp, data = fake_data,
 test
 ```
 
+拟合最优模型：
 ```{r}
 fit_best <- fitMod(dose = dose, resp = resp, data=fake_data, 
-                  model="emax"
+                  model="exponential"
                   )
 
 ## display fitted dose-effect curve
 plot(fit_best, CI=TRUE, plotData="meansCI",level=0.95)
 ```
 
-由逆回归方法推估感兴趣的剂量:
+*use general: *
 ```{r}
+# fit an anova
+fitlm <- lm(resp ~ factor(dose) - 1, data = fake_data)
+# get anova results
+mu_hat <- coef(fitlm)
+S_hat <- vcov(fitlm)
+anova_df <- fitlm$df.residual
+
+doses <- c(0, 2.5, 5)
+
+
+test_general <- MCTtest(dose = doses, 
+                        resp = mu_hat, 
+                        S = S_hat, 
+                        df = anova_df,
+                        models = mods, 
+                        type = "general"
+                        )
+print(test_general)
+```
+
+```{r}
+set.seed(42, "L'Ecuyer")
+
+res <- DoseFinding::MCPMod(dose = doses, resp = mu_hat, 
+                           # data = IBScovars,
+                           S = S_hat,
+                           models = mods,
+                           type = 'general',
+                           critV = TRUE,
+                           alpha = 0.025,
+                           alternative = 'one.sided',
+                           Delta = 1,
+                           selModel = 'maxT'
+                           )
+
+res$selMod
+```
+
+```{r}
+res$doseEst
+```
+
+
+```{r}
+DoseFinding::ED(fit_best, p = 0.9)
+
+DoseFinding::TD(fit_best)
+```
+
+
+所选出的最佳剂量反应曲线模型，可通过试验结果数据估计模型的参数，进而由逆回归方法推估感兴趣的剂量:
+inverse regression equation
+
+```{r}
+# 也即是通过Y的值去推测X的值
+# 以下对线形模型适用，但对此模型似乎不行
+# xval <- approx(x = fit_best$fitted, y = x, xout = 9.1)$y
+# points(xval, 9.1, col = "blue", lwd = 5)
+
+
+ypredict <- 9.1
+
+fun <- function(x1, y1, mod) {
+    predict(mod, newdata=data.frame(days=x1)) - y1
+    }    
+                
+(xpred <- sapply(ypredict, function(z) uniroot(fun, interval=c(0, 500), mod=fit_best, y1=z)$root))
+        
 
 ```
 
