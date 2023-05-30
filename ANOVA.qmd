@@ -45,7 +45,7 @@ library(easystats)
 library(car)
 library(multcomp)
 library(statsExpressions)
-library(PMCMRplus)
+library(PMCMRplus) # 事后检验
 ```
 
 
@@ -59,7 +59,7 @@ library(PMCMRplus)
 
 one-way ANOVA，其假设条件为因变量正态分布、独立、各组间方差相等、线性。
 
-假设检验为：H0 五个分组之间均值相等；H1
+假设检验为：H0 五个分组之间均值相等；H1，5个分组之间至少有一个分组和其他不同。
 
 ```{r}
 data(cholesterol, package="multcomp")
@@ -274,6 +274,7 @@ summary(fit5)
 
 #### 两阶段交叉设计资料方差分析
 
+这里的数据可以理解为一个患者经过了两次处理。
 
 ```{r}
 contain <- c(760,770,860,855,568,602,780,800,960,958,940,952,635,650,440,450,
@@ -301,14 +302,24 @@ summary(fit)
 
 重复测量方差分析，不可以有NA值，既是在同一个分组组合中不能有数据缺失。
 
+Unfortunately, there are no non-parametric alternatives to the two-way and the three-way repeated measures ANOVA. 
+
+- No significant outliers(outlier 对方差等分析的影响确实很大)
+- Normality
+- Assumption of sphericity
+
+
 ```{r}
 w1b1 <- subset(CO2, Treatment=='chilled')
 
 # Plant 既是Subject
+# This will split the error into subject error and interaction error. 
 fit6 <- aov(uptake ~ conc*Type + Error(Plant/(conc)), w1b1)
 
 summary(fit6)
 ```
+In one way repeated measures anova, the residuals splits into subject and interaction residuals as compared to one way anova. This decomposition of error term considerably reduce the residual source of variance for the calculation of F value.
+
 
 ```{r}
 fit7 <- aov(uptake ~ conc*Type + Error(Plant), w1b1) 
@@ -357,6 +368,28 @@ modelbased::estimate_contrasts(fit6)
 
 ```
 
+
+*考虑这样一种情况，只有conc这一分组变量：* 
+对于这种数据，相当于每一个患者，在不同时间接受了某种检测，现在查看不同时间的差别，
+从数据的角度来看，其似乎就是一个one-way anova，但每一行不是一个独立的case，而是一个重复测量数据。
+也即是one-way repeated measure：
+```{r}
+
+fit8 <- aov(uptake ~ conc + Error(Plant/conc), w1b1) 
+
+summary(fit8)
+
+```
+
+对于one-way repeated measure的事后检验，
+```{r}
+report(fit8)
+```
+
+```{r}
+# 很烦
+car::outlierTest(fit8)
+```
 
 
 
