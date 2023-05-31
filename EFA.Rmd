@@ -142,6 +142,23 @@ vif(model.fa.score)
 ```
 
 
+### Exploratory factor analysis for ordinal categorical data
+
+
+> http://dwoll.de/rexrepos/posts/multFApoly.html
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
 
 
 

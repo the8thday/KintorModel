@@ -43,7 +43,17 @@ gplots::balloonplot(t(as.table(as.matrix(housetasks))),
 ```
 
 ```{r}
-vcd::mplot(housetasks)
+# housetasks 明明是一个类似列联表的计数数据，其和table返回的数据不一样吗？
+# vcd::mosaic(~ Wife + Alternating, data = housetasks)
+
+foo <- housetasks %>% rownames_to_column() %>% 
+  pivot_longer(cols = -rowname)
+
+xtabs(value ~ rowname + name, data = foo) |> vcd::mosaic()
+
+# or 
+as.matrix(housetasks) %>% array(dim = dim(.), dimnames = dimnames(.)) %>% 
+  as.table() |> vcd::mosaic()
 ```
 
 ```{r}
@@ -97,6 +107,6 @@ var <- get_mca_var(res.mca)
 ```
 
 
-
+### Canonical Correspondence Analysis
 
 
