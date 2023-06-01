@@ -152,6 +152,8 @@ print(results)
 plot(results)
 ```
 
+
+可利用百分位法和偏差矫正百分位法进行Bootstrap区间估计。
 ```{r}
 boot.ci(results, type = c("perc", "bca"))
 ```
