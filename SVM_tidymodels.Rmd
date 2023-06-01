@@ -21,11 +21,14 @@ knitr::opts_chunk$set(echo = TRUE)
 简单点讲，SVM就是一种二类分类模型，他的基本模型是定义在特征空间上的间隔最大的线性分类器，SVM的学习策略就是间隔最大化。
 
 1.线性可分SVM,
-当训练数据线性可分时，通过硬间隔hard margin最大化可以学习得到一个线性分类器，即硬间隔SVM
+当训练数据线性可分时，通过硬间隔hard margin最大化可以学习得到一个线性分类器，即硬间隔SVM,
 2.线性SVM,
 当训练数据不能线性可分但是可以近似线性可分时，通过软间隔(soft margin)最大化也可以学习到一个线性分类器，即软间隔SVM。
 3.非线性SVM,
 当训练数据线性不可分时，通过使用核技巧(kernel trick)和软间隔最大化，可以学习到一个非线性SVM。
+
+
+在真实世界中，原始的特征空间内也许压根并不存在这样一个能够正确划分两类样本的超平面，即数据往往是线性不可分的。解决办法有软间隔分类器（Soft margin classifier）和核技巧（Kernel Trick）。相对硬间隔的分类完全准确、不存在分类错误的情况，软间隔允许一定量的样本分类错误，用于近似线性可分的情况。核技巧则是通过对数据点进行特征空间转换（将低维空间的点投射到高位空间）来实现线性可分，然后再通过核函数来获得高维空间中的超平面参数。
 
 
 _The disadvantages of support vector machines include:_
@@ -60,7 +63,7 @@ Can be sensitive to class imbalance: SVMs can be sensitive to class imbalance, w
 
 
 *SVM重要的超参数：*cost(C,错误项的惩罚参数)The value of C determines the penalty for the classifier； margin() regression only；kernel的选择是重要的，有一些kernel还有 自己的需要注意的参数，
-比如对于`poly`kernel有degree, 一般在1-10之间; `svm_linear`经常只需要Cost一个超参数。radial kernel这一常用又成功的kernel在`tidymodels` 以`svm_rbf`需要tune的参数有，recommend to search C in the range [2^−5;2^15] and γ in the range [2^−15;2^3].
+比如对于`poly`kernel有degree, 一般在1-10之间; `svm_linear`经常只需要Cost一个超参数。radial kernel这一常用又成功的kernel在`tidymodels` 以`svm_rbf`需要tune的参数有，recommend to search C in the range [2^−5;2^15] and γ in the range [2^−15;2^3].γ默认自变量个数的倒数，值越大表示低维度样本向高维度映的维度越高，训练的结果越好，但越容易引起过拟合（泛化能力越低）。C值影响支持向量与决策平面之间的距离的参数，表示错分样本时的惩罚程度，默认为1。C值越大分类器的准确性越高，但容错率会越低泛化能力会变差；C越小，泛化能力越强准确性会降低。
 对于`tidymodels`的超参数设置而言，其所提供的参数选项看起来不如`sklearn`，而且如果需要`set_engine`中的超参数的话还是需要自己去查阅资料的。
 
 _from chatGPT_
@@ -85,6 +88,8 @@ Data scaling:SVM is sensitive to the scale of the input data. If the input featu
 *svm*对于特征NA值的处理：
 纳入过多特征的数据集有一个大麻烦在于后续预测时，不是每一个样本都会包含这些特征，比如对于基因表达数据的检验，很有可能某一个基因其的表达本次没有检测到，而作为一个样本输入，如何去预测其的分类呢？
 分类变量：one-hot编码。
+
+支持向量机涉及到距离的计算，为了消除不同当量的影响，还需要将连续性变量进行标度统一（Scaling，或翻译成缩放？），归一化(normalization)和标准化(standardization)是最常用的方法。因为数据集分为了训练集和测试集，这样就有一个不可避免的问题：对变量进行标准化时应该采用整个数据集的均值和标准差，还是用训练集的均值和标准差？如果采用整个数据集的均值和标准差，实际上是将未来的、将要对其做出预测的信息引入了训练集中。但作为一个预测模型而言，预测是应用于未发现的数据，这些数据在建立模型时往往是不知道的，测试集实际上就是对此进行的模拟。所以为了获得对模型质量和泛化能力的良好估计，需要将标准化参数（均值和方差）的计算限制在训练集中，即训练集和测试集应该采用相同的参数进行Scaling。
 
 
 ### 一个简单的示例
