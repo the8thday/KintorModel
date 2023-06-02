@@ -90,6 +90,17 @@ If the p-value is less than the chosen significance level (e.g. 0.05), you would
 Keep in mind that the chi-square test of independence does not provide information about which specific groups (candidates) have different proportions. If you want to test for differences between specific groups, you may conduct post-hoc pairwise comparisons using proportion tests or employ other methods like Marascuilo Procedure or adjusted standardized residuals.
 
 
+*对于二分类的问题，似乎优选选择binom.test*
+prop.test() uses the score test, not a Wald test。
+binom.test(), as this always gives exact P-values.
+```{r}
+# 
+binom.test(x = 44, n = 63, p = 0.8, alternative = "two.sided")
+
+# without Yates' continuity correction
+prop.test(x = x1, n = n1, p = 0.8, alternative = "two.sided", correct = FALSE)
+```
+
 
 ### two-way table
 
