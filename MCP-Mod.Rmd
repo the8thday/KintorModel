@@ -88,7 +88,7 @@ ggplot(IBScovars, aes(factor(dose), resp)) +
 # The function “guesst” will pass the parameters of each model to function “Mods”, which will then produce a list that contains all information about candidate models.
 ?guesst
 
-quad <- guesst(d= 1, p = 0.9, model = 'quadratic')
+quad <- guesst(d = 1, p = 0.9, model = 'quadratic')
 ```
 
 ```{r}
