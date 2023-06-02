@@ -26,7 +26,9 @@ head(Arthritis)
 
 ### one-way table 
 
-`xtabs`的用法可以记成`table`函数的公式化版本。右边为需要cross-classified的变量，左边为频数（如果有的话）
+`xtabs`的用法可以记成`table`函数的公式化版本。右边为需要cross-classified的变量，左边为频数（如果有的话）.
+
+one waay table 也就是讲一组变量间的计数数据，比如实验组和对照组两个分组，但是得到的结局是一个计数（或者是比例）数据，其的分析采用的方法主要是，
 
 ```{r}
 # one-way table
@@ -43,12 +45,55 @@ plot(mytable)
 ```
 
 ```{r}
+barplot(mytable)
+```
+
+```{r}
 DescTools::BinomCI()
 ```
+
+`prop.test` can be used for testing the null that the proportions (probabilities of success) in several groups are the same, or that they equal certain given values.
+```{r}
+prop.test(c(42,14,28), c(84,84,84))
+```
+
+
+```{r}
+prop.trend.test()
+```
+
+
+卡方独立性检验，
+```{r}
+chisq.test(mytable)
+```
+
+
+```{r}
+# Create a contingency table with vote counts for candidates A, B, and C
+vote_counts <- c(42, 14, 28)
+vote_table <- matrix(vote_counts, nrow = 1, byrow = TRUE)
+
+# Name the rows and columns
+rownames(vote_table) <- "Votes"
+colnames(vote_table) <- c("Candidate A", "Candidate B", "Candidate C")
+
+
+# Perform the chi-square test of independence
+test_result <- chisq.test(vote_table)
+
+# Print the test results
+print(test_result)
+
+```
+If the p-value is less than the chosen significance level (e.g. 0.05), you would reject the null hypothesis and conclude that there is a significant difference among the proportions across the three groups (candidates).
+Keep in mind that the chi-square test of independence does not provide information about which specific groups (candidates) have different proportions. If you want to test for differences between specific groups, you may conduct post-hoc pairwise comparisons using proportion tests or employ other methods like Marascuilo Procedure or adjusted standardized residuals.
 
 
 
 ### two-way table
+
+这是最为常见的列联表的形式，
 
 ```{r}
 # 常见的2x2
@@ -83,6 +128,10 @@ class(with(Arthritis, table(Treatment, Improved)))
 不过这种转换和原始数据的格式还是不一样的。
 ```{r}
 as.data.frame(mytable1)
+
+# 怎么把这种格式的dataframe变成table呢
+as.data.frame(mytable1) %>% pivot_wider(id_cols = Treatment, 
+                                        names_from = Improved, values_from = Freq)
 ```
 
 
