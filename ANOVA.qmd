@@ -6,6 +6,9 @@ format: html
 ## 方差分析
 
 > R in action
+> https://stats.stackexchange.com/questions/60108/how-to-write-the-error-term-in-repeated-measures-anova-in-r-errorsubject-vs-e
+> https://stats.stackexchange.com/questions/286280/repeated-measures-anova-vs-factorial-anova-with-subject-factor-understanding
+
 
 方差(variance)指的是，一组数字和其均值间的度量，描述的是一个变量的离散程度，是随机变量与其总体均值或样本均值的离差的平方的期望值。方差是标准差的平方、分布的二阶矩，以及随机变量与其自身的协方差。
 
@@ -54,8 +57,11 @@ library(PMCMRplus) # 事后检验
 如上文所述，`aov`函数提供TypeI for partitioning the variance in y among the effects on the right side of this equation.
 其是包装的lm函数，不过其的输出更符合常规ANOVA的结构。
 
+同时需要特别注意，`aov`函数需要样本是balance的。
+The order in which the effects appear in a formula matters when (a) there’s more than one factor and the design is unbalanced or (b) covariates are present.
 
-#### 完全随机设计资料的方差分析
+
+#### 完全随机设计资料的方差分析 one-way ANOVA
 
 one-way ANOVA，其假设条件为因变量正态分布、独立、各组间方差相等、线性。
 
@@ -69,7 +75,9 @@ data(cholesterol, package="multcomp")
 描述性统计，以及数据检查：
 ```{r}
 
-
+ggplot(data = cholesterol, aes(x = trt, y = response)) +
+  geom_boxplot() +
+  theme_abyss()
 ```
 
 
@@ -81,6 +89,11 @@ summary(fit1)
 report::report_model(fit1)
 ```
 
+```{r}
+print(model.tables(fit1,"means"),digits=3)
+```
+
+
 Type III anova:
 
 ```{r}
@@ -88,17 +101,28 @@ car::Anova(fit1, type = 'III')
 ```
 
 
-模型检验：
+*模型检验：*
 
 ```{r}
 # 和线性模型一样
 plot(fit1) # 输出四幅模型诊断的图片
 
+```
+
+
+```{r}
+car::qqPlot(fit1, simulate = T, main = 'QQ Plot')
+```
+
+
+
+```{r}
 performance::check_model(fit1)
 
 # 除了满足模型假设外，还需要控制outlier
 car::outlierTest(fit1)
 ```
+
 
 对于one-way ANOVA其效应值为eta^2^
 ```{r}
@@ -138,6 +162,12 @@ labels1 <- cld(tuk, level=.05)$mcletters$Letters
 #### One-way ANCOVA
 
 在ANOVA的基础上加一个定量的协变量。协变量在`aov`函数中放在公式的前面。不过在`car::Anova`直接包裹时是不用考虑顺序的，因为其所提供的是typeII和typeIII anova。
+
+
+```{r}
+str(litter)
+```
+
 
 ```{r}
 # gesttime 是连续性变量
@@ -202,6 +232,8 @@ modelbased::estimate_contrasts(fit2,
 ```
 
 
+*多重检验：*
+
 The contrast c(3, -1, -1, -1) specifies a comparison of the first group with the average of the other three. 
 
 ```{r}
@@ -212,10 +244,36 @@ summary(multcomp::glht(fit2, linfct=mcp(dose=contrast)))
 ```
 
 
+*Assumptions:*
 
-#### 随机区组设计资料的方差分析
+除了正态性和等方差外，ANCOVA还假设homogeneity of regression slopes. 如果不满足此假设的话，可以采用`sm::sm.ancova`进行分析
 
-two-way factorial 分析，两个具有交互作用的分类变量和一个响应变量：
+```{r}
+fit2_2 <- aov(weight ~ gesttime * dose, data=litter)
+
+summary(fit2_2)
+```
+`gesttime:dose` 无统计学意义，证实了等斜率假设。
+
+
+
+#### 随机区组设计资料的方差分析 two-way factorial ANOVA
+
+two-way factorial ANOVA 分析，两个具有交互作用的分类变量和一个响应变量：
+
+supp和dose没有nest效应。都是between间的差别。同一个患者测了两个不同的指标。但每一行都是一个患者。
+
+
+```{r}
+ToothGrowth$dose <- factor(ToothGrowth$dose)
+
+ToothGrowth %>% janitor::tabyl(supp, dose)
+
+# 均衡设计, 此数据集的两个随机分组每个组合都有10例观测
+
+str(ToothGrowth)
+```
+
 
 ```{r}
 fit3 <- aov(len ~ supp*dose, data=ToothGrowth)
@@ -227,7 +285,14 @@ summary(fit3)
 gplots::plotmeans(len ~ interaction(dose, supp, sep = ' : '), data=ToothGrowth)
 ```
 
-Randomized block(随你区组)的实验设计，其数据格式和
+```{r}
+interaction.plot()
+```
+
+
+Randomized block(随机区组)的实验设计，其数据格式和多水平模型的数据格式相似。比如group为水平1单位、block为水平2单位。
+
+但每一行为一个患者。block怎么理解。
 
 ```{r}
 weight <- c(0.82,0.65,0.51,0.73,0.54,0.23,0.43,0.34,0.28,0.41,0.21,
@@ -238,18 +303,19 @@ group <- c(rep(c("A","B","C"),5))
 data4_4 <- data.frame(weight,block,group)
 
 head(data4_4)
+
+data4_4 %>% janitor::tabyl(block, group)
 ```
 
 
 ```{r}
-fit4 <- aov(weight ~ block + group,data = data4_4) #随机区组设计方差分析，注意顺序block位于前面
+fit4 <- aov(weight ~ block + group,data = data4_4) #随机区组设计方差分析，注意数据均衡与否，以及term的顺序。
 
 summary(fit4)
 ```
 
 
 拉丁方设计方差分析
-
 
 ```{r}
 psize <- c(87,75,81,75,84,66,73,81,87,85,64,79,73,73,74,78,73,77,77,68,69,74,76,73,
@@ -262,6 +328,10 @@ mydata <- data.frame(psize,drug,col_block,row_block)
 mydata$col_block <- factor(mydata$col_block)
 mydata$row_block <- factor(mydata$row_block)
 str(mydata)
+```
+
+```{r}
+xtabs(~ drug + col_block + row_block, data = mydata) |> ftable()
 ```
 
 ```{r}
@@ -302,30 +372,51 @@ summary(fit)
 
 重复测量方差分析，不可以有NA值，既是在同一个分组组合中不能有数据缺失。
 
-Unfortunately, there are no non-parametric alternatives to the two-way and the three-way repeated measures ANOVA. 
+Unfortunately, there are no non-parametric alternatives to the two-way and the three-way repeated measures ANOVA. one-wat 具有freedman 检验的。
 
 - No significant outliers(outlier 对方差等分析的影响确实很大)
 - Normality
 - Assumption of sphericity
+- 还有一点很重要aov需要balanced样本
 
 
 ```{r}
-w1b1 <- subset(CO2, Treatment=='chilled')
+# 一个很重要的数据格式问题
+# conc是否需要调整成factor类型，factor类型的实质为整数;
+# 那么调整成character呢？结果和number格式的conc也是不一样的，其没有Error:Within，但是和factor的结果一致
+# 经过一番资料查询，认为是有必要将水平2单位，往往是时间/浓度，整理成因子的。
+w1b1 <- subset(CO2, Treatment=='chilled') %>% 
+  mutate(conc = as.factor(conc))
 
+str(w1b1)
+```
+
+
+```{r}
 # Plant 既是Subject
 # This will split the error into subject error and interaction error. 
-fit6 <- aov(uptake ~ conc*Type + Error(Plant/(conc)), w1b1)
+# subject/time is notation for time nested in subject, and so expands to two parts, subject and the subject:time interaction.
+# 也就是conc这一水平1单位，嵌在Plant这一水平2单位里面
+fit6 <- aov(uptake ~ conc*Type + Error(Plant/conc), w1b1)
 
 summary(fit6)
 ```
-In one way repeated measures anova, the residuals splits into subject and interaction residuals as compared to one way anova. This decomposition of error term considerably reduce the residual source of variance for the calculation of F value.
+
+*interpret*: In one way repeated measures anova, the residuals splits into subject and interaction residuals as compared to one way anova. This decomposition of error term considerably reduce the residual source of variance for the calculation of F value.
 
 
+*They are equivalent only when there is exactly 1 measurement per each subject/time combination. If there are more measurements per subject/time combination (either simply because measurements were repeated, or because there is another within-subject factor B, in addition to time), then Error(subject) and Error(subject/time) will yield different F- and p-values for time.*
 ```{r}
+# 虽则fit7和fit6之间的Error不同，但是其summary的结果是一致的
+# 这种情况只在Plant和conc的组合只有一个测量值时一致。
 fit7 <- aov(uptake ~ conc*Type + Error(Plant), w1b1) 
 
 summary(fit7)
 
+```
+
+```{r}
+summary(aov(uptake ~ conc+Type + Error(Plant), w1b1))
 ```
 
 
@@ -337,8 +428,8 @@ CO2 %>%
     x = conc, y = mean_conc,
     group = Type, color = Type, linetype = Type
   )) +
-  geom_point(size = 2) +
-  geom_line(size = 1) +
+  geom_point(linewidth = 2) +
+  geom_line(linewidth = 1) +
   theme_bw() +
   theme(legend.position = "top") +
   labs(
@@ -352,8 +443,10 @@ CO2 %>%
 it assumes that the variances of the differences between any two levels of the within-groups factor are equal.
 
 ```{r}
+# 尚不支持
+# performance::check_sphericity(fit6)
 
-performance::check_sphericity(fit6)
+car::Anova()
 ```
 
 
@@ -369,17 +462,28 @@ modelbased::estimate_contrasts(fit6)
 ```
 
 
+*one-way repeated measure*
+
 *考虑这样一种情况，只有conc这一分组变量：* 
 对于这种数据，相当于每一个患者，在不同时间接受了某种检测，现在查看不同时间的差别，
 从数据的角度来看，其似乎就是一个one-way anova，但每一行不是一个独立的case，而是一个重复测量数据。
 也即是one-way repeated measure：
 ```{r}
-
-fit8 <- aov(uptake ~ conc + Error(Plant/conc), w1b1) 
+# 奇怪的问题，conc应该设置为factor还是numberic呢，设置成因子的时候结果似乎有所不同
+fit8 <- aov(uptake ~ conc + Error(Plant/conc), w1b1)
 
 summary(fit8)
 
 ```
+*interpret: *`Error: Within` 为conc的效应，似乎不同浓度间没有差别。`Error(id/time)` is used to divide the error variance into 4 different clusters, which therefore takes into account of the repeated measures. 
+
+
+```{r}
+# 此结果和上述的结果一致
+summary(aov(uptake ~ conc + Error(Plant), w1b1))
+```
+
+
 
 对于one-way repeated measure的事后检验，
 ```{r}
@@ -391,6 +495,22 @@ report(fit8)
 car::outlierTest(fit8)
 ```
 
+
+```{r}
+# 利用
+res <- nlme::lme(uptake ~ conc, random = ~1 | Plant, data = w1b1)
+
+# 查看分析结果
+summary(res)
+```
+
+```{r}
+# 进行事后检验
+post_hoc <- glht(res, linfct = mcp(conc = "Tukey"))
+
+# 显示事后检验结果
+summary(post_hoc)
+```
 
 
 #### Multivariate analysis of variance (MANOVA)
