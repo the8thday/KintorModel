@@ -8,7 +8,7 @@ format: html
 > https://rstudio-pubs-static.s3.amazonaws.com/378543_5b5bda32bf0541a485ccc49efbea680a.html
 > https://towardsdatascience.com/drug-dose-response-data-analysis-5d7d336ad8e9
 > https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_models_built-in_to_prism.htm
-> https://www.aatbio.com/tools/ic50-calculator
+> https://www.aatbio.com/tools/ic50-calculator 一个在线小工具
 > https://rstats4ag.org/dose-response-curves.html 重要的基础知识内容，主要参考文件
 > http://www.darrenkoppel.com/2020/09/04/dose-response-modelling-and-model-selection-in-r/
 
@@ -42,7 +42,7 @@ Kd
   在对数据进行绘图时，一般会对X轴的浓度数据取log，而Y轴的response一般进行简单的线性转换，主要是保证that all scatter around the curve is Gaussian。
   
   
-*模型判断：*如何判断一个curve模型呢？`drc`包似乎没有提供类似Prism R2的结果。而且在非线性模型中，R2不再是线性模型中x对
+*模型判断：*如何判断一个curve模型拟合的时候好呢？`drc`包似乎没有提供类似Prism R2的结果。而且在非线性模型中，R2不再是线性模型中x对
 y的解释程度的那个数值，For nonlinear regression, the choice of a ‘null’ model is not as simple, and therefore the  
 R2 type measure will be different depending on the chosen reduced model.
 R2在线性模型中实际上是两个模型的对比，所拟合的模型以及null model。
