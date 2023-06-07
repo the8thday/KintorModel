@@ -38,6 +38,18 @@ Randomized block: $y ~ B + A$(B is a blocking factor) 注意顺序
 For example, in a two-way ANOVA with unequal numbers of observations in the treatment combinations, the model `y ~ A*B` will not produce the same results as the model `y ~ B*A`. R默认采用TypeI（sequential），还有Type II (hierarchical)、Type III (marginal)，SAS and SPSS employ the Type III approach by default. 如果是均衡设计，3种类型的方差分析没有差别。所以很多时候会选择typeIII的结果。
 
 
+*Inappropriately Designating a Factor as Fixed or Random*
+In Analysis of Variance and some other methodologies, there are two types of factors: fixed effect and random effect. Which type is appropriate depends on the context of the problem, the questions of interest, and how the data is gathered. Here are the differences:
+_Fixed effect factor:_ Data has been gathered from all the levels of the factor that are of interest.
+
+Example: The purpose of an experiment is to compare the effects of three specific dosages of a drug on the response. "Dosage" is the factor; the three specific dosages in the experiment are the levels; there is no intent to say anything about other dosages.
+
+_Random effect factor:_ The factor has many possible levels, interest is in all possible levels, but only a random sample of levels is included in the data.1
+
+Example: A large manufacturer of widgets is interested in studying the effect of machine operator on the quality final product. The researcher selects a random sample of operators from the large number of operators at the various facilities that manufacture the widgets. The factor is "operator." The analysis will not estimate the effect of each of the operators in the sample, but will instead estimate the variability attributable to the factor "operator".
+
+
+
 在本笔记中，重点关注医学统计中的一些用法示例，其中会涉及到医学统计中常用到的概念，不过多也是以上描述的一些不同命名方式罢了。比如随机区组设计资料的方差分析，就是指的two-way ANOVA中的Randomized block。
 
 
