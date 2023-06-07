@@ -372,7 +372,7 @@ summary(fit)
 
 重复测量方差分析，不可以有NA值，既是在同一个分组组合中不能有数据缺失。
 
-Unfortunately, there are no non-parametric alternatives to the two-way and the three-way repeated measures ANOVA. one-wat 具有freedman 检验的。
+Unfortunately, there are no non-parametric alternatives to the two-way and the three-way repeated measures ANOVA. one-wat 具有freedman 检验的，其为非参数检验的形式。
 
 - No significant outliers(outlier 对方差等分析的影响确实很大)
 - Normality
@@ -519,6 +519,8 @@ one-way MANOVA，同时纳入多个因变量的意思有种显式变量推导隐
 
 ```{r}
 data(UScereal, package="MASS")
+
+str(UScereal)
 ```
 
 ```{r}
@@ -540,6 +542,7 @@ summary(fit8)
 
 Because the multivariate test is significant, you can use the summary.aov() function to obtain the univariate one-way ANOVAs.
 ```{r}
+# 得到每一个因变量的检验值
 summary.aov(fit8)
 ```
 
@@ -557,18 +560,25 @@ The two assumptions underlying a one-way MANOVA are multivariate normality and h
 *post-hoc*:
 
 ```{r}
-stats::TukeyHSD(fit8)
+stats::TukeyHSD()
 ```
+
+
 
 *Robust MANOVA*
+
+当假设条件不怎么满足的时候，可以考虑采用robust version of the one-way MANOVA.
 ```{r}
+# robust
 rrcov::Wilks.test(y,shelf,method="mcd")
 
-# or
-
-vegan::adonis()
 ```
 
+```{r}
+# or a nonparametric
+# 此函数在16S测序中经常用到，可参考对应笔记
+vegan::adonis()
+```
 
 
 
