@@ -166,16 +166,37 @@ gmodels::CrossTable(Arthritis$Improved, Arthritis$Treatment)
 
 fisher不只能用于2X2的列联表形式，只要是two-way的形式，其都可以。
 ```{r}
+# ?fisher.test
 mytable1 |> fisher.test()
 ```
 
+
+*卡方检验：*
+通过调整correct参数可以得出卡方值和连续调整卡方值，似然比卡方检验的话，Likelihood Ratio (G test) for contingency tables,
+可以通过`vcd::assocstats`得到。
 ```{r}
 chisq.test(mytable1)
 ```
 *interpret: *P值小于0.05，两个变量之间相关。
 
 
+```{r}
+# 如何出现理论频数和实际频数的表格呢？
+foo <- chisq.test(mytable1_2)
+
+foo
+
+names(foo)
+```
+
+```{r}
+vcdExtra::CMHtest(mytable1_2)
+```
+
+
+
 *association 分析*
+此处得到的结果和LR chi的结果一致。
 ```{r}
 vcd::assocstats(mytable1)
 ```
@@ -220,6 +241,8 @@ ftable(mytable2)
 
 
 Cochran-Mantel-Haenszel test, 分层卡方检验。用于比较两个分类变量在控制一个或多个混杂变量的条件下是否存在相关性。
+
+Mantel-Haenszel test,检验的是行和列之间是否存在线性关系（linear trend），而Pearson X2检验的是一般关联（General Association）。线形趋势一般用于行变量和列变量均为有序变量的情形。
 ```{r}
 # 注意输入数据中，哪个变量做为stratum，一般公式中最后一个变量为stratum
 # 比如本例中，sex即为stratum
