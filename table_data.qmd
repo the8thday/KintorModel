@@ -172,7 +172,7 @@ mytable1 |> fisher.test()
 
 
 *卡方检验：*
-通过调整correct参数可以得出卡方值和连续调整卡方值，似然比卡方检验的话，Likelihood Ratio (G test) for contingency tables,
+通过调整correct参数可以得出卡方值和连续调整卡方值(Yates)，似然比卡方检验的话，Likelihood Ratio (G test) for contingency tables,
 可以通过`vcd::assocstats`得到。
 ```{r}
 chisq.test(mytable1)
