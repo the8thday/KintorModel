@@ -91,7 +91,8 @@ broom::augment(fit1)
 
 如何理解线性关系呢？可以通过散点图等观察X自变量和Y因变量间的关系，似乎没有某种计算方式验证是否线性。
 ```{r}
-plot(women$height,women$weight, xlab="Height (in inches)", ylab="Weight (in pounds)")
+plot(women$height,women$weight, 
+xlab="Height (in inches)", ylab="Weight (in pounds)")
 
 abline(fit1)
 ```
@@ -285,8 +286,23 @@ car::influencePlot(fit4,
 
 ```{r}
 # 函数powerTransform提供的结果可供参考
-summary(car::powerTransform(states$Murder))
+# 其提供Box-Cox转换，即正态性转换
+summary(f2 <- car::powerTransform(states$Murder))
 
+```
+
+```{r}
+# 最佳变换
+hist(bcPower(states$Murder, f2$lambda))
+
+# 对数变换
+hist(bcPower(states$Murder, f2$roundlam))
+
+```
+
+除了上述的正态性转换外，对不满足线形关系的还可以进行Box-Tidwell转换
+```{r}
+car::boxTidwell(Murder ~ Population, data=states)
 
 ```
 
