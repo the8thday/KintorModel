@@ -4,19 +4,77 @@ format: html
 ---
 
 
-## SQl in R
+## SQL in R
 
 用SQL得到的数据总得用来进行分析，管理SQL数据库是一件事，用数据库里的数据则是另外一件事。
 
 本文主要记录，在R中query SQL数据后进行分析、统计、绘图的一些操作，其实容易想到只要得到数据表后，后续的操作自然是简单的。
 
 
-```{r}
-
+```{r, include=FALSE}
+library(DBI)
+library(dbplyr) # 并不需要显示的加载
+library(dplyr)
 ```
 
 
 ### 主要的是R中和多种SQL服务器的链接和操作
+
+*比如链接MySQL*
+
+```{r}
+# library(RMySQL)
+library(odbc)
+library('RMariaDB') # 似乎是RMySQL的替代品
+```
+
+
+Connect MySQL to R:
+```{r}
+# 个人电脑练习
+mysqlconnection = DBI::dbConnect(RMySQL::MySQL(),
+                            dbname='testDB',
+                            host='localhost',
+                            port=3306,
+                            user='root',
+                            password='liuc1234')
+
+
+# con <- DBI::dbConnect(odbc::odbc(),
+#                       Driver   = "[your driver's name]",
+#                       Server   = "[your server's path]",
+#                       UID      = rstudioapi::askForPassword("Database user"),
+#                       PWD      = rstudioapi::askForPassword("Database password"),
+#                       Port     = 3306)
+```
+
+
+list all the tables:
+```{r}
+dbListTables(mysqlconnection)
+```
+
+
+写SQL，并返回结果：
+```{r}
+result = dbSendQuery(mysqlconnection, "select * from course")
+
+data.frame = fetch(result)
+
+dbClearResult(result)
+```
+
+
+### use dplyr
+
+
+
+```{r}
+# 转换成可以操作的tibble
+tt <- tbl(con, "mtcars")
+```
+
+
 
 
 
