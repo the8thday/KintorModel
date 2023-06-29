@@ -22,7 +22,7 @@ library(dplyr)
 
 *比如链接MySQL*
 
-```{r}
+```{r, include=FALSE}
 # library(RMySQL)
 library(odbc)
 library('RMariaDB') # 似乎是RMySQL的替代品
@@ -32,7 +32,7 @@ library('RMariaDB') # 似乎是RMySQL的替代品
 Connect MySQL to R:
 ```{r}
 # 个人电脑练习
-mysqlconnection = DBI::dbConnect(RMySQL::MySQL(),
+mysqlconnection <- DBI::dbConnect(RMySQL::MySQL(),
                             dbname='testDB',
                             host='localhost',
                             port=3306,
@@ -57,25 +57,35 @@ dbListTables(mysqlconnection)
 
 写SQL，并返回结果：
 ```{r}
-result = dbSendQuery(mysqlconnection, "select * from course")
+result <- dbSendQuery(mysqlconnection, "select * from AGENTS")
 
-data.frame = fetch(result)
+df_AGENTS <- fetch(result)
 
 dbClearResult(result)
+```
+
+```{r}
+class(df_AGENTS)
+
 ```
 
 
 ### use dplyr
 
-
+和上面返回的不同的是df_AGENTS是一个data.frame格式。
+tt是一个
 
 ```{r}
 # 转换成可以操作的tibble
-tt <- tbl(con, "mtcars")
+tt <- tbl(mysqlconnection, "AGENTS")
 ```
 
 
 
+```{r}
+tt %>% select(AGENT_CODE) %>% 
+  show_query()
+```
 
 
 
