@@ -6,6 +6,14 @@ format: html
 
 ## SQL in R
 
+> https://dbi.r-dbi.org/articles/dbi
+> https://dbplyr.tidyverse.org/
+> https://dbi.r-dbi.org/articles/dbi-advanced
+> https://solutions.posit.co/connections/db/
+> https://rstudio.github.io/rstudio-extensions/rstudio-connections.html
+
+
+
 用SQL得到的数据总得用来进行分析，管理SQL数据库是一件事，用数据库里的数据则是另外一件事。
 
 本文主要记录，在R中query SQL数据后进行分析、统计、绘图的一些操作，其实容易想到只要得到数据表后，后续的操作自然是简单的。
@@ -13,12 +21,13 @@ format: html
 
 ```{r, include=FALSE}
 library(DBI)
-library(dbplyr) # 并不需要显示的加载
+# library(dbplyr) # 并不需要显示的加载
 library(dplyr)
+library(keyring) # 密码管理
 ```
 
 
-### 主要的是R中和多种SQL服务器的链接和操作
+### 首要的是R中和多种SQL服务器的链接和操作
 
 *比如链接MySQL*
 
@@ -32,12 +41,17 @@ library('RMariaDB') # 似乎是RMySQL的替代品
 Connect MySQL to R:
 ```{r}
 # 个人电脑练习
-mysqlconnection <- DBI::dbConnect(RMySQL::MySQL(),
-                            dbname='testDB',
-                            host='localhost',
-                            port=3306,
-                            user='root',
-                            password='liuc1234')
+# 连接对应的数据库。
+mysqlconnection <- DBI::dbConnect(
+  # RMySQL::MySQL(),
+  RMariaDB::MariaDB(),
+  dbname = "testDB",
+  host = "localhost",
+  port = 3306,
+  user = "root",
+  password = "liuc1234"
+  # password = keyring::key_get("localhost", "root") # 保证密码的安全
+)
 
 
 # con <- DBI::dbConnect(odbc::odbc(),
@@ -55,14 +69,68 @@ dbListTables(mysqlconnection)
 ```
 
 
+*这个函数不错：*
+非常方便了数据的录入DBMS, 
+```{r}
+dbWriteTable(mysqlconnection, "mtcars", mtcars)
+```
+
+这个也不错，
+```{r}
+dbListFields(mysqlconnection, "AGENTS")
+```
+
+
+
 写SQL，并返回结果：
 ```{r}
+# 如果这里可以自动补齐SQL就更好了
+# ?dbGetQuery 方便使用
 result <- dbSendQuery(mysqlconnection, "select * from AGENTS")
 
-df_AGENTS <- fetch(result)
+df_AGENTS <- dbFetch(result)
 
 dbClearResult(result)
 ```
+
+或者直接的得到全部的数据to a data.frame
+```{r}
+df <- dbReadTable(mysqlconnection, "AGENTS")
+head(df, 3)
+```
+
+
+*除了select的query外，类似update等的query自然也是可以的*
+不过在数据分析的真实场景中，数据库自有专人管理，data scientist自然以得到、清洗数据为主，
+
+以及How to use parameters (safely) in SQL queries的部分也是很重要的，具体的参考文档。
+```{r}
+?dbSendStatement
+
+safe_id <- dbQuoteIdentifier(con, "rating")
+safe_param <- dbQuoteLiteral(con, "G")
+
+query <- paste0("SELECT title, ", safe_id, " FROM film WHERE ", safe_id, " = ", safe_param )
+query
+```
+
+
+
+*对于较大的数据集，可以按照patch去query：*
+```{r}
+res <- dbSendQuery(con, "SELECT * FROM film")
+while (!dbHasCompleted(res)) {
+  chunk <- dbFetch(res, n = 300)
+  print(nrow(chunk))
+}
+```
+
+
+在对数据库fetch数据后，最好disconnect，
+```{r}
+dbDisconnect(mysqlconnection)
+```
+
 
 ```{r}
 class(df_AGENTS)
@@ -73,19 +141,50 @@ class(df_AGENTS)
 ### use dplyr
 
 和上面返回的不同的是df_AGENTS是一个data.frame格式。
-tt是一个
+tt是一个具有额外class的tbl，最为重要的一个是`tbl_lazy`.
 
 ```{r}
 # 转换成可以操作的tibble
-tt <- tbl(mysqlconnection, "AGENTS")
+# 不过这个tibble格式还具有其他的属性
+tt <- dplyr::tbl(mysqlconnection, "AGENTS")
+
+attributes(tt)
 ```
 
 
-
+省下的大就是`dplyr`的各种操作和语法了，
+不过对于大数据集有无优化？`data.table`能否调用？
 ```{r}
 tt %>% select(AGENT_CODE) %>% 
   show_query()
 ```
+
+
+*测试能否使用dtplyr：*
+
+```{r}
+library(data.table)
+library(dtplyr)
+library(dplyr, warn.conflicts = FALSE)
+# library("rqdatatable")
+
+data.table::getDTthreads()
+```
+
+
+```{r}
+demo_tt <- lazy_dt(tt)
+
+attributes(demo_tt)
+```
+```{r}
+# OK, 可以使用
+demo_tt %>% select(AGENT_CODE)
+```
+
+
+
+
 
 
 
