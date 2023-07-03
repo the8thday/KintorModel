@@ -166,10 +166,15 @@ subject on the same and sequential days.
 library(PKData)
 ```
 
+
+#### Single dose
+
+single dose 可以理解为visit时期开始的时间，比如C1D1, C0D7等等。
+
 美博所提供的数据:
 
 ```{r}
-my_pk <- readxl::read_excel('~/OneDrive/kintor/Daily_Work/8411-751_Concentration Table_01Jul2019.xls',
+my_pk <- readxl::read_excel('~/OneDrive/kintor/Daily_Work/meibo_PK_pooled/8411-751_Concentration Table_01Jul2019.xls',
                             sheet = 'Concentration_individual',
                             skip = 3
                             ) %>% 
@@ -205,7 +210,8 @@ pk_GT0918 <- pk_data %>% filter(analyte == 'GT0918',
          )
 ```
 
-12例样本，每一个样本都在同一个dose浓度下，测量11个时间点的血清浓度数据。
+*12例患者，每一个患者都在同一个dose浓度下，测量11个时间点的血清浓度数据。*
+
 
 ```{r}
 head(datasets::Theoph)
@@ -214,6 +220,7 @@ Theoph <- Theoph %>% as.data.frame()
 ```
 
 ```{r}
+# 好多好多
 PKNCA.options()
 
 # 可以设置的intervals
@@ -235,7 +242,7 @@ intervals <-
              )
 
 # 
-conc_obj <- PKNCAconc(pk_GT0918, conc~Time|subject)
+conc_obj <- PKNCA::PKNCAconc(pk_GT0918, conc~Time|subject)
 
 #
 # d_dose <- unique(datasets::Theoph[datasets::Theoph$Time == 0,
@@ -268,7 +275,7 @@ PKNCA.set.summary(
   rounding=list(signif=3)
 )
 
-summary(results_obj_automatic)
+summary(results_obj_automatic) |> as.data.frame()
 
 # summary提供的是对上表中多个样本的统计值，包括几何均值等。
 results_obj_automatic$result %>% filter(PPTESTCD == 'auclast') %>% 
@@ -279,7 +286,7 @@ results_obj_automatic$result %>% filter(PPTESTCD == 'auclast') %>%
 AUC to the Last Value Above the Limit of Quantification (AUC~last~)
 
 ```{r}
-pk_GT0918_1subject  <- pk_GT0918 %>% filter(subject == 1014)
+pk_GT0918_1subject  <- pk_GT0918 %>% filter(subject == 1021)
 
 tlast <- pk.calc.tlast(conc=pk_GT0918_1subject$conc,
                        time=pk_GT0918_1subject$Time)
@@ -302,6 +309,13 @@ commonly used for single-dose data. It calculates the AUC0-last and then extrapo
 
 ```
 
+
+#### Multi dose
+
+
+```{r}
+
+```
 
 
 
