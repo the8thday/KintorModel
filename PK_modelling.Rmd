@@ -21,6 +21,12 @@ knitr::opts_chunk$set(echo = TRUE)
 >
 > <https://www.pkpd-info.com/PK_introduction.php>
 > <http://opensource.nibr.com/xgx/index.html>
+> https://cran.r-project.org/web/views/Pharmacokinetics.html
+> https://discuss.go-isop.org/
+> https://cran.r-project.org/web/packages/ubiquity/vignettes/NCA.html
+
+
+
 
 Once a drug is administered, we usually describe subsequent processes
 within the organism by the pharmacokinetics (PK) process known as ADME:
@@ -59,8 +65,6 @@ library(nlmixr2) # 目前看起来是一个整合了多种nlme的包
 library(rxode2)
 library(nlmixr2data)
 library(ggPMX)
-# library(ubiquity)
-library(PKNCA)
 library(xpose)
 
 # library('nonmem2R')
@@ -160,16 +164,83 @@ subject on the same and sequential days.
 
 以我这两天查资料的情况来看，NCA和上文的modeling方法还是不一样的。顾名思义，一个把人体理解为compartment，一个没有。
 
-其需要两个数据集，分别是浓度数据集和dose数据集，对于每个数据集中的分类变量，其的语法为：
+其需要两个数据集，分别是浓度数据集和dose数据集，对于每个数据集中的分类变量，其的语法为：concentration, dose, and time must all be numeric.
+
+
+*NCA的一些资料收集：*
+
+只要药物符合线性药物动力学，不管它属于什么样的隔室模型，都能使用非房室方法。非房室模型是临床计算PK参数的主要方法。
+WinNonlin中非房室模型分析，以概率论和数理统计学中的统计矩方法为理论基础，对数据进行解析，主要包括零阶矩和一阶矩。
+
+其中不依赖末端消除速率λz的参数有药峰浓度（Cmax），达峰时间（Tmax），最后一个可定量点所对应的时间点（Tlast）和药物浓度（Clast），这些参数不依赖于计算，而是直接由观测值得出。还有从0时刻到最后一个可定量点所对应的曲线下面积（AUClast），一阶矩平均驻留时间（MRT），反应了药物在体内的平均停留时间。
+
+
+*一些概念的理清：*
+AUClast(Area Under the Curve)：AUClast是药物生物利用度描述指标，也就是逐点法计算得到的从给药开始到最后测量得到测定浓度（Clast）的药物暴露程度。即药物在体内的暴露程度，反映药物的吸收程度。AUClast是指药物在最后一个可测量时间点（通常为最后一个采样时间点）前的曲线下面积。它反映了药物在体内的总体曝露程度，即药物在体内的浓度随时间的积累情况。AUClast可以通过计算药物浓度与时间的曲线下的面积来获得。
+
+Cmax(Maximum Concentration)：药物吸收后，体内浓度达到最大值即为Cmax。一般来说，Cmax越大，说明药物吸收越快越全。它是一个用来描绘给药后药物浓度-时间曲线（concentration-time curve）的重要参数。 Cmax通常用来评估药物的吸收速度和程度，对于药物的疗效和安全性具有重要意义。*Cmax似乎就是时间梯度中最大的那个值，且来自观测数据本身，不是模型拟合计算得来的。*
+
+Clast：Clast是指在给药后的最后测定时刻所测得的药物浓度，也就是药物在体内吸收过程的最后测定点的血药浓度。clast通常用于评估药物在体内的消除速度和半衰期。*其也是直接提取的raw data中的数据*
+
+Tmax(Time to Maximum Concentration)：这是药物达到最大浓度的时间。这通常是一个反映药物吸收速度的重要指标。*来自数据本身*
+
+AUC0-∞：这是从给药开始到无穷远的预测药物全身暴露程度。平均来说，AUC0-∞相比AUClast能更好地反映药物的全部体内暴露程度。它反映了药物在体内的总体曝露程度，包括药物的吸收、分布、代谢和排泄过程。
+
+T1/2(Half-life) ：这是药物半衰期，表示药物浓度减半所需的时间。这个数字反映了药物从体内消除的速度。
+
+CL(Clearance)：清除率，衡量体内清除药物的能力。它可以反映药物的代谢和排泄情况。清除率越高，药物在体内的停留时间越短。
+$CL=Dose/AUC$
+
+Vd：分布容积，反映药物在体内分布的广度。
+
+MRT(Mean residence time): $MRT=AUMC/AUC$
+
+Vss(Steady state volume of distribution): $Vss = MRT × CL$
+
+
+*Generally NCA will determine the following directly from the data:*
+These properties are all based on observational data.
+
+Cmax - Maximum observed concentration (units=concentration)
+Tmax - The time where the maximum concentration was observed (units=time)
+AUC - The area under the curve (units=time × concentration)
+AUMC - The area under the first moment curve (units = time2 × concentration)
+
+*即然是基于观察数据得到的值，其本身只是总体的一个近似，这里变凸显出来实验设计的重要性，合理的时间点的设置*
+
+
+
+*NCA采用的非线性模型的具体方法：*
+_以下内容来自chatGPT，不一定正确_
+PK NCA（Noncompartmental Analysis）本身并不涉及非线性统计模型的拟合。它是一种基于数值积分和统计方法的非参数分析，用于计算和估计药物在体内的曝露和药代动力学参数，而无需假设具体的药物分布模型。
+
+PK NCA主要基于药物的浓度-时间数据，通过计算面积下曲线（AUC）和其他参数来评估药物的曝露程度、消除速率、吸收速度等。这些参数的计算通常不需要采用非线性统计模型。
+
+非线性统计模型通常在药物动力学建模和药物代谢动力学（PK/PD）建模中使用，用于描述药物在体内的动力学过程，考虑吸收、分布、代谢和排泄等因素，并拟合实际数据。这些模型可以是线性模型或非线性模型，如生理药动模型（Physiologically Based Pharmacokinetic Model，PBPK）、双指数模型、Michaelis-Menten模型等。这些模型需要更复杂的参数估计方法，通常使用非线性最小二乘拟合等技术进行参数拟合。
+
+WinNonlin中的PK NCA计算基于数值积分和统计方法，以计算和估计药物在体内的曝露和药代动力学参数。曲线下面积（AUC）计算：WinNonlin采用梯形法则（Trapezoidal Rule）进行AUC的计算。它通过对浓度-时间数据进行数值积分，将浓度-时间曲线下的面积近似为一系列梯形的面积之和。
+
+
+
 
 ```{r}
+# library(ubiquity) # 同样可以用来处理PK数据的R包,其所提供的NCA计算也是基于PKNCA的
+# 而且其提供的一些文档还是不错的
+library(PKNCA)
+
+
+# 其他的一些有用的R包
 library(PKData)
+
+# 韩国一个机构出品的包
+require(NonCompart)
+require(ncar)
 ```
 
 
 #### Single dose
 
-single dose 可以理解为visit时期开始的时间，比如C1D1, C0D7等等。
+single dose 可以理解为visit时期开始的时间，比如C1D1, C0D7等等。但是数据里面的dose还依旧是可以多个的。
 
 美博所提供的数据:
 
@@ -210,17 +281,18 @@ pk_GT0918 <- pk_data %>% filter(analyte == 'GT0918',
          )
 ```
 
+
+
 *12例患者，每一个患者都在同一个dose浓度下，测量11个时间点的血清浓度数据。*
-
-
 ```{r}
+# 132个观测
 head(datasets::Theoph)
 
 Theoph <- Theoph %>% as.data.frame()
 ```
 
 ```{r}
-# 好多好多
+# 好多好多可供选择的内容
 PKNCA.options()
 
 # 可以设置的intervals
@@ -241,19 +313,24 @@ intervals <-
              half.life = TRUE
              )
 
-# 
+# 不同采样时间点的药物浓度
+# 没有考虑不同的dose
 conc_obj <- PKNCA::PKNCAconc(pk_GT0918, conc~Time|subject)
 
 #
 # d_dose <- unique(datasets::Theoph[datasets::Theoph$Time == 0,
 #                                   c("Dose", "Time", "Subject")])
 
+# 本步的目的只是为了得到每个患者的dose信息而已
 d_dose <- unique(pk_GT0918[pk_GT0918$Time == 0,
                                   c("dose_level_mg", "Time", "subject")])
 
+# dose 和 时间点
 dose_obj <- PKNCAdose(d_dose, dose_level_mg~Time|subject)
 
-data_obj_automatic <- PKNCAdata(conc_obj, dose_obj,
+# ?PKNCAdata
+data_obj_automatic <- PKNCAdata(conc_obj, 
+                                dose_obj,
                                 intervals = intervals
                                 )
 ```
@@ -262,6 +339,8 @@ data_obj_automatic <- PKNCAdata(conc_obj, dose_obj,
 ```{r}
 results_obj_automatic <- pk.nca(data_obj_automatic)
 
+# 输出的结果符合
+# pharmacokinetic parameter (PP) TESTCD of CDISC SDTM
 results_obj_automatic
 # results_obj_automatic$result
 ```
@@ -281,6 +360,16 @@ summary(results_obj_automatic) |> as.data.frame()
 results_obj_automatic$result %>% filter(PPTESTCD == 'auclast') %>% 
   summarise(across(PPORRES, c(PKNCA::geomean, PKNCA::geocv)))
 ```
+
+
+*导出宽数据：*
+```{r}
+results_obj_automatic$result %>% filter(end == 'Inf') %>% pivot_wider(id_cols = c(ru_zu_bian_hao, start, end),
+                                                                      names_from = PPTESTCD,
+                                                                      values_from = PPORRES
+                                                                      )
+```
+
 
 
 AUC to the Last Value Above the Limit of Quantification (AUC~last~)
@@ -312,6 +401,7 @@ commonly used for single-dose data. It calculates the AUC0-last and then extrapo
 
 #### Multi dose
 
+对于Multi dose的理解就是，选择最后一期visit时期。
 
 ```{r}
 
