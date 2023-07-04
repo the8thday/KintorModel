@@ -262,6 +262,7 @@ my_pk2 <- my_pk %>% select(nominal_time_h:x16) %>%
 
 ```
 
+BQL编码为0，missing value为NA，
 ```{r}
 pk_data <- my_pk1 %>% bind_cols(my_pk2) %>% 
   fill(c(visit,analyte,dose_level_mg),.direction = 'down')
@@ -357,6 +358,7 @@ PKNCA.set.summary(
 summary(results_obj_automatic) |> as.data.frame()
 
 # summary提供的是对上表中多个样本的统计值，包括几何均值等。
+# 比如以下只对auclast进行summary计算
 results_obj_automatic$result %>% filter(PPTESTCD == 'auclast') %>% 
   summarise(across(PPORRES, c(PKNCA::geomean, PKNCA::geocv)))
 ```
@@ -396,6 +398,17 @@ AUC ~0-inf~
 commonly used for single-dose data. It calculates the AUC0-last and then extrapolates to ∞ using the estimated half-life. 
 ```{r}
 
+```
+
+
+*use another package:*
+其的结果和WinNonlin 的结果保持一致，尤其是AUC的部分。
+其对只有一个患者的数据，和多个患者的数据是用不同的函数分析的。
+```{r}
+NonCompart::tblNCA(Theoph, key = "Subject", colTime = "Time", colConc = "conc", 
+                   dose = 320, # Dose对不同的患者不一致咋办呢？
+                   adm = "Extravascular", dur = 0, doseUnit = "mg", timeUnit = "h", concUnit = "mg/L", 
+                   down = "Linear")
 ```
 
 
