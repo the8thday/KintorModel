@@ -20,3 +20,20 @@ library(tidyverse)
 library(sassy)
 ```
 
+
+
+
+### sasr package
+
+> https://insightsengineering.github.io/sasr/latest-tag/articles/introduction.html
+
+一个桥接`saspy`的R包，在R里运行SAS代码。
+
+```{r}
+require(sasr)
+```
+
+
+
+
+
