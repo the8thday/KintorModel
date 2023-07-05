@@ -191,11 +191,17 @@ T1/2(Half-life) ：这是药物半衰期，表示药物浓度减半所需的时�
 CL(Clearance)：清除率，衡量体内清除药物的能力。它可以反映药物的代谢和排泄情况。清除率越高，药物在体内的停留时间越短。
 $CL=Dose/AUC$
 
-Vd：分布容积，反映药物在体内分布的广度。
+Vd(volume of distribution)：分布容积，反映药物在体内分布的广度。
 
-MRT(Mean residence time): $MRT=AUMC/AUC$
+MRT(Mean residence time): $MRT=AUMC/AUC$, 表示药物在体内平均停留的时间
 
-Vss(Steady state volume of distribution): $Vss = MRT × CL$
+Vss(Steady state volume of distribution): $Vss = MRT × CL$ , 稳态分布容积）是一个用于描述药物在体内分布的参数，通常用符号Vss表示。它表示在稳态条件下，使血浆中的药物浓度达到平衡所需的药物总量与血浆中的药物浓度之间的关系。
+
+"lambda" 通常用于表示药物的消除速率常数（elimination rate constant）。消除速率常数是衡量药物从体内清除的速度的指标，它表示在单位时间内药物浓度减少的比例。
+
+"tlag" 在药物药代动力学中是指药物在给药后进入循环系统的延迟时间（lagtime）。它表示从给药到药物开始出现在血液中测量到的浓度的时间间隔。
+
+AUMCinf（Area Under the Moment Curve at Infinity）是指药物的无限时刻矩时刻曲线下的面积。 它是PK（Pharmacokinetics，药物药代动力学）中的一个衡量参数，用于描述药物在体内的总体暴露程度和分布。AUMCinf是通过计算药物浓度-时间曲线的矩时刻曲线下的面积来获得的。矩时刻曲线是将时间的各个次幂乘以对应时间点上的药物浓度所得到的曲线。AUMCinf通常与AUCinf（Area Under the Concentration Curve at Infinity，无限时刻浓度曲线下的面积）一起使用，以提供更全面的药物暴露和药代动力学信息。
 
 
 *Generally NCA will determine the following directly from the data:*
@@ -221,6 +227,8 @@ PK NCA主要基于药物的浓度-时间数据，通过计算面积下曲线（A
 WinNonlin中的PK NCA计算基于数值积分和统计方法，以计算和估计药物在体内的曝露和药代动力学参数。曲线下面积（AUC）计算：WinNonlin采用梯形法则（Trapezoidal Rule）进行AUC的计算。它通过对浓度-时间数据进行数值积分，将浓度-时间曲线下的面积近似为一系列梯形的面积之和。
 
 
+*三种数据类型：*
+
 
 
 ```{r}
@@ -241,6 +249,8 @@ require(ncar)
 #### Single dose
 
 single dose 可以理解为visit时期开始的时间，比如C1D1, C0D7等等。但是数据里面的dose还依旧是可以多个的。
+
+当然按照PKNCA的文档，真正只有一个dose的时候，`PKNCA.options("single.dose.aucs")`
 
 美博所提供的数据:
 
@@ -298,10 +308,19 @@ PKNCA.options()
 
 # 可以设置的intervals
 get.interval.cols()
+
+#
+?pk.calc.auc
+?pk.calc.aumc
+?pk.calc.half.life
 ```
 
 ```{r}
 
+# 不手动设置则会自动设置
+# 自动设置比较稳健，在你还没有全部了解的情况下
+# Intervals are subsets within a group by start and end time.
+# interval可以理解为所有时间梯度中的一部分，当然也可以选择全部
 intervals <-
   data.frame(start=0, end=c(24, Inf),
              cmax=c(FALSE, TRUE),
@@ -327,13 +346,18 @@ d_dose <- unique(pk_GT0918[pk_GT0918$Time == 0,
                                   c("dose_level_mg", "Time", "subject")])
 
 # dose 和 时间点
-dose_obj <- PKNCAdose(d_dose, dose_level_mg~Time|subject)
+# ?PKNCAdose
+dose_obj <- PKNCAdose(d_dose, dose_level_mg~Time|subject,
+                      route = 'extravascular',#Define the route of administration."extravascular" or "intravascular" 
+                      )
 
 # ?PKNCAdata
 data_obj_automatic <- PKNCAdata(conc_obj, 
                                 dose_obj,
                                 intervals = intervals
                                 )
+
+intervals_manual <- data_obj_automatic$intervals
 ```
 
 
@@ -406,15 +430,52 @@ commonly used for single-dose data. It calculates the AUC0-last and then extrapo
 其对只有一个患者的数据，和多个患者的数据是用不同的函数分析的。
 ```{r}
 NonCompart::tblNCA(Theoph, key = "Subject", colTime = "Time", colConc = "conc", 
-                   dose = 320, # Dose对不同的患者不一致咋办呢？
+                   dose = 320, # Dose对不同的患者不一致咋办呢？每个样本一个浓度是可行的
                    adm = "Extravascular", dur = 0, doseUnit = "mg", timeUnit = "h", concUnit = "mg/L", 
                    down = "Linear")
 ```
 
 
+```{r}
+# 注意目前需要data.frame格式，tibble的话需要改一下
+# 而且如果数据质量不行的话，会计算出很多的NA值
+
+Time = Theoph[Theoph$Subject == 8, "Time"]
+Concentration = Theoph[Theoph$Subject == 8, "conc"]
+Res = sNCA(Time, Concentration,dose = 320, concUnit = "mg/L")
+IntAUC(Time, Concentration, t1 = 0.5, t2 = 11, Res)
+```
+
+
+```{r}
+ncar::pdfNCA(fileName = "pdfNCA-Theoph.pdf", Theoph, key = "Subject", 
+       colTime = "Time", colConc = "conc", dose = 320, doseUnit = "mg", 
+       timeUnit = "h", concUnit = "mg/L", down = "Linear")
+
+# ncar::pdfNCA(fileName = "~/OneDrive/kintor/Daily_Work/GT1708F_CN2001/pdfNCA-GT1708F.pdf", 
+#              cal_pk_c0d1, key = "ru_zu_bian_hao", 
+#              colTime = "ji_hua_shi_jian_dian", colConc = "pk_nong_du", 
+#              dose = aa, 
+#              doseUnit = "mg", timeUnit = "h", concUnit = "mg/L", 
+#              down = "Linear"
+#              )
+# 
+# ncar::rtfNCA(fileName = "~/OneDrive/kintor/Daily_Work/GT1708F_CN2001/pdfNCA-GT1708F.rtf", 
+#              cal_pk_c0d1, key = "ru_zu_bian_hao", 
+#              colTime = "ji_hua_shi_jian_dian", colConc = "pk_nong_du", 
+#              dose = aa, 
+#              doseUnit = "mg", timeUnit = "h", concUnit = "mg/L", 
+#              down = "Linear"
+#              )
+```
+
+
+
 #### Multi dose
 
 对于Multi dose的理解就是，选择最后一期visit时期。
+
+multiple-dose study个人目前倾向于理解为，一个患者采集了多个dose的数据。
 
 ```{r}
 
