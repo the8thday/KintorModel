@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## pharm in R
 
+> https://github.com/insightsengineering
+
 
 R语言应用范围中，Pharma相关的应用是一个很大很重要的领域，考虑到`Rstudio`, `Shiny`在工作中的方便性，R语言和SAS在临床 药物研发等领域还是有的一比的，当然简单易用同时兼顾强大还需要很多优秀的开发人员。
 
@@ -120,5 +122,35 @@ plot(bb) +
 
 
 
+
+
+
+
+
+## R for clinical study reports
+
+
+```{r}
+# 写出RTF格式的表格
+library(r2rtf)
+library(tm)
+```
+
+
+读取RTF格式中的表格：
+```{r}
+# one table
+doc <- docxtractr::read_docx('~/OneDrive/kintor/Daily_Work/KX826_US1003_PK/L16.2.4.1_ADSL_LREF06.docx')
+```
+
+
+```{r}
+docx_tbl_count(doc)
+```
+
+
+```{r}
+docx_extract_tbl(doc, 1)
+```
 
 
