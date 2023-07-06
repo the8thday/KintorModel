@@ -21,7 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 >
 > <https://www.pkpd-info.com/PK_introduction.php>
 > <http://opensource.nibr.com/xgx/index.html>
-> https://cran.r-project.org/web/views/Pharmacokinetics.html
+> https://cran.r-project.org/web/views/Pharmacokinetics.html 
 > https://discuss.go-isop.org/
 > https://cran.r-project.org/web/packages/ubiquity/vignettes/NCA.html
 
@@ -73,6 +73,11 @@ library(xgxr) # 诺华 提供的一个探索性R包
 ```
 
 ### use nlmixr2 package
+
+```{r}
+require(pmxTools)
+```
+
 
 #### single-dose
 
@@ -156,15 +161,19 @@ xpose::dv_vs_ipred(xpdb)
 
 ### use PKNCA 包
 
+
+*NCA的实验设计要点：*
 此包主要是提供non-compartmental analysis (NCA) PK计算方法, NCA is used
 as method of description of PK with minimal assumptions of the rates of
 distribution of the drug through the body. NCA is typically used to
 describe the PK of a drug in clinical studies with many samples per
 subject on the same and sequential days.
 
+complete sampling and sparse sampling designs具体指的是，
+
 以我这两天查资料的情况来看，NCA和上文的modeling方法还是不一样的。顾名思义，一个把人体理解为compartment，一个没有。
 
-其需要两个数据集，分别是浓度数据集和dose数据集，对于每个数据集中的分类变量，其的语法为：concentration, dose, and time must all be numeric.
+PKNCA需要两个数据集，分别是浓度数据集和dose数据集，对于每个数据集中的分类变量，其的语法为：concentration, dose, and time must all be numeric.
 
 
 *NCA的一些资料收集：*
@@ -246,7 +255,7 @@ require(ncar)
 ```
 
 
-#### Single dose
+#### Single dose(单次给药)
 
 single dose 可以理解为visit时期开始的时间，比如C1D1, C0D7等等。但是数据里面的dose还依旧是可以多个的。
 
@@ -315,6 +324,8 @@ get.interval.cols()
 ?pk.calc.half.life
 ```
 
+
+以下计算是按照ID group列分开计算的，Parameter calculation will automatically split the data by the grouping factor(s), subset by the interval, calculate all required parameters, record all options used for the calculations, and include data provenance to show that the calculation was performed as described. 
 ```{r}
 
 # 不手动设置则会自动设置
@@ -368,6 +379,16 @@ results_obj_automatic <- pk.nca(data_obj_automatic)
 # pharmacokinetic parameter (PP) TESTCD of CDISC SDTM
 results_obj_automatic
 # results_obj_automatic$result
+```
+
+
+```{r}
+# Plot the concentration-time data and the interval
+ggplot(pk_GT0918, aes(x=Time, y=conc)) +
+  geom_point() + geom_line() +
+  scale_y_continuous(limits=c(0, NA)) +
+  labs(x="Time Since First Dose (hr)",
+       y="Concentration\n(arbitrary units)")
 ```
 
 ```{r}
@@ -471,14 +492,16 @@ ncar::pdfNCA(fileName = "pdfNCA-Theoph.pdf", Theoph, key = "Subject",
 
 
 
-#### Multi dose
+#### Multi dose（多次给药）
 
 对于Multi dose的理解就是，选择最后一期visit时期。
 
-multiple-dose study个人目前倾向于理解为，一个患者采集了多个dose的数据。
+multiple-dose study个人目前倾向于理解为，一个患者采集了多个dose的数据。即是多次给药。
+
+多次给药后的稳态作何理解呢？
 
 ```{r}
-
+?superposition
 ```
 
 
