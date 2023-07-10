@@ -212,6 +212,10 @@ Vss(Steady state volume of distribution): $Vss = MRT × CL$ , 稳态分布容积
 
 AUMCinf（Area Under the Moment Curve at Infinity）是指药物的无限时刻矩时刻曲线下的面积。 它是PK（Pharmacokinetics，药物药代动力学）中的一个衡量参数，用于描述药物在体内的总体暴露程度和分布。AUMCinf是通过计算药物浓度-时间曲线的矩时刻曲线下的面积来获得的。矩时刻曲线是将时间的各个次幂乘以对应时间点上的药物浓度所得到的曲线。AUMCinf通常与AUCinf（Area Under the Concentration Curve at Infinity，无限时刻浓度曲线下的面积）一起使用，以提供更全面的药物暴露和药代动力学信息。
 
+Span ratio（跨度比）是在非组分分析（NCA）中用于评估药物的体内分布特性的指标之一。它是通过计算药物在血浆和体液（如组织或尿液）中的浓度之间的比值来得到的。跨度比的计算通常采用AUC（Area Under the Curve，曲线下面积）作为血浆和体液浓度曲线的度量，并分别计算血浆和体液的AUC值。然后，通过计算体液AUC与血浆AUC的比值，得到跨度比。跨度比大于1表示药物在体液中的浓度高于血浆中的浓度，表明药物在体液中有较高的蓄积。跨度比小于1表示药物在体液中的浓度低于血浆中的浓度，表明药物在体液中的分布较少。
+
+Interpolation & Extrapolation, 插入/推断。
+
 
 *Generally NCA will determine the following directly from the data:*
 These properties are all based on observational data.
@@ -237,12 +241,17 @@ WinNonlin中的PK NCA计算基于数值积分和统计方法，以计算和估�
 
 
 *三种数据类型：*
+1. Sparse noncompartmental analysis (NCA)，理解起来似乎就是拼凑起来的数据，在这种情况下，由于缺乏每个个体的完整曲线数据， 传统的非组分分析方法可能无法直接应用。稀疏NCA方法旨在解决这个问题，以在有限的数据情况下对药物的药代动力学进行评估。
+2. Single dose
+3. Multiple dose
 
 
 
 ```{r}
-# library(ubiquity) # 同样可以用来处理PK数据的R包,其所提供的NCA计算也是基于PKNCA的
-# 而且其提供的一些文档还是不错的
+ # 同样可以用来处理PK数据的R包,其所提供的NCA计算也是基于PKNCA的,而且其提供的一些文档还是不错的
+# library(ubiquity)
+# 其提供的sparse NCA分析脚本值得参考，待完成
+
 library(PKNCA)
 
 
@@ -323,6 +332,27 @@ get.interval.cols()
 ?pk.calc.aumc
 ?pk.calc.half.life
 ```
+
+
+单位设置
+```{r}
+d_units_auto <- pknca_units_table(concu="ng/mL", doseu="mg", amountu="mg", timeu="hr")
+
+# 其可以对单位进行自动的转换
+# 参数传给PKNCAdata函数
+d_units <-
+  pknca_units_table(
+    concu="mg/L", doseu="mg/kg", timeu="hr",
+    # use molar units for concentrations and AUCs
+    conversions=
+      data.frame(
+        PPORRESU=c("(mg/kg)/(hr*mg/L)", "(mg/kg)/(mg/L)", "mg/L", "hr*mg/L"),
+        PPSTRESU=c("L/hr/kg", "L/kg", "mmol/L", "hr*mmol/L"),
+        conversion_factor=c(NA, NA, 1/180.164, 1/180.164)
+      )
+  )
+```
+
 
 
 以下计算是按照ID group列分开计算的，Parameter calculation will automatically split the data by the grouping factor(s), subset by the interval, calculate all required parameters, record all options used for the calculations, and include data provenance to show that the calculation was performed as described. 
@@ -411,6 +441,7 @@ results_obj_automatic$result %>% filter(PPTESTCD == 'auclast') %>%
 
 *导出宽数据：*
 ```{r}
+# as.data.frame(results_obj_automatic) == results_obj_automatic$result
 results_obj_automatic$result %>% filter(end == 'Inf') %>% pivot_wider(id_cols = c(ru_zu_bian_hao, start, end),
                                                                       names_from = PPTESTCD,
                                                                       values_from = PPORRES
@@ -419,9 +450,13 @@ results_obj_automatic$result %>% filter(end == 'Inf') %>% pivot_wider(id_cols = 
 
 
 
-AUC to the Last Value Above the Limit of Quantification (AUC~last~)
+*以下还可以单独计算：*
+
+AUC to the Last Value Above the Limit of Quantification (AUC~last~),
+AUClast是指，在tlast（最后一个非零值所对应的时间点）到时间点为0的曲线下面积。
 
 ```{r}
+# 首先是找到tlast
 pk_GT0918_1subject  <- pk_GT0918 %>% filter(subject == 1021)
 
 tlast <- pk.calc.tlast(conc=pk_GT0918_1subject$conc,
@@ -431,6 +466,7 @@ tlast
 
 
 AUC~all~
+在tlast后的一个点进行linear interpolation to zero后，求得的从时间0开始的曲线下积分。
 
 ```{r}
 first_after_tlast <- my_conc$time[my_conc$time > tlast][1]
@@ -440,10 +476,28 @@ first_after_tlast
 
 AUC ~0-inf~
 
-commonly used for single-dose data. It calculates the AUC0-last and then extrapolates to ∞ using the estimated half-life. 
+commonly used for single-dose data. It calculates the AUC0-last and then extrapolates to ∞ using the estimated half-life.
+文档中的图很好的说明了这一AUC所对应的面积。
+和AUC_all_相比（可以简单的理解为曲线下的面积），其更像是从half-life推测出的延长线而得到的曲线下面积，一般而言其比AUC~all~的值要大一些。
+
 ```{r}
 
 ```
+
+
+Half-Life Calculation
+
+> https://billdenney.github.io/pknca/articles/v06-half-life-calculation.html
+
+半衰期的计算是对concentration取自然对数的log后和时间拟合曲线。The default calculation method is curve stripping。
+似乎就是选择不同的点拟合不同的模型，然后选择一个best fit。
+
+```{r}
+PKNCA.options("min.hl.points")
+
+PKNCA.options("allow.tmax.in.half.life")
+```
+
 
 
 *use another package:*
