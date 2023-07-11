@@ -33,6 +33,8 @@ within the organism by the pharmacokinetics (PK) process known as ADME:
 absorption, distribution, metabolism, excretion.
 具体的关于PK的一些描述可以参见第四个链接。
 
+*什么是PK的房室模型*
+
 将人体简化为depot compartment。PK compartment models assume that drug
 concentration is perfectly homogeneous in each compartment of the body
 at all times.
@@ -41,29 +43,54 @@ PK models do not describe how a drug is administered. Administered doses
 are source terms, i.e., inputs that dynamically modify the state of a
 system. This is important to note because it means that the same PK
 model can be used for different dose regimens.
+典型的PK房室模型包括中心房室（central compartment）和外周房室（peripheral compartments），中心房室代表血浆或血液循环系统，而外周房室代表组织或器官。通过建立和求解一组微分方程，PK房室模型可以描述药物在这些房室之间的动态分布和消除过程。这些方程描述了药物在各个房室之间的转移速率、药物在每个房室中的浓度以及药物的消除速率。中心房室（central compartment）通常代表血浆或血液循环系统，它是药物在体内的主要分布区域。药物在中心房室中的浓度可以反映血液中的药物浓度。外周房室（peripheral compartments）代表体内的组织或器官。药物从中心房室进入外周房室，通过血液循环分布到组织或器官中。外周房室的数量可以根据需要进行扩展，以更准确地描述药物在不同组织或器官之间的分布和转移。
 
-ordinary differential equations (ODEs):
 
-PK模型有很多，但非线性混合模型是PK建模中常用的模型。下面以一个测试数据集进行初步的学习，此处做一笔记。
 
-k : rate constants (kinetic) --\> movement from 'x' to 'y' Ka:
-absorption constant Vc: distribution compartment (central) Q: rate
-constant between Vc and Vp Vp: distribution compartment (periph.) CL:
-elimination constant (clearance) Described by differential equations of
-change in compartment (A) over time (T): dA/dT
+*ordinary differential equations (ODEs): 常微分方程*
+ODEs在PK房室模型中用于建立药物在中心房室（通常为血浆）和外周房室（代表组织或器官）之间的药物转移过程。通过这些方程，我们可以模拟和预测药物在体内的吸收、分布和消除过程，以及药物在不同组织和器官中的浓度变化。
 
-对于非线性混合效应模型，The system will support but not be limited to
-the following estimation methods: FO, FOI, FOCE, FOCEI, Laplacian,
-Lindstrom and Bates, MCMC, MCPEM, SAEM, Gaussian quadrature, and
-nonparametric methods。
+利用ODEs，我们可以计算和推断出药物在给定剂量和给药方案下的浓度-时间曲线，从而了解药物在体内的动态行为。此外，ODEs还可以用于优化给药方案、评估药物的疗效和毒性，以及预测个体化的药物剂量调整。
+
+
+*常见的一些指标：*
+Vd（分布容积）：表示药物在体内分布的广度。它是药物总体量与血浆中药物浓度之间的比率。Vd可以反映药物在体内的分布程度，通常以升或升/公斤为单位。
+Cl（清除率）：表示单位时间内从体内清除药物的速率。清除率可以用来评估药物的消除速度，通常以升/小时或升/分钟为单位。
+t1/2（半衰期）：表示药物浓度减少一半所需的时间。半衰期是描述药物消除速度的重要参数，可以用来评估药物在体内的停留时间和剂量频率。
+AUC（曲线下面积）：表示药物浓度-时间曲线下的面积，反映了药物在体内的总曝露程度。AUC可用于评估药物的吸收、分布和消除过程，并与药物的疗效和毒性相关。
+Cmax（峰浓度）：表示药物在给药后达到的最高浓度。Cmax可以用来评估药物的吸收速度和最大效应。
+
+k : rate constants (kinetic) -- movement from 'x' to 'y'. 消除速率常数）：k表示药物从体内清除的速率常数。它决定了药物浓度下降的速度。k的倒数（1/k）被称为药物的消除半衰期（t1/2）。消除速率常数k通常以小时的倒数（1/h）为单位。
+Ka: absorption constant. 吸收速率常数）：ka表示药物从给药部位吸收到血液循环的速率常数。它用于描述药物的吸收过程。ka通常以小时的倒数（1/h）为单位。
+Vc: distribution compartment (central). （中心房室容积）：Vc表示中心房室（通常为血浆）的容积。它是用来表示药物在中心房室的分布范围。Vc的单位通常是升或升/公斤。
+Q: rate constant between Vc and Vp. （外周房室间转移速率常数）：Q表示不同外周房室之间药物转移的速率常数。它用于描述药物在不同组织或器官之间的分布和转移。Q通常以升/小时为单位。
+Vp: distribution compartment (periph.) 
+CL:elimination constant (clearance) Described by differential equations of change in compartment (A) over time (T): dA/dT
+At（时间到达最大浓度）：这个指标表示药物在体内吸收过程中所需的时间，通常以时间单位表示（例如小时）。At表示从给药开始到药物在体内达到最高浓度（Cmax）所经过的时间。
+
+Ktp（血浆半衰期）：血浆半衰期是描述药物从体内消除一半所需的时间。它是指药物浓度减少到初始浓度的一半所需的时间。通常，血浆半衰期以时间单位（例如小时）表示。
+
+Kpt（分布常数）：Kpt是PK房室模型中的一个参数，表示药物分布过程的速度常数。它描述了药物从血浆向组织的转移速度。Kpt的单位通常是1/时间（例如小时的倒数）。
+
+
+
+*非线性混合效应模型*
+
+对于非线性混合效应模型，The system will support but not be limited to the following estimation methods: FO, FOI, FOCE, FOCEI, Laplacian, Lindstrom and Bates, MCMC, MCPEM, SAEM, Gaussian quadrature, and nonparametric methods。
+
+
+
 
 ```{r, include=FALSE}
 library(tidyverse)
 # library(saemix)
 # library(nlmixr) # 主要学习的R包，不过和2的版本不兼容，二者先library一个
+
+# nlmixr2 is an R package for fitting population pharmacokinetic (PK) and pharmacokinetic-pharmacodynamic (PKPD) models.
 library(nlmixr2) # 目前看起来是一个整合了多种nlme的包
 library(rxode2)
 library(nlmixr2data)
+
 library(ggPMX)
 library(xpose)
 
@@ -72,36 +99,53 @@ library(xgxr) # 诺华 提供的一个探索性R包
 
 ```
 
-### use nlmixr2 package
+
+### 拟合PK数据的房室模型
 
 ```{r}
 require(pmxTools)
+require(nonmem2rx)
+require(babelmixr2)
 ```
 
 
-#### single-dose
+#### single-dose 单次给药
 
 fitting a simple one-compartment PK model use `nlmixr2` package.
 
-one-compartment指的是，
+one-compartment指的是，In a one-compartment model, the body is considered as a single well-stirred compartment where the drug distributes instantaneously and uniformly. The model assumes that the drug is rapidly and completely absorbed into the systemic circulation and that the elimination occurs directly from this central compartment.
 
-下面的模型中，和在使用`saemix`包时是一致的，包括模型和起始值。`nlmixr2`包的语法和ini的命名系统是模仿的NONMEM软件。在ini中设置值时一般的是一个值，或者三个值（c(lower,
-est, upper)）,`~`是方差或相关性，`<-`是参数赋值,`#`后面的内容是
+下面的模型中，和在使用`saemix`包时是一致的，包括模型和起始值。`nlmixr2`包的语法和ini的命名系统是模仿的NONMEM软件。在ini中设置值时一般的是一个值，或者三个值（c(lower, est, upper)）,`~`是方差或相关性，`<-`是参数赋值,`#`后面的内容是
 label的内容会在Parameter展现，也可以用label函数。
 
-其中，model部分的意思是：A mathematical model which best describes the
-data
+其中，model部分的意思是：A mathematical model which best describes the data
 
-theo_sd是常见的theophylline数据集，是longitudinal repeated measures
+`theo_sd`是常见的theophylline数据集，是longitudinal repeated measures
 data，每一个个体其随时间测得的血药浓度在PK 中都是非线性的。 The form of
 the nonlinear model is determined by the pharmacokinetic theory, not
 derived from the data.
 但是依据PK理论所得到的每一个个体的PK参数是有变化的，不同的，所以还要考虑population，引入个体间的random
 effect。
-在`nlmixr2`中数据的列名是有要求的吗？毕竟文档的示例中直接就输入了数据名。。在saemix中尚且需要指定数据。
+在`nlmixr2`中数据的列名是有要求的吗？毕竟文档的示例中直接就输入了数据名。在saemix中尚且需要指定数据。
+
 
 ```{r}
+# https://nlmixr2.org/articles/running_nlmixr.html
+# 数据集的介绍来自官网
+theo_sd
+```
+
+```{r}
+# 罗列所有的Est方法
+nlmixr2est::nlmixr2AllEst()
+```
+
+
+Once the initialization block has been defined, you can define a model in terms of the variables defined in the ini block. You can also mix rxode2() blocks into the model if needed.
+```{r}
 #  ordinary differential equations (ODEs) model
+# 采用不同的算法需要不同的模型参数
+# 同时注意文档中所介绍的命名格式的问题，比如rx_ or nlmixr_开头是不允许的，不过一般也都是模仿NONMEM的命名
 one.compartment.saem <- function() {
     ini({
         tka <- .5   # Log Ka
@@ -123,23 +167,39 @@ one.compartment.saem <- function() {
     })
 }
 
-# 数据集相关的变量啥也不用指定吗？？
+
+# Checking model syntax
+nlmixr2::nlmixr(one.compartment.saem)
+```
+
+fit the model:
+fit模型有几种方法，此处的方法，在不提供data参数时，会打印one.compartment.saem的内容。
+```{r}
+# 数据集相关的变量啥也不用指定吗？CDISC?
 fit <- nlmixr2(one.compartment.saem, 
                data = theo_sd, 
                est="saem" # nlmixr2est::nlmixr2AllEst()
                )
-
 ```
 
+
+
+在终端打印更漂亮：
 ```{r}
 print(fit)
 ```
 
+
 base plot:
 
 ```{r}
+## Standard nlmixr plots
 plot(fit)
 ```
+*interpret the result: *
+
+
+
 
 除上述通过`base`包得到的诊断图之外，还提供了`xpose`包的使用，`xpose`包是aims
 to reduce the post processing burden and improve diagnostics commonly
@@ -153,7 +213,18 @@ xpdb <- xpose_data_nlmixr(fit) # 此object可以使用xpose包的函数
 xpose::dv_vs_ipred(xpdb)
 ```
 
-#### multi-dose
+
+Another option is to use the ggPMX package. 
+```{r}
+library(ggPMX)
+ctr = pmx_nlmixr(fit)
+pmx_plot_dv_ipred(ctr)
+```
+
+
+
+
+#### multi-dose 多次给药
 
 ```{r}
 
