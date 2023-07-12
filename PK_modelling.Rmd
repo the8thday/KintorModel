@@ -80,6 +80,19 @@ Kpt（分布常数）：Kpt是PK房室模型中的一个参数，表示药物分
 
 
 
+*One-compartment model（一室模型）：*
+
+在一室模型中，药物被视为在体内分布均匀。这意味着药物在血液中的浓度与组织中的浓度是一致的。这个简化模型对于那些迅速在血浆和组织之间分布的药物较适用。但对于那些在体内分布不均匀的药物，一室模型可能不能准确描述其药代动力学特征。
+
+*Two-compartment model（两室模型）：*
+
+两室模型包括两个独立的"室"：中心室（central compartment）和外周室（peripheral compartment）。中心室通常包括血浆、心脏、肝脏和肾脏等高血流组织；外周室通常包括肌肉、皮肤和脂肪等较低血流组织。在这个模型中，药物首先在中心室分布，然后通过血流进入外周室。两室模型较好地描述了那些在体内分布不均匀的药物。
+
+*Three-compartment model（三室模型）：*
+
+三室模型进一步细分了药物在体内的分布过程，将外周室分为两个不同的室。这种模型适用于那些在体内存在多个不同分布相的药物。例如，药物可能首先在中心室分布，然后迅速进入一个外周室（比如较高血流的组织），再慢慢进入另一个外周室（比如较低血流的组织）。这种模型可以更精确地描述那些在体内具有复杂分布特征的药物。
+
+
 
 ```{r, include=FALSE}
 library(tidyverse)
@@ -111,7 +124,7 @@ require(babelmixr2)
 
 #### single-dose 单次给药
 
-fitting a simple one-compartment PK model use `nlmixr2` package.
+##### fitting a simple one-compartment PK model use `nlmixr2` package.
 
 one-compartment指的是，In a one-compartment model, the body is considered as a single well-stirred compartment where the drug distributes instantaneously and uniformly. The model assumes that the drug is rapidly and completely absorbed into the systemic circulation and that the elimination occurs directly from this central compartment.
 
@@ -219,6 +232,18 @@ Another option is to use the ggPMX package.
 library(ggPMX)
 ctr = pmx_nlmixr(fit)
 pmx_plot_dv_ipred(ctr)
+```
+
+
+##### 两房室模型
+
+```{r}
+Bolus_2CPT
+```
+
+
+```{r}
+
 ```
 
 
