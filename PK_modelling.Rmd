@@ -60,17 +60,23 @@ t1/2（半衰期）：表示药物浓度减少一半所需的时间。半衰期�
 AUC（曲线下面积）：表示药物浓度-时间曲线下的面积，反映了药物在体内的总曝露程度。AUC可用于评估药物的吸收、分布和消除过程，并与药物的疗效和毒性相关。
 Cmax（峰浓度）：表示药物在给药后达到的最高浓度。Cmax可以用来评估药物的吸收速度和最大效应。
 
-k : rate constants (kinetic) -- movement from 'x' to 'y'. 消除速率常数）：k表示药物从体内清除的速率常数。它决定了药物浓度下降的速度。k的倒数（1/k）被称为药物的消除半衰期（t1/2）。消除速率常数k通常以小时的倒数（1/h）为单位。
+k : rate constants (kinetic) -- movement from 'x' to 'y'. (消除速率常数）：k表示药物从体内清除的速率常数。它决定了药物浓度下降的速度。k的倒数（1/k）被称为药物的消除半衰期（t1/2）。消除速率常数k通常以小时的倒数（1/h）为单位。
 Ka: absorption constant. 吸收速率常数）：ka表示药物从给药部位吸收到血液循环的速率常数。它用于描述药物的吸收过程。ka通常以小时的倒数（1/h）为单位。
 Vc: distribution compartment (central). （中心房室容积）：Vc表示中心房室（通常为血浆）的容积。它是用来表示药物在中心房室的分布范围。Vc的单位通常是升或升/公斤。
 Q: rate constant between Vc and Vp. （外周房室间转移速率常数）：Q表示不同外周房室之间药物转移的速率常数。它用于描述药物在不同组织或器官之间的分布和转移。Q通常以升/小时为单位。
 Vp: distribution compartment (periph.) 
 CL:elimination constant (clearance) Described by differential equations of change in compartment (A) over time (T): dA/dT
-At（时间到达最大浓度）：这个指标表示药物在体内吸收过程中所需的时间，通常以时间单位表示（例如小时）。At表示从给药开始到药物在体内达到最高浓度（Cmax）所经过的时间。
+At:（时间到达最大浓度）：这个指标表示药物在体内吸收过程中所需的时间，通常以时间单位表示（例如小时）。At表示从给药开始到药物在体内达到最高浓度（Cmax）所经过的时间。
 
 Ktp（血浆半衰期）：血浆半衰期是描述药物从体内消除一半所需的时间。它是指药物浓度减少到初始浓度的一半所需的时间。通常，血浆半衰期以时间单位（例如小时）表示。
 
 Kpt（分布常数）：Kpt是PK房室模型中的一个参数，表示药物分布过程的速度常数。它描述了药物从血浆向组织的转移速度。Kpt的单位通常是1/时间（例如小时的倒数）。
+
+tka（时间到达最低浓度）：tka表示药物在体内吸收过程中所需的时间，以达到最低浓度（Cmin）。类似于At（时间到达最大浓度），tka表示从给药开始到药物在体内达到最低浓度所经过的时间。
+
+tcl（血浆消除半衰期）：tcl是指血浆中药物浓度减少到初始浓度的一半所需的时间。它表示药物在体内消除过程的速度。tcl通常以时间单位（例如小时）表示。
+
+tv（中央分布容积）：tv是药物动力学模型中的一个参数，表示药物分布到中央组织（通常是血浆或中央血池）的容积。它代表药物在体内的分布范围。tv的单位通常是容积单位（例如升）。
 
 
 
@@ -96,12 +102,12 @@ Kpt（分布常数）：Kpt是PK房室模型中的一个参数，表示药物分
 
 ```{r, include=FALSE}
 library(tidyverse)
-# library(saemix)
-# library(nlmixr) # 主要学习的R包，不过和2的版本不兼容，二者先library一个
+# library(saemix) # https://saemixr.github.io/
+# library(nlmixr) # 主要的R包，不过和2的版本不兼容，二者先library一个
 
 # nlmixr2 is an R package for fitting population pharmacokinetic (PK) and pharmacokinetic-pharmacodynamic (PKPD) models.
 library(nlmixr2) # 目前看起来是一个整合了多种nlme的包
-library(rxode2)
+library(rxode2) # ode-based models
 library(nlmixr2data)
 
 library(ggPMX)
@@ -131,7 +137,7 @@ one-compartment指的是，In a one-compartment model, the body is considered as
 下面的模型中，和在使用`saemix`包时是一致的，包括模型和起始值。`nlmixr2`包的语法和ini的命名系统是模仿的NONMEM软件。在ini中设置值时一般的是一个值，或者三个值（c(lower, est, upper)）,`~`是方差或相关性，`<-`是参数赋值,`#`后面的内容是
 label的内容会在Parameter展现，也可以用label函数。
 
-其中，model部分的意思是：A mathematical model which best describes the data
+其中，model部分的意思是：A mathematical model which best describes the data.
 
 `theo_sd`是常见的theophylline数据集，是longitudinal repeated measures
 data，每一个个体其随时间测得的血药浓度在PK 中都是非线性的。 The form of
@@ -147,6 +153,31 @@ effect。
 # 数据集的介绍来自官网
 theo_sd
 ```
+
+> https://nlmixr2.github.io/rxode2/articles/rxode2-datasets.html
+
+Subject Identification Columns
+The subject identification column separates subjects for identification of random effects.
+
+ID: A subject identifier that may be an integer, character, or factor.
+Observation Columns
+Observation columns are used to indicate the dependent variable and how to use or measure it.
+
+DV: A numeric column with the measurement
+CENS: A numeric column for indication of censoring, such as below the limit of quantification for an assay.
+LIMIT: A numeric column for helping indicate the type of censoring, such as below the limit of quantification for an assay.
+MDV: An indicator for missing DV values
+CMT: The name or number of the compartment
+DVID: The dependent variable identifier
+EVID The event identifier
+Dosing Columns
+AMT: The amount of the dose
+CMT: The name or number of the compartment
+EVID: The event identifier
+ADDL: The number of additional doses
+RATE or DUR: The rate or duration of a dose
+
+
 
 ```{r}
 # 罗列所有的Est方法
@@ -216,7 +247,7 @@ plot(fit)
 
 除上述通过`base`包得到的诊断图之外，还提供了`xpose`包的使用，`xpose`包是aims
 to reduce the post processing burden and improve diagnostics commonly
-associated the development of non-linear mixed effect models.
+associated the development of non-linear mixed effect models. 检查模型的表现。
 
 ```{r}
 library(xpose.nlmixr2)
@@ -237,23 +268,381 @@ pmx_plot_dv_ipred(ctr)
 
 ##### 两房室模型
 
+The “true” model is two compartmental, with first-order absorption and linear elimination.
+
 ```{r}
-Bolus_2CPT
+Bolus_2CPT %>% head(n = 100)
+```
+
+
+###### 利用`saemix`包
+
+详情见`saemix`包的官方文档。
+
+```{r}
+saemix.data<-saemixData(name.data=warfa_data,header=TRUE,sep=" ",
+  na=NA, name.group=c("id"),name.predictors=c("amount","time"),
+  name.response=c("y1"), name.X="time")
 ```
 
 
 ```{r}
+model1cpt<-function(psi,id,xidep) {
+  dose<-xidep[,1]
+  tim<-xidep[,2]
+  ka<-psi[id,1]
+  V<-psi[id,2]
+  k<-psi[id,3]
+  CL<-k*V
+  ypred<-dose*ka/(V*(ka-k))*(exp(-k*tim)-exp(-ka*tim))
+  return(ypred)
+}
 
+saemix.model<-saemixModel(model=model1cpt,description="warfarin",
+  type="structural",psi0=matrix(c(1,7,1,0,0,0),ncol=3,byrow=TRUE,
+  dimnames=list(NULL, c("ka","V","k"))),transform.par=c(1,1,1),
+  omega.init=matrix(c(1,0,0,0,1,0,0,0,1),ncol=3,byrow=TRUE),
+  covariance.model=matrix(c(1,0,0,0,1,0,0,0,1),ncol=3,
+  byrow=TRUE))
 ```
 
 
+###### 利用`nlmixr2`
+
+```{r}
+# 两房室模型对应的起始值
+# 模型的微分方程和参数
+
+#定义两室模型公式
+
+# Two-compartment model with additive residual error:
+model.2cpt.ode <- function() {
+  ini({
+    tka <- log(1.05)
+    tcl <- log(0.121)
+    tv2 <- log(1.939)
+    tv3 <- log(5.65)
+    tq <- log(0.282)
+    eta.ka ~ 0.1
+    eta.cl ~ 0.1
+    eta.v2 ~ 0.1
+    eta.v3 ~ 0.1
+    eta.q ~ 0.1
+    add.err <- 75
+  })
+  model({
+    ka <- exp(tka + eta.ka)
+    cl <- exp(tcl + eta.cl)
+    v2 <- exp(tv2 + eta.v2)
+    v3 <- exp(tv3 + eta.v3)
+    q <- exp(tq + eta.q)
+    d / dt(depot) <- -ka * depot
+    d / dt(center) <- ka * depot - cl / v2 * center + q / v3 * periph - q / v2 * center
+    d / dt(periph) <- q / v2 * center - q / v3 * periph
+    cp <- center / v2
+    cp ~ add(add.err)
+  })
+}
+
+model.2cpt.ode_2 <- function() {
+  ini({
+    tka <- log(1.05)           # 吸收速率常数的对数值
+    tcl <- log(0.121)          # 清除速率常数的对数值
+    tv2 <- log(1.939)          # 第二个组织的体积常数的对数值
+    tv3 <- log(5.65)           # 第三个组织的体积常数的对数值
+    tq <- log(0.282)           # 第一个组织到第二个组织的转移速率常数的对数值
+    eta.ka ~ 0.1               # 吸收速率的个体差异（ETA）的标准差
+    eta.cl ~ 0.1               # 清除速率的个体差异（ETA）的标准差
+    eta.v2 ~ 0.1               # 第二个组织的体积的个体差异（ETA）的标准差
+    eta.v3 ~ 0.1               # 第三个组织的体积的个体差异（ETA）的标准差
+    eta.q ~ 0.1                # 第一个组织到第二个组织的转移速率的个体差异（ETA）的标准差
+    add.err <- 75              # 额外的误差（残差误差）常数值
+  })
+  model({
+    ka <- exp(tka + eta.ka)    # 计算吸收速率
+    cl <- exp(tcl + eta.cl)    # 计算清除速率
+    v2 <- exp(tv2 + eta.v2)    # 计算第二个组织的体积
+    v3 <- exp(tv3 + eta.v3)    # 计算第三个组织的体积
+    q <- exp(tq + eta.q)       # 计算第一个组织到第二个组织的转移速率
+    d / dt(depot) <- -ka * depot                       # 第一个组织（depot）的变化率
+    d / dt(center) <- ka * depot - cl / v2 * center + q / v3 * periph - q / v2 * center   # 第二个组织（center）的变化率
+    d / dt(periph) <- q / v2 * center - q / v3 * periph  # 第三个组织（periph）的变化率
+    cp <- center / v2          # 计算中央组织（center）中的药物浓度
+    cp ~ add(add.err)          # 建立中央组织中药物浓度与残差误差之间的关系
+  })
+}
+
+
+# Two-compartment model with proportional residual error:
+model.2cptp.ode <- function() {
+  ini({
+    tka <- log(1.05)
+    tcl <- log(0.121)
+    tv2 <- log(1.939)
+    tv3 <- log(5.65)
+    tq <- log(0.282)
+    eta.ka ~ 0.1
+    eta.cl ~ 0.1
+    eta.v2 ~ 0.1
+    eta.v3 ~ 0.1
+    eta.q ~ 0.1
+    prop.err <- 0.075
+  })
+  model({
+    ka <- exp(tka + eta.ka)
+    cl <- exp(tcl + eta.cl)
+    v2 <- exp(tv2 + eta.v2)
+    v3 <- exp(tv3 + eta.v3)
+    q <- exp(tq + eta.q)
+    d / dt(depot) <- -ka * depot
+    d / dt(center) <- ka * depot - cl / v2 * center + q / v3 * periph - q / v2 * center
+    d / dt(periph) <- q / v2 * center - q / v3 * periph
+    cp <- center / v2
+    cp ~ prop(prop.err)
+  })
+}
+
+
+# Two-compartment model with proportional residual error and weight on CL:
+model.2cpt.ode.wtcl <- function() {
+  ini({
+    tka <- log(1.14)
+    tcl <- log(0.0190)
+    tv2 <- log(2.12)
+    tv3 <- log(20.4)
+    tq <- log(0.383)
+    wteff <- 0.35
+    eta.ka ~ 1
+    eta.cl ~ 1
+    eta.v2 ~ 1
+    eta.v3 ~ 1
+    eta.q ~ 1
+    prop.err <- 0.075
+  })
+  model({
+    ka <- exp(tka + eta.ka)
+    cl <- exp(tcl + wteff * lnWT + eta.cl)
+    v2 <- exp(tv2 + eta.v2)
+    v3 <- exp(tv3 + eta.v3)
+    q <- exp(tq + eta.q)
+    d / dt(depot) <- -ka * depot
+    d / dt(center) <- ka * depot - cl / v2 * center + q / v3 * periph - q / v2 * center
+    d / dt(periph) <- q / v2 * center - q / v3 * periph
+    cp <- center / v2
+    cp ~ prop(prop.err)
+  })
+}
+
+
+# Two-compartment model with proportional residual error and sex on 𝑉𝑉2:
+model.2cpt.ode.sexv2 <- function() {
+  ini({
+    tka <- log(1.14)
+    tcl <- log(0.0190)
+    tv2 <- log(2.12)
+    tv3 <- log(20.4)
+    tq <- log(0.383)
+    sexeff <- -0.2
+    eta.ka ~ 1
+    eta.cl ~ 1
+    eta.v2 ~ 1
+    eta.v3 ~ 1
+    eta.q ~ 1
+    prop.err <- 0.075
+  })
+  model({
+    ka <- exp(tka + eta.ka)
+    cl <- exp(tcl + eta.cl)
+    v2 <- exp(tv2 + sexeff * (SEX) + eta.v2)
+    v3 <- exp(tv3 + eta.v3)
+    q <- exp(tq + eta.q)
+    d / dt(depot) <- -ka * depot
+    d / dt(center) <- ka * depot - cl / v2 * center + q / v3 * periph - q / v2 * center
+    d / dt(periph) <- q / v2 * center - q / v3 * periph
+    cp <- center / v2
+    cp ~ prop(prop.err)
+  })
+}
+```
+
+
+```{r}
+# Checking model syntax
+nlmixr2::nlmixr(model.2cpt.ode)
+```
+
+模型的拟合过程非常耗时，要注意数据的大小，不知能否多线程运行。
+对于此数据集，在我的Mac上跑了得有一个多小时。
+```{r}
+# fit.2cpt.ode.saem <- nlmixr2(object = model.2cpt.ode,
+#                              data = Bolus_2CPT,
+#                              est = 'saem'
+#                              )
+
+# write_rds(fit.2cpt.ode.saem, './datasets/fit.2cpt.ode.saem.rds')
+
+readRDS('./datasets/fit.2cpt.ode.saem.rds')
+```
+
+
+```{r}
+# 运行也很久
+AIC(fit.2cpt.ode.saem)
+```
+
+
+利用`xpose`包做检查：
+```{r}
+# require(xpose.nlmixr2)
+
+xpdb <- xpose.nlmixr2::xpose_data_nlmixr2(fit.2cpt.ode.saem)
+
+xpdb
+```
+
+```{r}
+# 似乎有点小问题
+summary(xpdb, problem = 1)
+```
+
+数据拟合的很差，对于这种拟合很差的情况该如何解决呢？
+```{r}
+dv_vs_ipred(xpdb)
+```
+
+
+
+##### three compartment model
+
+
+```{r}
+# Three-compartment model with proportional residual error:
+
+model.3cpt.ode <- function() {
+ ini({
+ tka <- log(1.42)
+ tcl <- log(0.044)
+ tv2 <- log(2)
+ tv3 <- log(10)
+ tv4 <- log(10)
+ tq2 <- log(0.5)
+ tq3 <- log(0.5)
+ eta.ka ~ 0.1
+ eta.cl ~ 0.1
+ eta.v2 ~ 0.1
+ eta.v3 ~ 0.1
+ eta.v4 ~ 0.1
+ eta.q2 ~ 0.1
+ eta.q3 ~ 0.1
+ prop.err <- 0.075
+ })
+ model({
+ ka <- exp(tka + eta.ka)
+ cl <- exp(tcl + eta.cl)
+ v2 <- exp(tv2 + eta.v2)
+ v3 <- exp(tv3 + eta.v3)
+ v4 <- exp(tv4 + eta.v4)
+ q2 <- exp(tq2 + eta.q2)
+ q3 <- exp(tq3 + eta.q3)
+ d/dt(depot) = -ka * depot
+ d/dt(center) = ka * depot - cl / v2 * center + q2/v3 * periph1 - q2/v2 * center + q3/v4 *
+periph2 - q3/v2 * center
+ d/dt(periph1) = q2/v2 * center - q2/v3 * periph1
+ d/dt(periph2) = q3/v2 * center - q3/v4 * periph2
+ cp = center / v2
+ cp ~ prop(prop.err)
+ })
+}
+
+
+# 定义模型
+model.3cpt.ode <- function() {
+
+  # 初始值
+  ini({
+    # 吸收速率常数的对数值
+    tka <- log(1.42)  
+    # 清除率常数的对数值 
+    tcl <- log(0.044)   
+    # 中央室体积的对数值
+    tv2 <- log(2) 
+    # 外周室1体积的对数值 
+    tv3 <- log(10)  
+    # 外周室2体积的对数值
+    tv4 <- log(10) 
+    # 从中央室到外周室1的间质清除速率常数的对数值
+    tq2 <- log(0.5) 
+    # 从中央室到外周室2的间质清除速率常数的对数值
+    tq3 <- log(0.5)
+    # 吸收速率的随机效应标准差
+    eta.ka ~ 0.1 
+    # 清除率的随机效应标准差 
+    eta.cl ~ 0.1    
+    # 中央室体积的随机效应标准差
+    eta.v2 ~ 0.1
+    # 外周室1体积的随机效应标准差
+    eta.v3 ~ 0.1  
+    # 外周室2体积的随机效应标准差
+    eta.v4 ~ 0.1
+    # 从中央室到外周室1的间质清除速率随机效应标准差
+    eta.q2 ~ 0.1
+    # 从中央室到外周室2的间质清除速率随机效应标准差
+    eta.q3 ~ 0.1
+    # 归一化残差的标准差
+    prop.err <- 0.075
+  })
+
+  # 模型方程 
+  model({
+    # 吸收速率
+    ka <- exp(tka + eta.ka)
+    # 清除率
+    cl <- exp(tcl + eta.cl) 
+    # 中央室体积
+    v2 <- exp(tv2 + eta.v2)
+    # 外周室1体积
+    v3 <- exp(tv3 + eta.v3)
+    # 外周室2体积
+    v4 <- exp(tv4 + eta.v4)
+    # 从中央室到外周室1的间质清除速率 
+    q2 <- exp(tq2 + eta.q2) 
+    # 从中央室到外周室2的间质清除速率
+    q3 <- exp(tq3 + eta.q3)
+
+    # 释放部位量的微分方程
+    d/dt(depot) = -ka * depot
+
+    # 中央室量的微分方程
+    d/dt(center) = ka * depot - cl / v2 * center +  
+                   q2/v3 * periph1 - q2/v2 * center + 
+                   q3/v4 * periph2 - q3/v2 * center
+
+    # 外周室1量的微分方程
+    d/dt(periph1) = q2/v2 * center - q2/v3 * periph1
+
+    # 外周室2量的微分方程 
+    d/dt(periph2) = q3/v2 * center - q3/v4 * periph2
+
+    # 中央室浓度
+    cp = center / v2
+
+    # 浓度的误差模型
+    cp ~ prop(prop.err)
+  })
+
+}
+
+```
 
 
 #### multi-dose 多次给药
 
 ```{r}
-
+theo_md
 ```
+
+
+
 
 ### use PKNCA 包
 
