@@ -10,16 +10,16 @@ format: html
 > https://statisticsbyjim.com/regression/choose-linear-nonlinear-regression/
 
 
-非线性模型是一系列模型的统称。其和线性回归区分的重点在于，当然线性模型亦可拟合非线性关系，比如多项式回归、GAM都可以归属于线性模型，但其用于拟合非线性关系。
+非线性模型是一系列模型的统称。其和线性回归区分的重点在于？。当然线性模型亦可拟合非线性关系，比如多项式回归、GAM都可以归属于线性模型，但其用于拟合非线性关系。
 
 GLMs可以理解成将非线性分布的outcome数据进行转换成线性而进行分析的，因变量和自变量间的线性关系。罗辑回归经常被视为线性回归。The _linear_ in "generalized linear model" says the parameters enter the model linearly. Due to the parameter 𝜙1
  the logistic growth model is not exactly equal to the logistic function used in logistic regression. 当然logistic的拟合其本身是非线性的，是在经过logit转换后a logit-linear model，其的公式才呈现为线性的模式。
 
 怎么更为合适的区分，线性和非线性呢？多项式回归应该属于线性回归，虽则其所拟合的曲线是弯曲的，*linear in the parameters*，可以作为区分的标准，或者说符合$y=a1*x1+a2x2+...$格式的都属于线性回归。其他的可以理解为非线性回归。
 
-Like OLS, nonlinear regression estimates the parameters by minimizing the SSE. However, nonlinear models use an iterative algorithm rather than the linear approach of solving them directly with matrix equations. 
+Like OLS, nonlinear regression estimates the parameters by minimizing the SSE. However, nonlinear models use an *iterative algorithm* rather than the linear approach of solving them directly with matrix equations. 
 
-The main positive is that nonlinear regression provides the most flexible curve-fitting functionality. The downside is that it can take considerable effort to choose the nonlinear function that creates the best fit for the particular shape of the curve. Unlike linear regression, you also need to supply starting values for the nonlinear algorithm. 
+The main positive is that nonlinear regression provides the most flexible curve-fitting functionality. The downside is that it can take considerable effort to choose the nonlinear function that creates the best fit for the particular shape of the curve. _Unlike linear regression, you also need to supply starting values for the nonlinear algorithm. _
 
 下面整理一些常见的非线性模型的例子：
 
@@ -47,7 +47,18 @@ Nonlinear regression models are generally assumed to be *parametric*, where the 
 *Popular algorithms for fitting a nonlinear regression include:*
 - Gauss-Newton algorithm
 - Gradient descent algorithm
-- Levenberg-Marquardt algorithm
+- Levenberg-Marquardt algorithm, It combines aspects of both the steepest descent method and the Gauss-Newton method, and is able to find a solution that is robust to both large and small residuals.
+- non-linear least squares
+
+梯度下降法（Gradient Descent）：梯度下降法可能是最基本和最常用的优化算法，它用于求解可微函数的最小值。这个方法基于的主要思想是，如果一个函数在某个点的导数为负，那么该函数在该点的左侧可能有一个最小值；如果导数为正，那么可能在右侧有一个最小值。
+
+牛顿法（Newton's Method）：牛顿法是求解无约束优化问题的有效方法，尤其是当目标函数二次可微时。它是基于泰勒级数的第二个近似来寻找函数的最小值。
+
+拟牛顿法（Quasi-Newton Methods）：在求解大规模优化问题时，计算和存储海森矩阵可能会非常困难。拟牛顿法提供了一种有效的替代方案，它使用矩阵来近似海森矩阵，常见的有BFGS算法。
+最大期望算法（Expectation-Maximization Algorithm）：这是一种迭代优化算法，主要用于含有隐变量的统计模型。
+模拟退火算法（Simulated Annealing）：这是一种全局优化方法，模拟物理系统冷却过程中粒子的排列情况以找到函数的全局最小值。
+遗传算法（Genetic Algorithms）：这是一种从自然选择过程中得到启发的全局优化和搜索方法。
+随机梯度下降法（Stochastic Gradient Descent）：这是一种优化算法，主要用于大规模数据集，当计算资源有限时，它可以更快地收敛。
 
 
 It’s important to note that R-squared is invalid for nonlinear models and statistical software *can’t calculate p-values for the terms/estimates*.不过在Prism等软件中，在拟合dose-response curve时，会给出R2值。
@@ -166,7 +177,7 @@ library(nlraa)
 
 
 ```{r}
-
+# 首先是起始值的设置
 ```
 
 
