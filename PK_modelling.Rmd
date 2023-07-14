@@ -245,7 +245,7 @@ plot(fit)
 
 
 
-除上述通过`base`包得到的诊断图之外，还提供了`xpose`包的使用，`xpose`包是aims
+除上述`plot`函数得到的诊断图之外，还提供了`xpose`包的使用，`xpose`包是aims
 to reduce the post processing burden and improve diagnostics commonly
 associated the development of non-linear mixed effect models. 检查模型的表现。
 
@@ -280,34 +280,42 @@ Bolus_2CPT %>% head(n = 100)
 详情见`saemix`包的官方文档。
 
 ```{r}
-saemix.data<-saemixData(name.data=warfa_data,header=TRUE,sep=" ",
-  na=NA, name.group=c("id"),name.predictors=c("amount","time"),
-  name.response=c("y1"), name.X="time")
+saemix.data <- saemixData(
+  name.data = warfa_data, header = TRUE, sep = " ",
+  na = NA, name.group = c("id"), name.predictors = c("amount", "time"),
+  name.response = c("y1"), name.X = "time"
+)
 ```
 
 
 ```{r}
-model1cpt<-function(psi,id,xidep) {
-  dose<-xidep[,1]
-  tim<-xidep[,2]
-  ka<-psi[id,1]
-  V<-psi[id,2]
-  k<-psi[id,3]
-  CL<-k*V
-  ypred<-dose*ka/(V*(ka-k))*(exp(-k*tim)-exp(-ka*tim))
+model1cpt <- function(psi, id, xidep) {
+  dose <- xidep[, 1]
+  tim <- xidep[, 2]
+  ka <- psi[id, 1]
+  V <- psi[id, 2]
+  k <- psi[id, 3]
+  CL <- k * V
+  ypred <- dose * ka / (V * (ka - k)) * (exp(-k * tim) - exp(-ka * tim))
   return(ypred)
 }
 
-saemix.model<-saemixModel(model=model1cpt,description="warfarin",
-  type="structural",psi0=matrix(c(1,7,1,0,0,0),ncol=3,byrow=TRUE,
-  dimnames=list(NULL, c("ka","V","k"))),transform.par=c(1,1,1),
-  omega.init=matrix(c(1,0,0,0,1,0,0,0,1),ncol=3,byrow=TRUE),
-  covariance.model=matrix(c(1,0,0,0,1,0,0,0,1),ncol=3,
-  byrow=TRUE))
+saemix.model <- saemixModel(
+  model = model1cpt, description = "warfarin",
+  type = "structural", psi0 = matrix(c(1, 7, 1, 0, 0, 0),
+    ncol = 3, byrow = TRUE,
+    dimnames = list(NULL, c("ka", "V", "k"))
+  ), transform.par = c(1, 1, 1),
+  omega.init = matrix(c(1, 0, 0, 0, 1, 0, 0, 0, 1), ncol = 3, byrow = TRUE),
+  covariance.model = matrix(c(1, 0, 0, 0, 1, 0, 0, 0, 1),
+    ncol = 3,
+    byrow = TRUE
+  )
+)
 ```
 
 
-###### 利用`nlmixr2`
+###### 利用`nlmixr2`包进行
 
 ```{r}
 # 两房室模型对应的起始值
@@ -481,7 +489,7 @@ nlmixr2::nlmixr(model.2cpt.ode)
 
 # write_rds(fit.2cpt.ode.saem, './datasets/fit.2cpt.ode.saem.rds')
 
-readRDS('./datasets/fit.2cpt.ode.saem.rds')
+fit.2cpt.ode.saem <- readRDS('./datasets/fit.2cpt.ode.saem.rds')
 ```
 
 
@@ -491,7 +499,7 @@ AIC(fit.2cpt.ode.saem)
 ```
 
 
-利用`xpose`包做检查：
+利用`xpose`包对模型的拟合程度做检查：
 ```{r}
 # require(xpose.nlmixr2)
 
@@ -519,39 +527,39 @@ dv_vs_ipred(xpdb)
 # Three-compartment model with proportional residual error:
 
 model.3cpt.ode <- function() {
- ini({
- tka <- log(1.42)
- tcl <- log(0.044)
- tv2 <- log(2)
- tv3 <- log(10)
- tv4 <- log(10)
- tq2 <- log(0.5)
- tq3 <- log(0.5)
- eta.ka ~ 0.1
- eta.cl ~ 0.1
- eta.v2 ~ 0.1
- eta.v3 ~ 0.1
- eta.v4 ~ 0.1
- eta.q2 ~ 0.1
- eta.q3 ~ 0.1
- prop.err <- 0.075
- })
- model({
- ka <- exp(tka + eta.ka)
- cl <- exp(tcl + eta.cl)
- v2 <- exp(tv2 + eta.v2)
- v3 <- exp(tv3 + eta.v3)
- v4 <- exp(tv4 + eta.v4)
- q2 <- exp(tq2 + eta.q2)
- q3 <- exp(tq3 + eta.q3)
- d/dt(depot) = -ka * depot
- d/dt(center) = ka * depot - cl / v2 * center + q2/v3 * periph1 - q2/v2 * center + q3/v4 *
-periph2 - q3/v2 * center
- d/dt(periph1) = q2/v2 * center - q2/v3 * periph1
- d/dt(periph2) = q3/v2 * center - q3/v4 * periph2
- cp = center / v2
- cp ~ prop(prop.err)
- })
+  ini({
+    tka <- log(1.42)
+    tcl <- log(0.044)
+    tv2 <- log(2)
+    tv3 <- log(10)
+    tv4 <- log(10)
+    tq2 <- log(0.5)
+    tq3 <- log(0.5)
+    eta.ka ~ 0.1
+    eta.cl ~ 0.1
+    eta.v2 ~ 0.1
+    eta.v3 ~ 0.1
+    eta.v4 ~ 0.1
+    eta.q2 ~ 0.1
+    eta.q3 ~ 0.1
+    prop.err <- 0.075
+  })
+  model({
+    ka <- exp(tka + eta.ka)
+    cl <- exp(tcl + eta.cl)
+    v2 <- exp(tv2 + eta.v2)
+    v3 <- exp(tv3 + eta.v3)
+    v4 <- exp(tv4 + eta.v4)
+    q2 <- exp(tq2 + eta.q2)
+    q3 <- exp(tq3 + eta.q3)
+    d / dt(depot) <- -ka * depot
+    d / dt(center) <- ka * depot - cl / v2 * center + q2 / v3 * periph1 - q2 / v2 * center + q3 / v4 *
+      periph2 - q3 / v2 * center
+    d / dt(periph1) <- q2 / v2 * center - q2 / v3 * periph1
+    d / dt(periph2) <- q3 / v2 * center - q3 / v4 * periph2
+    cp <- center / v2
+    cp ~ prop(prop.err)
+  })
 }
 
 
@@ -700,6 +708,7 @@ AUMCinf（Area Under the Moment Curve at Infinity）是指药物的无限时刻�
 Span ratio（跨度比）是在非组分分析（NCA）中用于评估药物的体内分布特性的指标之一。它是通过计算药物在血浆和体液（如组织或尿液）中的浓度之间的比值来得到的。跨度比的计算通常采用AUC（Area Under the Curve，曲线下面积）作为血浆和体液浓度曲线的度量，并分别计算血浆和体液的AUC值。然后，通过计算体液AUC与血浆AUC的比值，得到跨度比。跨度比大于1表示药物在体液中的浓度高于血浆中的浓度，表明药物在体液中有较高的蓄积。跨度比小于1表示药物在体液中的浓度低于血浆中的浓度，表明药物在体液中的分布较少。
 
 Interpolation & Extrapolation, 插入/推断。
+> https://en.wikipedia.org/wiki/Curve_fitting
 
 
 *Generally NCA will determine the following directly from the data:*
