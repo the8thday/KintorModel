@@ -27,7 +27,12 @@ library(emmeans)
 
 
 广义线性模型(Generalized linear model, GLIMs)是指一类，通过不同的link function将因变量和自变量的关系变成线性模型。
-The term "generalized" linear model (GLIM or GLM) refers to a larger class of models popularized by McCullagh and Nelder (1982, 2nd edition 1989).
+The term "generalized" linear model (GLIM or GLM) refers to a larger class of models popularized by McCullagh and Nelder (1982, 2nd edition 1989).其需要满足因变量的条件分布属于指数分布族，且因变量的均值是自变量的线性函数的某个单调可微函数（称为联接函数）。
+
+其的一般形式为：
+$$g(ui)=\beta0+b1x1+...+bnxn$$
+其中，g是联接函数，μi是第i个观测值对应的因变量的均值，β0, β1, ..., βp是待估计的参数，xi1,...xip是第i个观测值的自变量。
+
 
 There are three components to any GLM:
 - Random Component: specifies the probability distribution of the response variable
@@ -220,18 +225,54 @@ summary(lm_fit2)
 
 ### 负二项分布
 
+负二项分布(Negative Binomial Distribution)是一种离散型概率分布,它描述在Bernoulli试验中观察到r次“成功”之前发生的“失败”次数的概率分布。
+
+$$P(X=k) = \frac{\Gamma(k+r)}{\Gamma(r)k!} p^r (1-p)^k$$
+其中:
+
+$k$ - 观察到第$r$次“成功”之前的“失败”次数
+$r$ - “成功”的次数
+$p$ - 单次Bernoulli试验中“成功”的概率
+$\Gamma()$ - Gamma函数
+
+
+负二项分布的期望和方差为:
+E(X) = r(1-p)/p
+Var(X) = r(1-p)/p^2
+与其他分布的关系:
+当r=1时,负二项分布退化为几何分布。
+当r→∞时,负二项分布趋向于泊松分布。
+
+负二项分布可以用来描述一些现实问题，比如在一个电话销售活动中，需要拨打多少电话才能完成r次销售；或者在一个广告投放活动中，需要投放多少次广告才能吸引到r次点击等。
+
+
+*模型假设：*
+
+
 ```{r}
 # 负二项分布
 # 负二项分布回归一般用于count数据，尤其较为离散over-dispersed分布的count数据，柏松分布假设means和var是same的。
 # negative binomial models assume the conditional means are not equal to the conditional variances
+
 library(MASS)
+
+
 dat <- read_csv('./datasets/Lab_exp.csv')
 
+```
+
+
+考虑如下一个简单的示例，Diplo_intensity为counts数的计数；Treatment为不同条件。
+```{r}
 # check assumptions
+# 可以看到四个分组之间
 with(dat, tapply(Diplo_intensity, Treatment, function(x) {
     sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
 }))
+```
 
+
+```{r}
 m1 <- MASS::glm.nb(formula = Diplo_intensity~Treatment,
                    data = dat %>% filter(Treatment %in% c('Infected HG', 'Control')))
 
@@ -239,8 +280,18 @@ m1 <- MASS::glm.nb(formula = Diplo_intensity~Treatment,
 est <- cbind(Estimate = coef(m1), confint(m1))
 exp(est)
 
+
+```
+
+```{r}
 summary(m1)
 anova(m1)
+```
+
+
+模型假设还是很方便的。
+```{r}
+performance::check_model(m1)
 ```
 
 
@@ -250,22 +301,25 @@ R包`mvabund`的负二项分布建模：
 # mvabund 负二项分布建模
 library(mvabund)
 
-mm1 <- manyglm(
+mm1 <- mvabund::manyglm(
   formula = Diplo_intensity~Treatment,
-  data = dat,
+  data = dat %>% filter(Treatment %in% c('Infected HG', 'Control')),
   family = 'negative.binomial'
 )
 
 summary(mm1)
 # summary.manyglm(mm1, test = 'wald', nBoot = 9999)
-```
 
+message(rep("#", 50), "\n")
+
+mm1
+```
 
 *结果解读: *对于MASS包，其summary后的系数和一般线性模型的解释类似，如连续性变量则是其每改变一个单位对outcome的log count的影响，对于离散变量则是和refer group的对比。
 
 
 
-多变量的MASS package & manyglm的对比
+*多个自变量的MASS package & manyglm的对比*
 
 ```{r}
 m2 <- MASS::glm.nb(Diplo_intensity~Treatment+Fish_family+Fish_sex+Initial_weight_g, 
@@ -275,8 +329,10 @@ summary(m2)
 mm2 <- manyglm(Diplo_intensity~Treatment+Fish_family+Fish_sex+Initial_weight_g, 
                    data = dat,
                    family = 'negative.binomial')
+
 summary.manyglm(mm2, test = 'wald', nBoot = 9999)
 ```
+
 
 评估负二项分布, 对于mvabund包performance包不支持，不过mvabund自身有提供一些手段; 对于MASS包的结果是支持的。
 
