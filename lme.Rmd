@@ -26,11 +26,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
 
-mixed effects model average trends, random effects model the extent to which these trends vary across levels of some grouping factor.
+mixed effects model average trends, random effects model the extent to which these trends vary across levels of some grouping factor.混合效应模型可以量化不同群体间平均趋势的差异程度。这里的grouping factor指的是对数据进行分组的因素, 比如地区、性别等。
 
 混合模型的优点之一就是可以处理不等距时间数据，这对于分析临床回顾性研究中收集的患者不等距时间点上的重复测量数据是非常合适的。
 
+
 *线性混合效应模型原理：*
+假设随机效应满足正态分布(似乎有带商榷),即每个群体的随机效应都是从总体随机效应的正态分布中独立取样的。在线性混合效应模型 (LMM) 中，因变量被视为固定效应和随机效应的线性组合。
 
 
 线性混合模型的应用较多，此处只针对医学研究中常见的重复测量数据分析。
@@ -57,10 +59,10 @@ library(mmrm) # 一个针对临床重复资料设计的R包
 
 > https://ase.tufts.edu/bugs/guide/assets/mixed_model_guide.html
 
-首先是检验数据因变量的概率分布，在这一点上似乎和广义线性模型相似，线性混合模型需要因变量满足正态性.
+首先是检验数据因变量的概率分布，在这一点上似乎和一般线性模型相似，线性混合模型需要因变量满足正态性（目前来看值得商榷）.线性混合模型的统计推断如t检验、F检验依赖于残差的正态性和方差的齐性,而不是依赖于因变量的正态性。
 如果不符合正态性检验，需选择正确的建模方法，比如penalized quasilikelihood (PQL) 、Laplace approximation and Markov chain Monte Carlo algorithms (MCMC).
 
-PQL is a flexible technique that can deal with non-normal data, unbalanced design, and crossed random effects. However, it produces biased estimates if your response variable fits a discrete count distribution, like Poisson or binomial, and the mean is less than 5 - or if your response variable is binary.
+PQL is a flexible technique that can deal with non-normal data, unbalanced design, and crossed random effects. However, it produces biased estimates if your response variable fits a discrete count distribution, like Poisson or binomial, and the mean is less than 5 - or if your response variable is binary.`MASS::glmmPQL`
 
 The Laplace approximation can handle up to 3 random effects.Any more than that, and you'll have to use MCMC, which is a Bayesian method that can be somewhat confusing.
 
@@ -75,7 +77,8 @@ the Laplace approximation is a special case of a parameter estimation method cal
 
 1. 解释变量和相应变量间线性相关
 2. 残差独立、正态分布、并have constant variance
-3. 
+3. Normally distributed random effects - The random effects are usually assumed to be normally distributed.
+4. No extreme multicollinearity ;No extreme outliers
 
 
 ```{r}
@@ -141,7 +144,7 @@ anova (nullmodel1, nullmodel2) #  基于LRT比的模型间的对比，同时还�
 *报错问题的解决：*首先是考虑随机效应的数目，随机效应数目的计算方式为，1|PatientID，其随机效应值为77，time | PatientID, 因为time是一个分类变量，则其在计算时time*77便是随机效应值，在这个意义上来讲，数据在time上不是repeated measures，不能将time视为随机效应。
 This is because the levels of a categorical variable are represented by dummy variables - essentially they are treated as different variables. So in your case, when you fit random slopes only you are asking the software to estimate 5 random slopes for each group. When you fit random intercepts and random slopes there will be 407 random intercepts, but only 4 random slopes for each group (since one level will be treated as a reference group and included in the intercept), so either way you will have 5 x 407 random effects.
 
-The only way to solve this is by either coding the variable as numeric, if that is plausible in your study/data, or not fitting random slopes, or having more than 1 observation per treatment per group.
+The only way to solve this is by either coding the variable as `numeric`, if that is plausible in your study/data, or not fitting random slopes, or having more than 1 observation per treatment per group.
 
 
 ```{r}
@@ -519,8 +522,8 @@ lines(smooth.spline(fitted(lme_model), residuals(lme_model)))
 
 最近发现了一个新包`MMRM`，记录下其的应用。
 
-
 医学研究中的重复测量数据有其对应的考量之处：
+
 ```{r}
 #   MMRM 
   mod.gls1 <- nlme::gls(Y_comp ~ Group + Time + Group*Time,
