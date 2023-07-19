@@ -25,7 +25,24 @@ lightGBM(Light Gradient Boosting Machine)是一个流行的基于决策树算法
 lightGBM是，，其和`xgboost`的差异在于The main difference between these frameworks is the way they are growing. XGBoost applies `level-wise` tree growth where LightGBM applies `leaf-wise` tree growth. Level-wise approach grows horizontal whereas leaf-wise grows vertical.
 
 
+- 更快的训练速度,并支持大规模数据的训练。
+lightGBM通过综合两种技术来实现更快的训练速度: Gradient-based One-Side Sampling (GOSS)和Exclusive Feature Bundling (EFB)。GOSS通过采样方式找到信息量最大的样本来训练;EFB通过捆绑互斥的特征来降维。
+- 更低的内存占用。
+lightGBM采用了直方图算法来整合连续特征信息,大大减少了内存使用。在构建决策树时，LightGBM使用Histogram算法将特征按值域分桶，并将每个桶视为一个离散的特征。
+- 更高的准确性。
+lightGBM实现了Leaf-wise(叶子层级)的最佳分裂策略,可以减少误差;同时支持高效的并行学习,提高了准确性。
+- 支持多分类问题。
+lightGBM直接聚合二分类模型解决多分类问题,无需重新训练,并保证效率。
+- 支持并行学习。
+lightGBM支持基于共享内存的并行学习,可以充分利用多核设备。
+- 处理异常值的稳健性。
+lightGBM通过梯度上限和采样措施限制异常值的影响。lightGBM能够直接处理缺失数据,不需要提前删除或填充。
+
+
 *lightGBM的数据输入要求：*LightGBM直接支持类别特征，对类别特征不必进行独热编码处理
+
+
+在使用LightGBM时，需要选择一些*超参数来调整模型*，例如：树的深度、学习率、叶子节点数量等。LightGBM提供了一些自动调参的工具，例如网格搜索、随机搜索和贝叶斯优化等。
 
 
 
