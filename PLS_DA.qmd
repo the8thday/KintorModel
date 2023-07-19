@@ -10,11 +10,12 @@ format: html
 *DA(Discriminant Analysis)*, 判别分析，是一种统计学习方法，旨在寻找将观测数据分为不同类别的最佳决策边界。它是一种有监督学习方法，需要已知观测数据所属的类别信息。 DA 的目标是找到一组线性组合，能够将不同类别的数据分离得最好。DA 的优点在于它可以找到最佳的决策边界，从而对新的观测数据进行分类。此外，DA可以处理多个自变量同时影响输出变量的情况。但是，DA 对输入变量之间的相关性比较敏感，如果输入变量高度相关，可能会出现过拟合现象。
 
 
-*PLS-DA (Partial Least Squares Discriminant Analysis)* 是一种用于分类问题的统计学习方法。它可以同时考虑多个自变量之间的相关性，克服了传统的线性判别分析（LDA）在自变量高度相关的情况下容易出现的过拟合现象。PLS-DA 是 PLS （Partial Least Squares） 的一种变体，PLS 是一种主成分回归方法，旨在通过线性组合来提取输入变量中的信息，并建立它们与输出变量之间的关系。与主成分回归方法类似，PLS-DA 将输入变量投影到一个低维空间中，但它是针对分类问题的。在 PLS-DA 中，我们首先根据输入变量的协方差矩阵来计算一组新的变量，称为潜在变量。潜在变量是输入变量的线性组合，并且它们在输入变量中的方差最大，同时与输出变量之间的相关性也最大。我们可以通过不断地计算潜在变量来逐步提高分类模型的准确度。
+*PLS-DA (Partial Least Squares Discriminant Analysis)* 是一种用于分类问题的统计学习方法。它可以同时考虑多个自变量之间的相关性，克服了传统的线性判别分析（LDA）在自变量高度相关的情况下容易出现的过拟合现象。PLS-DA 是 PLS （Partial Least Squares） 的一种变体，PLS 是一种主成分回归方法，旨在通过线性组合来提取输入变量中的信息，并建立它们与输出变量之间的关系。与主成分回归方法类似，PLS-DA 将输入变量投影到一个低维空间中，但它是针对分类问题的。
+在 PLS-DA 中，我们首先根据输入变量的协方差矩阵来计算一组新的变量，称为潜在变量。潜在变量是输入变量的线性组合，并且它们在输入变量中的方差最大，同时与输出变量之间的相关性也最大。我们可以通过不断地计算潜在变量来逐步提高分类模型的准确度。
 PLS-DA 的优点在于它能够同时考虑输入变量之间的相关性以及它们与输出变量之间的关系。这使得它能够处理高度相关的输入变量，同时避免出现传统 LDA 中的过拟合现象。此外，PLS-DA可以很好地处理高维数据，因为它可以将数据投影到一个低维空间中，并保留尽可能多的信息。
 
 
-*PLS (Partial Least Squares)* 是一种回归分析方法，旨在通过线性组合来提取输入变量中的信息，并建立它们与输出变量之间的关系。与传统的多元线性回归（MLR）方法不同，PLS不是直接将输入变量与输出变量拟合到一个线性方程中，而是通过一系列潜在变量来描述输入和输出变量之间的关系。在 PLS 中，我们首先根据输入变量的协方差矩阵来计算一组新的变量，称为潜在变量。潜在变量是输入变量的线性组合，并且它们在输入变量中的方差最大，同时与输出变量之间的相关性也最大。我们可以通过不断地计算潜在变量来逐步提高回归模型的准确度。PLS可以用来处理变量间相关性，共线性问题的数据，比如其经常用在代谢组、微生物组中等。
+*PLS (Partial Least Squares)* 是一种回归分析方法，旨在通过线性组合来提取输入变量中的信息，并建立它们与输出变量之间的关系。与传统的多元线性回归（MLR）方法不同，PLS不是直接将输入变量与输出变量拟合到一个线性方程中，而是通过一系列潜在变量来描述输入和输出变量之间的关系。在 PLS中，我们首先根据输入变量的协方差矩阵来计算一组新的变量，称为潜在变量。潜在变量是输入变量的线性组合，并且它们在输入变量中的方差最大，同时与输出变量之间的相关性也最大。我们可以通过不断地计算潜在变量来逐步提高回归模型的准确度。PLS可以用来处理变量间相关性，共线性问题的数据，比如其经常用在代谢组、微生物组中等。
 
 - Standardize both the predictor and response variables.
 - Calculate M linear combinations (called “PLS components”) of the original p predictor variables that explain a significant amount of variation in both the response variable and the predictor variables.
@@ -90,15 +91,18 @@ sum(diag(tab))/sum(tab)
 ldahist(data = p$x[,1], g = trainData$Species)
 ```
 *interpret the result: *It’s clearly evident that no overlaps between first and second and first and third species. But some overlap observed between the second and third species.
+即是，在第一维的情况下，三个分组之间具有不错的区分。
 
 ```{r}
 ldahist(data = p$x[,2], g = trainData$Species)
 ```
 *interpret the result: *histogram based on lda2 showing complete overlap and its not good.
 
+
 ```{r}
 klaR::partimat(Species~., data = trainData, method = "lda")
 ```
+*interpret the result: *
 
 
 
