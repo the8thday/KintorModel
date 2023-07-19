@@ -90,7 +90,7 @@ dat <- readr::read_csv('./datasets/worland5.csv')
 以mediation model为例，我们知道mediation model/covariance modelling the primary focus here is the relationships between variables. e.g., estimate and test direct and indirect effects in a system of regression equations and estimate and test theories about the absence of relationships.
 
 Exogenous variables: those which are not predicted by any other
-Endogenous variables: variables which do have predictors, and may or may not predict other variales
+Endogenous variables: variables which do have predictors, and may or may not predict other variables.
 
 *其可以应用在*
 
