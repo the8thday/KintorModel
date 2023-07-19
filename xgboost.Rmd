@@ -375,7 +375,7 @@ vb_df <- bind_rows(winners, losers) %>%
 
 An XGBoost model is based on trees, so we don’t need to do much preprocessing for our data; we don’t need to worry about the factors or centering or scaling our data. 
 
-`xgboost`不是只能输入数字型数据?
+`xgboost`不是只能输入数字型数据? 可能在R中的实现上进行了优化，对于数据还是要再做一下检查。
 
 ```{r, eval=FALSE}
 usemodels::use_xgboost(win ~ ., data = vb_df)
