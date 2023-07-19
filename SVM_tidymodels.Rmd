@@ -84,7 +84,7 @@ _from chatGPT_
 
 
 *preprocessing steps before fitting an SVM: *
-Data scaling:SVM is sensitive to the scale of the input data. If the input features have different scales, then it can cause problems with the optimization of the SVM. To avoid this, you should scale the input data so that each feature has a similar range. This can be done using techniques like normalization, standardization, or scaling to a specific range.
+Data scaling:SVM is sensitive to the scale of the input data. If the input features have different scales, then it can cause problems with the optimization of the SVM. To avoid this, you should `scale the input data` so that each feature has a similar range. This can be done using techniques like normalization, standardization, or scaling to a specific range.
 *svm*对于特征NA值的处理：
 纳入过多特征的数据集有一个大麻烦在于后续预测时，不是每一个样本都会包含这些特征，比如对于基因表达数据的检验，很有可能某一个基因其的表达本次没有检测到，而作为一个样本输入，如何去预测其的分类呢？
 分类变量：one-hot编码。
