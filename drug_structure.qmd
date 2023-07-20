@@ -19,11 +19,21 @@ library(bio3d)
 library(rcdk)
 library(DrugSim2DR)
 
-
 ```
 
 
+```{r}
+data(sdfsample) 
 
+sdfset <- sdfsample
+```
+
+
+```{r}
+# ChemmineR 所绘制的分子结构
+
+plot(sdfset[1:4], print=FALSE)
+```
 
 
 
