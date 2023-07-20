@@ -94,3 +94,34 @@ ggplot(plotdata, aes(x=samsize, y=es)) +
 
 
 
+
+
+### 临床预测模型的样本量估算
+
+> Calculating the sample size required for developing a clinical prediction model。
+
+at least 10 outcome events per variable (EPV) to ensure accuracy.
+
+另外，孙振球教授主编的《医学统计学（第四版）》也给出了一些常用的经验方法，比如：自变量个数的15~20倍（logistic回归分析）、自变量个数的5~10倍（多元线性回归）、自变量个数的15~20倍（Cox回归）。个人认为这些可以看作是10 EPV的扩展。
+但是，上述估算方法仅仅是经验做法，只是考虑了最终纳入模型的变量个数（实际上考虑的是系数β的个数），没有考虑到多分类、交互作用、非线性关系等方面的影响，因此，最好是使用每个候选预测因子参数的事件数（EPP）来进行预测。候选参数很重要，因为模型过拟合的程度取决于所考虑的预测参数总数，而不仅仅是最终模型方程中包含的预测参数。
+
+
+
+```{r}
+library(pmsampsize)
+```
+
+
+
+```{r}
+pmsampsize(type = "b", rsquared = 0.288, 
+           parameters = 24, prevalence = 0.174)
+```
+
+
+
+
+
+
+
+
