@@ -179,6 +179,54 @@ labels1 <- cld(tuk, level=.05)$mcletters$Letters
 ```
 
 
+*手动计算方差分析的结果：*
+```{r}
+# 首先是全部样本的离均差平方和和方差
+var(cholesterol$response) * (50 -1)
+
+sum((cholesterol$response - mean(cholesterol$response))^2)
+
+
+# 然后是组间的方差
+# 以下是一个组内均衡设计的例子
+foo <- aggregate(cholesterol$response, by = list(cholesterol$trt), FUN = 'mean')
+var(foo$x) * 4 * 10
+
+
+# 然后是组内的方差
+# 组内方差
+
+```
+
+```{r}
+# 计算组均值
+group_means <- cholesterol %>% group_by(trt) %>% summarise(mean_Y = mean(response))
+
+# 计算总均值
+overall_mean <- mean(cholesterol$response)
+
+# 计算总样本数量
+n_total <- nrow(cholesterol)
+
+# 计算组数量
+n_groups <- nrow(group_means)
+
+# 计算组内样本数量
+n_obs_per_group <- (cholesterol %>% group_by(trt) %>% summarise(n_obs = n()))$n_obs
+
+# 计算组间方差
+between_group_variance <- sum(n_obs_per_group * (group_means$mean_Y - overall_mean)^2) / (n_groups - 1)
+
+# 计算离均差平方和（总平方和）
+total_ss <- sum((cholesterol$response - overall_mean)^2)
+
+# 计算组内方差
+within_group_variance <- (total_ss - between_group_variance * (n_groups - 1)) / (n_total - 1 - n_groups)
+
+```
+
+
+
 #### One-way ANCOVA
 
 在ANOVA的基础上加一个定量的协变量。协变量在`aov`函数中放在公式的前面。不过在`car::Anova`直接包裹时是不用考虑顺序的，因为其所提供的是typeII和typeIII anova。
