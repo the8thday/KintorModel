@@ -24,9 +24,10 @@ knitr::opts_chunk$set(echo = TRUE)
 > https://stats.stackexchange.com/questions/488428/how-do-you-know-the-number-of-random-effects-in-a-mixed-effects-model
 > https://cran.r-project.org/web/packages/glmmTMB/vignettes/covstruct.html
 > https://drive.google.com/file/d/1sOZUAFOc004H4jO8vuUc_4HyYHEgu45b/view
+> https://mp.weixin.qq.com/s/jxnwMVB3eNkru60jebC8Zw
 
 
-对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。
+
 线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*，个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
 
 mixed effects model average trends, random effects model the extent to which these trends vary across levels of some grouping factor.混合效应模型可以量化不同群体间平均趋势的差异程度。这里的grouping factor指的是对数据进行分组的因素, 比如地区、性别等。
@@ -40,7 +41,16 @@ mixed effects model average trends, random effects model the extent to which the
 假设随机效应满足正态分布(似乎有带商榷),即每个群体的随机效应都是从总体随机效应的正态分布中独立取样的。在线性混合效应模型 (LMM) 中，因变量被视为固定效应和随机效应的线性组合。
 
 
+*同样是控制其他的因素，混合模型和多元线性模型的差别在哪里呢，或者说为什么线性模型更合适呢？*
+随机因子作为需要控制的变量，让人想到协变量以及协方差分析。它利用拟合的协变量与因变量的线性回归关系，把需要控制的变量拉到同一水平（总均数），相应地得到修正后的Y值，再对各组Y值的均值进行比较分析。
+多元线性回归里的净回归系数，也是指控制其它预测变量后，当前自变量对因变量的纯粹影响关系。
+多元线性回归模型假设测量数据之间的独立性，但是不同患者同一时间的采样，受限于个体内的影响，Y值在个体内会有所关联，并导致错误的模型参数估计。LME模型把组内（各患者）的相关测量（另外如：个体的重复测量）采用随机效应来处理，解决了数据独立性的问题。
+
+
 线性混合模型的应用较多，此处只针对医学研究中常见的重复测量数据分析。
+对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。
+此时不同的受试者作为分层因素，`(1|PatientID)`，其中1是指截距，竖线右侧是分组因子，因此这里的含义是：分别为每个患者设置一个截距参数。
+
 
 *一个需要注意点在于怎么引入交互作用：*下面这段摘抄是一个不错的建议，For the so called ‘fixed effects’, one typically specifies effects of time (as a categorical or factor variable), randomised treatment group, and their interaction. This implies a saturated model for the mean, or put another way, there is a separate mean parameter for each time point in each treatment group. Often there are baseline covariates to be adjusted for. One can adjust for these as simple main effects, or additionally with an interaction with time, in order to allow for the association between the baseline variable(s) and outcome to potential vary over time. For a more in depth discussion of the model, see for example Molenberghs et al 2004 (open access). 一般来说需要考虑时间和group的交互，以及时间和base line间的交互。随机项的话，或者一个随机截距，或者随机time系数。过多的需要考虑的分组信息是一个需要小心的事情。
 `m2 <- lmer(Obs ~ Treatment * Day + (1+Day|Subject), mydata)`
@@ -53,6 +63,11 @@ Essentially, an MMRM is a specific linear mixed effects model that includes (at 
 重复测量方差分析的精妙之处在于，它把被试间的平方和从组内平方和中剥离出来，使得误差平方和变得更小，相比于减少不多的自由度，其误差均方也会变小。F检验中的分母变小，意味着其值将变大，能够提升统计功效，更容易发现组间的实验效应。
 
 LME模型中，因变量的总方差等于固定效应方差、随机效应方差和残差方差之和。模型的解释力是用_条件R2_(conditional R2)来表示的，它是指固定效应方差和随机效应方差之和除以总方差，而_边缘R2_(marginal R2)是指固定效应方差除以总方差。
+
+
+*如何比较原先的模型与纳入随机效应后的新模型，以便确认新模型的优势。*
+首先是似然比检验（likelihood ratio,LR）方法，它是一种基于p值、适用于大样本数据的模型比较方法。而对于小样本数据，可以使用Satterthwaite近似法（对于REML模型）来推导出p值。
+REML是指残差最大似然法，它是LME模型默认的参数估计方法。这是因为最大似然（ML）估计是有偏差的，而REML的偏差通常较小。不过，在比较具有不同固定效应的模型时，应该选用ML方法，因为它不依赖于固定效应的系数。
 
 
 
@@ -115,8 +130,8 @@ REML estimation is unbiased but does not allow for comparing models with differe
 *随机效应的选择*
 ```{r}
 
-nullmodel1 <- lme4::lmer(score ~ 1 + (1|PatientID), data = df2, REML=FALSE)
-nullmodel2 <- lme4::lmer(score ~ 1 + (1 + class |PatientID), data = df2, REML=FALSE)
+nullmodel1 <- lme4::lmer(score ~ 1 + (1 | PatientID), data = df2, REML = FALSE)
+nullmodel2 <- lme4::lmer(score ~ 1 + (1 + class | PatientID), data = df2, REML = FALSE)
 
 # 一个常见的报错，即随机效应的数目大于等于观察数目
 # 比如以下这个公式，其time|PatientID的数目和观察的数目相等，即是考虑了随机截距和随机slope后，随机效应的
@@ -248,6 +263,14 @@ Estimates of Covariance Parameters:
 lmerTest::ranova(lme_model)
 ```
 *interpret result: *如果P值小于0.05，可以理解成有必要考虑随机效应。
+
+
+*绘制固定效应拟合直线：*
+```{r}
+#绘制固定效应拟合直线
+plot(effects::allEffects(lme_model))
+```
+
 
 
 ```{r}
