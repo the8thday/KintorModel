@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## linear mixed effect model
 
+
+> https://yury-zablotski.netlify.app/post/mixed-models/
 > https://m-clark.github.io/mixed-models-with-R/random_intercepts.html
 > https://poissonisfish.com/2017/12/11/linear-mixed-effect-models-in-r/
 > https://bbolker.github.io/mixedmodels-misc/
@@ -24,7 +26,8 @@ knitr::opts_chunk$set(echo = TRUE)
 > https://drive.google.com/file/d/1sOZUAFOc004H4jO8vuUc_4HyYHEgu45b/view
 
 
-对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*， 个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
+对于医学中常见的纵向数据，同一个受试者在不同时间的因变量值是相关的，不同受试者的因变量值可以认为不独立。
+线性混合模型用来解释因变量的连续型和分类型自变量的作用称为*固定效应*，个体之间的差别的影响称为*随机效应*,随机效应是用来代表观察对象间的差异以及观察对象内的差异（如由重复测量造成的相关性），这些差异是随机的且不可观察到的。
 
 mixed effects model average trends, random effects model the extent to which these trends vary across levels of some grouping factor.混合效应模型可以量化不同群体间平均趋势的差异程度。这里的grouping factor指的是对数据进行分组的因素, 比如地区、性别等。
 
@@ -32,6 +35,8 @@ mixed effects model average trends, random effects model the extent to which the
 
 
 *线性混合效应模型原理：*
+线性混合模型也有叫混合线性模型，是在线性模型的基础上发展起来的。LME模型的出现主要是为了解决抽样数据不独立的问题，例如同一被试多次测得的血压。使用线性回归模型方法有一个重要前提，就是要求每个测量数据都是独立的。默认假设组间被试是异质的，而组内被试则是同质的。重复测量会增加一些随机变化，最终导致拟合的模型会偏离实际情况。
+
 假设随机效应满足正态分布(似乎有带商榷),即每个群体的随机效应都是从总体随机效应的正态分布中独立取样的。在线性混合效应模型 (LMM) 中，因变量被视为固定效应和随机效应的线性组合。
 
 
@@ -41,6 +46,14 @@ mixed effects model average trends, random effects model the extent to which the
 `m2 <- lmer(Obs ~ Treatment * Day + (1+Day|Subject), mydata)`
 
 Essentially, an MMRM is a specific linear mixed effects model that includes (at least) an interaction of treatment arm and categorical visit variables as fixed effects. The covariance structure of the residuals can have different forms, and often an unstructured (i.e. saturated parametrization) covariance matrix is preferred. This structure can be represented by random effects in the mixed model. 
+
+
+*一些总结：*
+重复测量方差分析对应的是具有随机截距和随机斜率的混合效应模型。
+重复测量方差分析的精妙之处在于，它把被试间的平方和从组内平方和中剥离出来，使得误差平方和变得更小，相比于减少不多的自由度，其误差均方也会变小。F检验中的分母变小，意味着其值将变大，能够提升统计功效，更容易发现组间的实验效应。
+
+LME模型中，因变量的总方差等于固定效应方差、随机效应方差和残差方差之和。模型的解释力是用_条件R2_(conditional R2)来表示的，它是指固定效应方差和随机效应方差之和除以总方差，而_边缘R2_(marginal R2)是指固定效应方差除以总方差。
+
 
 
 ```{r, include=FALSE}
@@ -169,6 +182,7 @@ lme_model <-
              )
 summary(lme_model)
 
+# 纳入time的公式有问题，这里用class做一个测试。不过没有必要考虑fixed变量的随机slope吧
 lme_model2 <- 
   lme4::lmer(score ~ time * class + AGE + (0 + class |`PatientID`),
              data = df2
@@ -197,13 +211,34 @@ gtsummary::tbl_regression(lme_model,
 ```
 
 
+随机效应的残差方差：
 ```{r}
-lme4::VarCorr(lme_model)
+d <- lme4::VarCorr(lme_model)
+d
 
 # 可重复性
 # 如果你得到的重复性小于1.0，那么个体内测量结果之间的变化来源是什么。仅是测量误差吗？
 216.0^2/(216.0^2 + 417.9^2)
 ```
+
+
+计算固定效应方差：
+```{r}
+#计算固定效应方差
+fm.var <- model.matrix(lme_model) %*% fixef(lme_model)
+
+var(fm.var)
+```
+
+*关于线性混合效应模型的R2计算方法：*
+`var(fm.var)/(var(fm.var) + d$vcov[1] + d$vcov[2])`
+
+```{r}
+# 手动计算R2
+
+MuMIn::r.squaredGLMM(lme_model)
+```
+
 
 
 Estimates of Covariance Parameters:
@@ -681,19 +716,6 @@ plot(bb) +
   theme_bw() +
   geom_vline(xintercept = 0, linetype = 2, color = 'red4')
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
