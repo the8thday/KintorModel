@@ -11,18 +11,22 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## unConstrained Ordination
 
-非约束排序（unConstrained Ordination）While PCA preserves Euclidean distances among samples and CA chi-square distances, PCoA provides Euclidean representation of a set of objects whose relationship is measured by any dissimilarity index.
-非约束排序只是描述性方法，不存在检验评估排序结果是否显著性的问题，约束排序则需要对排序结果进行显著性检验。
 
-
-此处记录几种常见的非约束排序类型，经验主要来自微生物组数据分析，包括：PCA/CA(eigenanalysis-based ordination methods), PCoA/NMDS(distance-based unconstrained ordination)
-
-MDS等的算法的一般过程
+MDS等的算法的一般过程:
 > https://stats.stackexchange.com/questions/14002/whats-the-difference-between-principal-component-analysis-and-multidimensional
 > https://www.davidzeleny.net/anadat-r/doku.php/en:pcoa_nmds
 
 
-约束排序和非约束排序的意思是在生态学中常用的一些概念，在统计学中主要以对变量操作的方法来进行理解解释。排序，故名思义是按照样本的变量对样本进行排序，只是因为数据维度太高，需要一种手段将其映射到低纬度上去。
+约束排序和非约束排序是在生态学中常用的一些概念，在统计学中主要以对变量操作的方法来进行理解解释。排序，故名思义是按照样本的变量对样本进行排序，只是因为数据维度太高，需要一种手段将其映射到低纬度上去。
+
+
+非约束排序（unConstrained Ordination）：While PCA preserves Euclidean distances among samples and CA chi-square distances, PCoA provides Euclidean representation of a set of objects whose relationship is measured by any dissimilarity index.
+非约束排序只是描述性方法，不存在检验评估排序结果是否显著性的问题，约束排序则需要对排序结果进行显著性检验。非约束排序的主要思想是基于物种（或样本）之间的相似性距离计算，它们可以是基于相关系数、欧氏距离、Bray-Curtis距离等。然后，通过将高维数据映射到低维空间，保持相似性距离的相对顺序，创建一个可视化的数据表示。
+
+
+此处记录几种常见的非约束排序类型，经验主要来自微生物组数据分析，包括：PCA/CA(eigenanalysis-based ordination methods), PCoA/NMDS(distance-based unconstrained ordination).
+MDS和PCoA都属于线性降维方法,建立在距离矩阵的基础上,通过矩阵分解求解样本的低维表示。
+NMDS是非线性降维技术,通过迭代寻优使得低维距离保持输入距离的排序一致。
 
 
 除了上文提到的非约束性排序外，约束性排序主要包括Common constrained ordinations in ecology are redundancy analysis, canonical correlation, canonical correspondence analysis, canonical discriminant (or canonical variate) analysis, and more recently canonical analysis of principal coordinates.
@@ -30,8 +34,8 @@ MDS等的算法的一般过程
 
 
 ```{r, include=FALSE}
-library(vegan)
-library(FactoMineR)
+library(vegan) # 生态学中核心的R包
+library(FactoMineR) # 本次测试使用的R包
 library(psych)
 ```
 
@@ -39,33 +43,244 @@ library(psych)
 
 ### PCoA
 
+PCoA（Principal Coordinates Analysis），也称为主坐标分析，是一种非约束排序技术。PCoA基于样本之间的距离矩阵，这些距离可以是基于相关系数、欧氏距离、Bray-Curtis距离或其他相似性/距离度量。
+PCoA是基于特征值分解（eigenvalue decomposition），它将距离矩阵转换为坐标矩阵。而MDS可以使用多种方法，包括度量MDS（Metric MDS）和非度量MDS（Non-metric MDS）。度量MDS是通过最小化原始距离与降维后的距离之间的误差来进行映射的，而非度量MDS则是通过排列样本之间的距离来进行映射。
 
-关于PCoA的负特征根
+
+*关于PCoA的负特征根*
 
 PCoA算法本身的问题，如果输入的距离测度并非欧式距离属性，则PCoA的计算结果中可能会产生负特征根，正负特征根之间可能还会夹带0值的特征根。负特征根不能有效反映真实的PCoA轴贡献度信息。
-PCoA只包含样本信息，原始PCoA的物种变量在计算距离矩阵后丢失。
+*PCoA只包含样本信息，原始PCoA的物种变量在计算距离矩阵后丢失。*
+
+
+对于PCoA而言，距离或不相似性矩阵需要满足`度量性质`。度量性质是指距离或相似性满足以下条件：
+- 矩阵对角元素为0，同一性（Identity）：对于任何样本，其与自己的距离或相似性应该为0。
+- 矩阵对称
+- 三角不等式成立
+- 变量数量要少于样本数量,否则主坐标分析会产生负特征值。
+- 距离或不相似性矩阵不能有缺失值。
+- 样本数量不能太少,通常需要30个以上样本才能产生稳定的PCoA结果。
+- 对离群点和极端值需要进行预处理,否则这些值会对PCoA结果产生很大影响。
+
+满足这些要求的常见距离度量有欧氏距离、曼哈顿距离、马氏距离等。不相似性指数有杰卡德指数、索肯贝指数等。
+
+当样本数量较小时，建议使用其他降维技术，比如t-SNE（t-distributed Stochastic Neighbor Embedding）或UMAP（Uniform Manifold Approximation and Projection），这些方法在处理小样本数量时可能更适合，因为它们对于非线性结构的数据也能够表现较好。
+
+
+*评估PCoA结果的显著性*
+1. 随机化检验
+打乱距离/不相似性矩阵的行列标识,进行PCoA,重复多次
+用实际PCoA结果与随机结果分布进行比较,得到p值
+2. Procrustes分析
+计算不同PCoA结果的旋转一致性
+3. PERMANOVA(Permutational Multivariate Analysis of Variance)
+基于距离矩阵,检验不同组间距离的显著性
+可用于检验PCoA矩阵的组间差异是否显著
+4. Mantel检验
+计算两个矩阵之间的关联系数和显著性
+可用来检验原始距离矩阵与PCoA距离矩阵的关联
+5. ANOSIM(Analysis of Similarities)
+一种非参数检验,检验两组距离矩阵的显著性
+6. BioENV过程
+寻找与生物数据最相关的环境因子组合
+可用来解释PCoA主轴的环境意义
+
+
+*关于vegan包的一些记录：*
+vegan包中实现非度量多维缩放的功能主要有:
+
+metaMDS(): 用于非度量多维缩放(NMDS)
+monoMDS(): 用于单值或经典多维缩放(MDS)
+cmdscale(): 用于经典和质心多维缩放
+其中cmdscale()是基于距离矩阵进行矩阵分解实现的经典多维缩放。
+
+
+```{r}
+tax_color <- c(
+  "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072", "#80B1D3",
+  "#FDB462", "#B3DE69", "#FCCDE5", "#BC80BD", "#CCEBC5", "gray"
+)
+
+
+otu <- read.delim('./datasets/otu_table.txt', row.names = 1, 
+                  sep = '\t', stringsAsFactors = FALSE, check.names = FALSE)
+
+# 30多个样本、1000多个OTU物种
+otu <- data.frame(t(otu))
+```
 
 
 
 ```{r}
+# 加载需要的包
+# library(ecodist)
+
+# 导入样本数据 
+data <- otu
+
+# 计算样本距离矩阵
+dis_mat <- vegdist(data, method="bray") 
+
+# 进行PCoA分析
+pcoa <- cmdscale(dis_mat, k=3, eig = TRUE)
+
+# PCoA结果包含特征值（eigenvalues）、主坐标轴坐标值和解释的百分比
+eigenvalues <- pcoa$eig  # 特征值
+coordinates <- pcoa$points  # 主坐标轴坐标值
+explained_variance <- eigenvalues / sum(eigenvalues) * 100  # 解释的百分比
+
+# 生成二维ordination图
+# ordiplot(pcoa, type = 'text', main = 'PCoA Sample') # 会有提醒species scores not available
+plot(pcoa$points[,1], pcoa$points[,2], type="n")
+text(pcoa$points[,1], pcoa$points[,2], rownames(data))
+
 
 ```
+
+评估下负特征值,
+可以看到在末尾几个轴有负特征值，一般这种在末尾且值不是很大的负特征值影响不是很大。
+```{r}
+barplot(eigenvalues)
+
+# 如果负特征值影响严重，该如何进行矫正呢
+# PCoA 函数中本身也提供了校正参数（add），避免负特征值的产生
+```
+
+
+```{r}
+# 计算各 PCoA 轴的解释度
+exp_var <- round(pcoa$eig[1:2]/sum(pcoa$eig), 3)*100 
+
+# Weighted Averages Scores for Species
+# 添加物种，也即是特征得分
+# 物种信息在相异矩阵的计算过程中丢失，原始PCoA结果中只有样方得分。
+species <- wascores(pcoa$points[, 1:2], otu)
+
+
+# 提取每个样本对应的特征值
+# 注意要加上每个样本的已知分组信息
+sample_site <- data.frame({
+  pcoa$point
+})[1:2]
+sample_site$names <- rownames(sample_site)
+names(sample_site)[1:2] <- c("PCoA1", "PCoA2")
+```
+
+
+```{r}
+group_border <- sample_site %>% 
+  group_by(Type) %>%
+  summarise(border = list(chull(.[[2]], .[[3]])))
+
+group_border <- plyr::ddply(sample_site, "Type", function(df) {
+  # 计算当前组的凸包
+  hull <- chull(df[[2]], df[[3]]) 
+  
+  # 根据凸包索引提取对应的数据框
+  df[hull, ]
+
+})
+
+
+p_pcoa <- ggplot(sample_site, aes(PCoA1, PCoA2, group = Type)) +
+  theme(
+    panel.grid = element_line(color = "gray", linetype = 2, size = 0.1),
+    panel.background = element_rect(color = "black", fill = "transparent"),
+    legend.key = element_rect(fill = "transparent")
+  ) +
+  geom_vline(xintercept = 0, color = "gray", size = 0.4) +
+  geom_hline(yintercept = 0, color = "gray", size = 0.4) +
+  geom_polygon(data = group_border, aes(fill = Type)) +
+  geom_point(aes(color = Type), size = 1.5, alpha = 0.8) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_color_manual(values = c("orange", "blue2", "red4", "#C673FF2E", "green2")) +
+  scale_fill_manual(values = c("#C673FF2E", "#73D5FF2E", "#49C35A2E", "#FF985C2E", "#C673FF2E")) +
+  guides(fill = guide_legend(order = 1), shape = guide_legend(order = 2), color = guide_legend(order = 3)) +
+  labs(
+    x = paste("PCoA axis1: ", round(100 * pcoa_eig[1], 2), "%"),
+    y = paste("PCoA axis2: ", round(100 * pcoa_eig[2], 2), "%")
+  )
+```
+
+
+```{r}
+# 进行随机化检验
+rand_pcoa <- how(nrepet=999){
+  rand_dis <- randomizeMatrix(dis_mat, nrepet=1, distFun="bray")
+  cmdscale(rand_dis$randMat[[1]], k=3)$eig[1]
+}
+pvalue <- sum(rand_pcoa >= exp_var[1])/1000
+
+# Mantel检验
+# 结果r越接近1,表示两个距离矩阵越正相关
+vegan::mantel(dist(pcoa$points), dis_mat)
+
+# Procrustes检验
+# 用来评估PCoA或NMDS的稳定性
+# ss数值越小,表示两矩阵的转换关系越好,配置越一致
+vegan::procrustes(pcoa$points, cmdscale(dis_mat))$ss
+```
+
+
 
 
 ### PCA
 
+*PCA是什么以及怎么计算的呢*
+
+主成分可以认为是特征的规范性线性组合。在一个数据集中，第一个主成分就是能够最大程度解释数据中方差的特征线性组合。第二个主成分是在与第一主成分垂直这个限制条件下，最大程度解释数据中的方差。其后的每一个主成分都遵循同样的规则。
+PCA中的线性组合是一个关键假设。如果你有一堆变量之间基本上不相关的数据集，用PCA分析就会得到毫无意义的分析结果。另一个关键的假设是，你使用的数据应该服从正态分布，这样协方差矩阵即可充分描述数据集。
+
+步骤1：数据标准化
+对原始数据进行标准化处理，将每个特征的值转换为零均值和单位方差，以消除不同尺度之间的影响。
+
+步骤2：计算协方差矩阵
+计算标准化后的数据的协方差矩阵，该矩阵描述了数据中特征之间的相关性。
+
+步骤3：计算特征值与特征向量
+对协方差矩阵进行特征值分解，得到特征值和对应的特征向量。特征向量构成了新的特征空间。
+
+步骤4：选择主成分
+根据特征值的大小选择前k个特征向量，这些特征向量对应的特征值较大，包含了大部分数据方差。
+
+步骤5：投影数据
+将原始数据投影到所选择的前k个特征向量构成的新空间，得到降维后的数据。
+
+
+*几个常见的概念：*
+
+①特征向量
+特征向量是方差最大（信息最多）的轴的方向，称之为主成分。
+②特征值
+特征值为某个主成分的方差，其相对比例可理解为方差解释度或贡献值。特征值从第一主成分会逐渐减少。
+③载荷
+载荷是特征向量乘以特征值的平方根。载荷是每个主成分上各个原始变量的权重系数。
+正交旋转与解释
+旋转背后的意义是使变量在某个主成分上的载荷最大化，这样可以减少（或消灭）主成分之间的相关性，有助于对主成分的解释。进行正交旋转的方法称为“方差最大法”。
+
+
 PCA和EFA之间的差别是什么呢？二者都用一些变量代表其他的变量。PCA是将多个相关变量变成一个PC，这个PC与PC之间一般而言是不具备相关性的，而EFA或者说验证性因子分析cfa，其是寻找到显示变量间的关系而得到隐变量间的关系。PCA中对每一个变量赋予一个权重都是为了最大化PC之间的方差，让PC之间不相关。而因子分析中的F1、F2等是为了解释显变量产生的原因，往往在我们的分析中还会再进一步的看待F1、F2等间的关系。
 
 简单而言，PCA是为了降维，而FA是为了发现潜变量。
+
 PCA的衍生变量PC其是其他变量的线性相加：
 $$PC_1=a_1x_1 + a_2x_2 + ...+a_kx_k$$
 首先，是确定所需要的PC数目，确定PC数目的方法有多种，包括先验的分组信息和依据eigenvalue进行的分组。
 此处记录依据eigenvalue进行PC数目的确认。
 
+
 ```{r}
-# 利用已包装好的函数
-psych::fa.parallel(USJudgeRatings, fa = 'pc', n.iter = 100, 
-                   show.legend = FALSE, main = 'Scree plot with parallel analysis'
+# 是否需要检验数据的多元正态分布呢
+# 考虑到PCA对正态分布的包容性似乎也不太必要
+```
+
+
+```{r}
+# 利用已包装好的函数绘制碎石图
+psych::fa.parallel(USJudgeRatings, 
+                   fa = 'pc', n.iter = 100, 
+                   show.legend = FALSE, 
+                   main = 'Scree plot with parallel analysis'
                    )
 ```
 上述示例数据从结果来看不是很合适，不过此处仅作为演示。
@@ -73,16 +288,43 @@ psych::fa.parallel(USJudgeRatings, fa = 'pc', n.iter = 100,
 
 再确定了PC的数目后，展开PCA分析，因为PC1的演示意义不是很大，此处用两个PC
 ```{r}
-pc <- psych::principal(USJudgeRatings, nfactors = 1)
+pc <- psych::principal(USJudgeRatings, nfactors = 2,
+                       rotate = 'none'
+                       )
 
 pc
 ```
 *interpret：*h2为该变量被PC解释的方差，u2为没有解释的部分。Proportion Var是每一个PC解释的方差占比。
+第一部分就是3个主成分中每个主成分的变量载荷，分别标注为RC1至RC3。对于第一个主成分，变量Petal.width具有非常高的正载荷,对于第二个主成分，变量Sepal.Length具有非常高的正载荷。
+第二个重要部分，就是以平方和SS loading开始的表格，SSloading中的值是每个主成分的特征值。如果对特征值进行标准化，就可以得到Proportion Explained行。这一行表示的是每个主成分解释的方差的比例。可以看到，对于旋转后的3个主成分能够解释的所有方差，第一个主成分可以解释其中的44%，一般来讲，你选择的主成分应该至少解释大约80%的全部方差（经验数据）。查看Cumulative Var行可以知道，这3个旋转后的主成分可以解释99%的全部方差（我们的数据实际上可能并不会这么好）。
 
 
-如果输入的是一个相关性矩阵的话，不需要指定吗？
 ```{r}
-pc2 <- psych::principal(Harman23.cor$cov, nfactors = 2, n.obs = 302, 
+plot(pc$values, type="b", ylab="Eigenvalues", xlab="Component")
+```
+
+```{r}
+pca.scores <- data.frame(pc$scores)
+
+head(pca.scores)
+
+pca.scores$class <- data$class
+
+p1<-ggplot(pca.scores, 
+           aes(x = RC1, y = RC2,fill = class,colour = class))+ 
+  geom_point(size = 3.0) +
+  scale_color_manual(values=c("orange","darkblue", "darkgreen"))+
+  theme_test()
+
+p1
+```
+
+
+如果输入的是一个相关性矩阵的话，不需要指定具体的数据格式吗？
+```{r}
+# ?psych::principal
+pc2 <- psych::principal(Harman23.cor$cov, 
+                        nfactors = 2, n.obs = 302, 
                         rotate = 'varimax')
 
 pc2
@@ -98,7 +340,7 @@ head(pc$scores)
 
 
 
-*下面对比几个常用函数在计算PCA时用法的不同*
+#### *下面对比几个常用函数在计算PCA时用法的不同*
 
 There are two general methods to perform PCA in R :
 
@@ -108,9 +350,12 @@ There are two general methods to perform PCA in R :
 `stats::prcomp` the singular value decomposition (SVD)
 `stats::princomp` uses the spectral decomposition approach
 
+SVD(奇异值分解)指的是，
+
 ```{r}
 wdbc <- read.csv("./datasets/wdbc.data.csv", header = F)
-features <- c("radius", "texture", "perimeter", "area", "smoothness", "compactness", "concavity", "concave_points", "symmetry", "fractal_dimension")
+features <- c("radius", "texture", "perimeter", "area", "smoothness", 
+              "compactness", "concavity", "concave_points", "symmetry", "fractal_dimension")
 names(wdbc) <- c("id", "diagnosis", paste0(features,"_mean"), paste0(features,"_se"), paste0(features,"_worst"))
 ```
 
@@ -160,6 +405,8 @@ legend("topleft",
   col = c("blue"), lty = 5, cex = 0.6
 )
 ```
+
+
 ```{r}
 library("factoextra")
 
@@ -210,24 +457,176 @@ pc_varimax
 
 
 
-`vegan`包里提供的分析：
+#### `vegan`包里提供的分析：
 
-在生态学里面，PCA的应用有其对应的一些特点，因为数据中经常出现双零问题，会对物种数据采用Hellinger转化后再进行分析，当然对于诸如环境类的数据采用上述分析即可。
-更推荐的方法是使用主坐标分析（Principal Coordinate Analysis，PCoA）代替PCA，通过计算样方间的定量非对称距离测度 （如Bray-curtis距离），实现多维物种空间中的样方排序。
+在生态学里面，PCA的应用有其对应的一些特点，因为数据中经常出现双零问题，会对物种数据采用`Hellinger`转化后再进行分析，当然对于诸如环境类的数据采用上面其他的几种分析即可。
+
+更推荐的方法是使用主坐标分析（Principal Coordinate Analysis，PCoA）代替PCA，通过计算样方间的定量非对称距离测度 （如Bray-curtis距离），实现多维物种空间中的样方排序。对于PCoA，若输入的距离测度为欧几里得距离，则PCoA将产生与PCA相似的排序结果。类似地，输入卡方距离测度，获得与CA相似的结果。
+
 
 ```{r}
 species_hel <- decostand(species, method = 'hellinger')
+
+# rda scale为TRUE时排序对象是相关矩阵、scale为FASLE时排序对象是离差矩阵
+pca_sp <- rda(species_hel, scale = FALSE)
+
+ordiplot(pca_sp, scaling = 1, display = 'site', type = 'points')
+```
+
+
+```{r}
+#先做卡方标准化，再计算欧几里得距离，即可得卡方距离，再 PCoA
+otu_chi <- decostand(otu, method = 'chi.square')
+chi <- vegdist(otu_chi, method = 'euclidean')
+pcoa_chi <- cmdscale(chi, k = (nrow(otu_chi) - 1), eig = TRUE)
 ```
 
 
 
 
-### NMDS
+### MDS，Multidimensional Scaling
+
+距离度量需要满足以下四个条件:
+
+非负性:距离度量值必须非负。
+恒等性:一个对象与自身的距离为零。
+对称性:对象A到B的距离等于B到A的距离。
+三角不等式:对象A到C的距离小于等于A到B距离与B到C距离之和。
+任何不满足上述一个或多个条件的距离定义,都属于非度量距离。
+
+
+常见的非度量距离或相似度指数包括:
+
+杰卡德相似系数(Jaccard)
+互信息量
+马氏距离（Morisita-Horn）
+替代距离
+Canberra距离
+Bray-Curtis距离
+
+
+```{r}
+# 在vegan包中，和PCoA所用到的函数是同一个
+# 它们的目标和步骤在很大程度上是相同的，都是为了将高维的距离矩阵映射到低维空间中，以便更好地展示样本之间的关系。
+
+
+```
+
+
+### NMDS，Non-metric Multidimensional Scaling
+
+Non-metric Multidimensional Scaling(非度量多维缩放,NMDS)是一种重要的非约束型降维技术,经常被应用于生态学和环境科学领域。用于可视化样本之间的相似性或距离关系。NMDS是MDS的一种变体，它在计算样本之间的相对距离时不依赖于原始距离的比例关系，而只关注样本之间的相对顺序，因此适用于非度量距离矩阵。不保证坐标间距离与原始距离严格吻合,只要排序一致即可。
+NMDS更适合处理非度量距离，例如在生态学研究中常用的Bray-Curtis距离、Jaccard距离等。这些非度量距离可能不满足传统MDS中的度量性质，而NMDS则不需要满足这个限制，因此更加灵活。
+
+
+*结果解读:*
+NMDS轴没有具体意义,仅表示样本相对位置关系。
+样本点越聚集表示越相似。
+需配合环境因子解释样本分布。
+采用Procrustes旋转评估多次结果的一致性。
+
+
+*NMDS评估：*
+Shepard图
+查看配置距离与原始距离的吻合情况。
+点散布接近于y=x对角线表示较好。
+
+
+```{r}
+# 计算杰卡德指数作为距离矩阵
+# ?vegdist
+dist_mat <- vegdist(otu, method='bray')
+
+# 进行NMDS分析 
+nmds <- metaMDS(dist_mat, 
+                k=2, # 指定二维
+                trymax=100, # 最大迭代次数
+                autotransform = TRUE) #自动转换
+```
+
+
+```{r}
+#提取应力函数值（stress）
+nmds1.stress <- nmds1$stress
+
+#提取样本排序坐标, 主坐标轴坐标值
+nmds1.point <- data.frame(nmds1$point)
+
+#提取物种（OTU）排序坐标
+nmds1.species <- data.frame(nmds1$species)
+```
+
+
+```{r}
+# 绘图
+plot(nmds$points, type='n',
+     xlab='NMDS1', ylab='NMDS2')
+text(nmds$points, labels=rownames(species))
+
+# 加载环境因子拟合结果
+efit <- envfit(nmds, environmental_factors, 
+               perm=1000) 
+
+# 绘制环境因子
+plot(efit)
+
+# 稳定性检验
+stressplot(nmds)
+```
+
+
+```{r}
+# 假设您已经进行了NMDS分析并获得了nmds1.point和nmds1.species对象，以及top10_otu和mapfile数据框。
+
+# 给nmds1.point添加样本名称列
+nmds1.point$Description <- row.names(nmds1.point)
+
+# 将nmds1.point与mapfile数据框连接，根据Description列进行连接
+input_data <- left_join(nmds1.point, mapfile, by = c("Description" = "Description"))
+
+# 将第一列和第二列的列名改为"NMDS1"和"NMDS2"
+names(input_data)[1:2] <- c("NMDS1", "NMDS2")
+
+# 提取nmds1.species中top10_otu行的前两列，并给它们添加"NMDS1"和"NMDS2"列名，得到species_site数据框
+species_site <- nmds1.species[top10_otu, ][, 1:2]
+species_site$group <- rownames(species_site)  # 添加group列，用于存储行名
+names(species_site)[1:2] <- c("NMDS1", "NMDS2")
+
+# 创建散点图
+sample_point <- ggplot(input_data, aes(x = NMDS1, y = NMDS2, colour = Type)) +
+  geom_point(aes(shape = Type)) +  # 使用Type作为颜色和形状的映射
+  stat_ellipse(linetype = 2, type = "t") +  # 绘制椭圆
+  theme_bw() +  # 设置主题为白底
+  scale_color_manual(values = Color[1:length(group_name)]) +  # 设置颜色映射
+  labs(title = paste("Stress =", round(nmds1$stress, 3))) +  # 设置图表标题
+  geom_text(aes(label = group), data = species_site, color = "green4", size = 2) +  # 在散点图上添加文本标签
+  theme(plot.title = element_text(hjust = 0.5))  # 设置标题的居中位置
+
+# 将sample_point打印出来或进行其他操作
+print(sample_point)
+
+```
+
+
+
+### tSNE, t-Distributed Stochastic Neighbor Embedding
+
+t-SNE和UMAP都是典型的无监督非约束降维技术,主要用于数据可视化探索,而不是约束排序分析。
 
 
 ```{r}
 
 ```
+
+
+
+### UMAP, Uniform Manifold Approximation and Projection
+
+
+
+
+
+
 
 
 
