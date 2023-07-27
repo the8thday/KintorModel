@@ -1,0 +1,71 @@
+---
+title: "constrained ordination"
+format: html
+---
+
+## constrained ordination
+
+
+在整理了部分非约束排序方法后，这里记录一些约束排序的常用方法。
+
+
+约束排序（Constrained Ordination）：在约束排序中，降维的过程受到了来自其他变量（如环境变量）的约束。这些约束帮助我们理解数据中特定的变异，并将其与其他因素进行关联。经典的约束排序方法包括冗余分析（Redundancy Analysis，RDA）和典型对应分析（Canonical Correspondence Analysis，CCA）。
+
+非约束排序（Unconstrained Ordination）：在非约束排序中，降维的过程不受外部因素的约束，它是通过在低维空间中优化某种目标函数来实现的。非约束排序更注重在低维空间中保留样本之间的相对距离关系，以更好地展示数据的内在结构。
+
+
+```{r}
+library(vegan)
+```
+
+
+### RDA
+
+RDA（Redundancy Analysis）：冗余分析是一种经典的约束排序方法，它将环境变量或处理因子作为约束变量，将样本在约束条件下进行主成分分析，从而寻找主成分分析和约束变量之间的关联。
+
+
+
+### CCA
+
+CCA（Canonical Correspondence Analysis）：典型对应分析是一种类似于RDA的方法，它也是将约束变量考虑进主成分分析的过程中，但不同之处在于CCA使用对应分析而不是协方差分析，因此更适用于计数数据。
+
+```{r}
+
+```
+
+
+### CAP
+
+CAP（Canonical Analysis of Principal coordinates）：主坐标分析的典型分析是对样本之间的距离矩阵进行主成分分析， 而CAP则在主成分分析中同时考虑了约束变量的信息，类似于RDA和CCA的结合。
+
+CAP(Canonical Analysis of Principal coordinates):
+
+在PCoA(主坐标分析)的基础上进行约束排序。
+先进行非约束性PCoA获取样本主坐标。
+再以环境变量为约束对PCoA轴进行RDA(冗余分析)。
+综合利用PCoA和RDA的优点。
+
+
+
+### RNMDS
+
+RNMDS（Redundancy Analysis of Non-metric Multidimensional Scaling）：非度量多维尺度法的冗余分析是将非度量多维尺度法（NMDS）与环境变量或约束变量相结合，用于分析环境因子对样本的影响。
+
+
+### Others
+
+
+部分冗余分析（Partial Redundancy Analysis，pRDA）、距离理论冗余分析（Distance-based Redundancy Analysis，db-RDA）、正相关环境向量分析（Best Vector Environmental Correlation，BVEC）等方法都属于约束排序（Constrained Ordination）的一种。
+
+
+
+
+
+
+
+
+
+
+
+
+
