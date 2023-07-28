@@ -19,9 +19,92 @@ library(vegan)
 ```
 
 
-### RDA
+### RDA & tbRDA
 
 RDA（Redundancy Analysis）：冗余分析是一种经典的约束排序方法，它将环境变量或处理因子作为约束变量，将样本在约束条件下进行主成分分析，从而寻找主成分分析和约束变量之间的关联。
+是一种回归分析结合主成分分析的排序方法，也是多响应变量（multi-response）回归分析的拓展。
+
+tb-RDA在分析前首先对原始数据做一定的转化（例如Hellinger预转化包含很多零值的群落物种数据），并使用转化后的数据执行RDA。
+
+
+```{r}
+# OTU 数据
+phylum <- read.delim('./datasets/phylum_table.txt', 
+                     row.names = 1, sep = '\t', stringsAsFactors = FALSE, check.names = FALSE)
+
+# 环境
+env <- read.delim('./datasets/env_table.txt', row.names = 1, 
+                  sep = '\t', stringsAsFactors = FALSE, check.names = FALSE)
+
+class(phylum)
+```
+
+
+#### normal RDA
+
+```{r}
+# ?rda
+# Y, Constraining matrix, typically of environmental variables.
+# 一般环境矩阵在公式的右边
+
+rda_result <- rda(phylum~., data = env, scale = FALSE)
+
+rda_result
+```
+
+
+#### tb-RDA
+
+当物种丰度表中出现很多“0”值的情况下，应当首先进行Hellinger转化后，再输入至RDA中。
+
+
+```{r}
+phylum_hel <- decostand(phylum, method = 'hellinger')
+
+rda_tb <- rda(phylum_hel~., env, scale = FALSE)
+
+rda_tb
+```
+*Interpret: *第一部分为公式；第二部分中Constrained、Unconstrained的方差分解结果，其中约束轴可以解释的方差为0.73；
+Eigenvalues，特征值（各轴解释的方差），RDA1/2/3为基于拟合值所得的约束轴。
+
+
+*更为详细的数据*
+```{r}
+rda_tb.scaling1 <- summary(rda_tb, scaling = 1)
+rda_tb.scaling1
+```
+*intrepret：*PC为基于残差所得的非约束轴。
+
+
+
+```{r}
+plot(rda_tb)
+# plot(rda_tb, scaling = 1, main = 'I 型标尺', display = c('wa', 'sp', 'cn'))
+```
+
+
+*RDA模型的验证方法:*
+```{r}
+r2 <- RsquareAdj(rda_tb)
+rda_noadj <- r2$r.squared       #原始 R2
+rda_adj <- r2$adj.r.squared     #校正后的 R2
+```
+
+
+```{r}
+##置换检验
+#所有约束轴的置换检验，基于 999 次置换检验
+rda_tb_test <- anova(rda_tb, permutations = 999)
+#或者使用
+rda_tb_test <- anova.cca(rda_tb, step = 1000)
+ 
+#各约束轴逐一检验，基于 999 次置换检验
+rda_tb_test_axis <- anova(rda_tb, by = 'axis', permutations = 999)
+#或者使用
+rda_tb_test_axis <- anova.cca(rda_tb, by = 'axis', step = 1000)
+```
+
 
 
 
