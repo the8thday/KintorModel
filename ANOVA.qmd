@@ -223,6 +223,20 @@ total_ss <- sum((cholesterol$response - overall_mean)^2)
 # 计算组内方差
 within_group_variance <- (total_ss - between_group_variance * (n_groups - 1)) / (n_total - 1 - n_groups)
 
+
+# 计算F值
+F_value = between_group_variance / within_group_variance
+
+
+# 通过F分布得到对应的P值, 查F分布临界值
+F_crit <- qf(0.95, (n_groups - 1), (n_total - 1 - n_groups))
+
+# 判断显著性
+if(F_value > F_crit) {
+  print("Group effect is significant") 
+} else {
+  print("Group effect is not significant")
+}
 ```
 
 
