@@ -12,7 +12,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ## 协方差分析
 
 此文通过一个小示例记录协方差分析以及计算 emmeans时的应用。 比如在具有主要结局指标的重复测量数据分析中， 以baseline作为协变量，以某一时期的结果作为主要结局变量，则通常会采用协变量的方法进行分析。
+
+*什么是协变量分析：*
+\[ Y = \beta_0 + \beta_1 X + \beta_2 Z + \epsilon \]
+
+一个设计简单的方差分析，一般需要计算出组内方差和组间方差，然后求出F值，并根据F值阈值做出判断。在协方差中，在这些计算之前需要对协变量进行adjust。协方差分析是将线性回归与方差分析相结合的一种分析方法。把对因变量Y有影响的因素X看作协变量，建立Y对X的线性回归，利用回归关系把X值化为相等，再进行各组Y的修正均数间比较。
+在协方差分析（ANCOVA）中，协变量（covariates）是用于控制研究中潜在的混淆因素。协变量的主要目的是降低误差的方差，从而增加实验中处理效应的统计效能。具体来说，协变量可以帮助我们更准确地估计处理效应，因为它们允许我们在考虑其他影响因变量的变量的同时，考虑处理变量的影响。
+
+
+
 协变量分析的效应值就是矫正过的在各个分组中的均值，协方差分析的自变量至少包括一个分类变量和一个数值型变量。
+协方差分析也即是矫正混杂因素。
 
 emmeans为在各个分组中outcome的均值；contrasts为不同分组间的差异，汇报的结果一般还需要包括Pvalue和95%CI。
 
@@ -38,7 +48,7 @@ In a confirmatory randomized experiment it is commonplace to have a "no interact
 ```{r, include=FALSE}
 library(tidyverse)
 library(easystats)
-library(rstatix)
+# library(rstatix)
 library(grafify)
 library(emmeans)
 library(marginaleffects)
@@ -100,14 +110,22 @@ anova_test(data = df,
 # 除了上述检验外还需要检查各种残差的分布，详见
 # https://www.datanovia.com/en/lessons/ancova-in-r/#:~:text=The%20Analysis%20of%20Covariance%20(ANCOVA,two%20or%20more%20independent%20groups.
 ```
+
+
 ```{r}
 # fit two nested models (equal and varying slopes across groups)
 aov0 <- aov(diffW24 ~ W1D1 + `研究项目分组`, data=df) # ≈ lm(Postwt ~ Prewt + Treat + offset(Prewt), data=anorexia)
 aov1 <- aov(diffW24 ~ W1D1 * `研究项目分组`, data=df) 
 # check if we need the interaction term
 anova(aov0, aov1)
+
+```
+
+
+```{r}
 summary.lm(aov1)
 ```
+
 
 
 
@@ -204,8 +222,98 @@ lm_fit <- lm(diffW24 ~ W1D1 + `研究项目分组`,
                data = df)
 
 summary(lm_fit)
+
+```
+
+
+```{r}
+anova_table <- anova(lm_fit)
+
+anova_table
+```
+
+
+不同`type`间的anova差别在于计算方式的不同，比如`anova`函数默认采用'I'型，即是
+```{r}
 car::Anova(lm_fit, type = 'III')
 ```
+
+
+```{r}
+#通过anova表获取平方和
+SS_group = anova_table[1,2] 
+SS_x = anova_table[2,2]
+SS_error = anova_table[3,2]
+
+#计算自由度
+df_group = anova_table[1,1]
+df_x = anova_table[2,1] 
+df_error = anova_table[3,1]
+
+#计算均方
+MS_group = SS_group/df_group
+MS_x = SS_x/df_x
+MS_error = SS_error/df_error
+
+#计算F值
+F_group = MS_group/MS_error
+F_x = MS_x/MS_error
+
+#进行F检验
+pf(F_group, df_group, df_error, lower.tail=FALSE) 
+pf(F_x, df_x, df_error, lower.tail=FALSE)
+```
+
+
+### 手动计算
+
+```{r}
+# 生成数据
+y = c(7.1, 6.8, 7.2, 8.1, 8.3, 7.9, 8.5, 7.4, 8.0, 8.6)  
+group = c('a','a','a','b','b','b','c','c','c','c')
+x = c(65, 70, 75, 85, 80, 75, 90, 85, 80, 95)
+
+data <- data.frame(Y = y, # 因变量
+                   X = group,# 自变量
+                   Z = x # 协变量
+                   )
+
+# 建立协变量和因变量的线性方程
+lm_cov <- lm(Y ~ Z, data = data)
+
+y_predict <- predict(lm_cov, newdata = data)
+
+
+# 各组中协变量的均值
+cov_group_mean <- tapply(x, group, mean)
+# 协变量均值的预测值
+c <- cov_group_mean * (coefficients(lm_cov)[2]) + coefficients(lm_cov)[1]
+
+# 用y值减去对应组的c值
+y_adj <- c()
+for(i in 1:length(y)){
+  y_adj[i] = y[i] - c[group[i]]
+}
+
+
+# 协变量的方差分析
+anova(lm_cov)
+```
+
+对矫正后的Y值做方差分析，注意在这里还需要
+*好难实现哦*
+```{r}
+df <- data.frame(Y = y_adj, X = group)
+
+aov(Y ~ X, data = df) |> summary()
+```
+
+和R语言的`aov`函数做对比：
+```{r}
+aov(Y ~ Z + X, data = data) |> summary()
+```
+
+
 
 
 ### 多因素协方差分析
