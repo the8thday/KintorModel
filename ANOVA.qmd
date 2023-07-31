@@ -65,6 +65,7 @@ Example: A large manufacturer of widgets is interested in studying the effect of
 
 library(tidyverse)
 library(easystats)
+
 library(car)
 library(multcomp)
 library(statsExpressions)
@@ -601,9 +602,19 @@ summary(post_hoc)
 
 #### Multivariate analysis of variance (MANOVA)
 
+在统计学中，多元方差分析 (MANOVA, multivariate analysis of variance) 是一种对多个分组中检测了多个指标变量 (这里的变量等同于上面的指标；如每个样本中每个物种的丰度信息、每个样本中每个基因的表达信息)的样本整体均值的检验方法  。作为一个多变量过程，它在有两个或多个因变量时使用，并且通常会分别涉及各个因变量的显着性检验。
+用于检测多个因变量之间是否存在群体间总体平均数向量的差异。MANOVA要满足正态性、同质性矩阵、独立性等统计假设。MANOVA适用于因变量间相关的多元实验数据。
+
+*模型假设：*
+The two assumptions underlying a one-way MANOVA are multivariate normality and homogeneity of variance-covariance matrices. 
+
 one-way MANOVA，同时纳入多个因变量的意思有种显式变量推导隐变量的感觉。三个因变量都属于营养测量这一大的范畴。
 
+在微生物OTU表格数据中，所有的OTU的丰度值作为因变量，其他的自变量因素如分组变量说明，在这些不同的分组中因变量的不同可以检验因变量之间的关系是否受自变量的影响。当因变量之间存在相关时,MANOVA比多个ANOVA更有力量。
+
+
 ```{r}
+# 测试数据
 data(UScereal, package="MASS")
 
 str(UScereal)
@@ -619,12 +630,15 @@ colnames(y) <- c("calories", "fat", "sugars")
 ```
 
 
+一个简单的示例，只有一个自变量：
 ```{r}
-fit8 <- manova(y ~ shelf)
+fit8 <- stats::manova(y ~ shelf)
 
-summary(fit8)
+summary(fit8, test = 'Pillai') # one of “Pillai”, “Wilks”, “Hotelling-Lawley”, “Roy”
 ```
-*interpret:* The significant F value indicates that 分类变量shelf在营养测量上具有差异。
+*interpret:* The significant F value indicates that 分类变量shelf在营养测量上具有差异。也就是多个因变量在整体上具有差异。
+Pillai/Wilks(Wilks' lambda、Pillai's trace、Hotelling-Lawley trace等统计量)等为其的统计量。Pillai’s trace系数为0.93869，是MANOVA分析中一个衡量组间差异的指标，其取值范围为0到1，越接近1表示组间差异越大。
+
 
 Because the multivariate test is significant, you can use the summary.aov() function to obtain the univariate one-way ANOVAs.
 ```{r}
@@ -633,13 +647,33 @@ summary.aov(fit8)
 ```
 
 
-模型假设：
-The two assumptions underlying a one-way MANOVA are multivariate normality and homogeneity of variance-covariance matrices. 
+*模型检验：*
 
 ```{r}
 # multivariate normal distribution
+check_normality(fit8)
 
 # homogeneity of variance-covariance matrices
+
+
+```
+
+
+```{r}
+mvnfast::
+```
+
+
+用`car`包做的分析：
+```{r}
+# same as Manova
+fit9 <- car::Manova(lm(y ~ shelf))
+
+# 行Mauchly球形检验,检验方差-协方差矩阵的同质性
+mauchly.test(cbind(Y1, Y2, Y3) ~ A*B, data)
+
+# 自定义线性假设检验
+LinearHypothesis(model, L = c("A1 - A2 = 0"))
 ```
 
 
@@ -651,20 +685,62 @@ stats::TukeyHSD()
 
 
 
-*Robust MANOVA*
+##### *Robust MANOVA*
 
 当假设条件不怎么满足的时候，可以考虑采用robust version of the one-way MANOVA.
 ```{r}
 # robust
-rrcov::Wilks.test(y,shelf,method="mcd")
+# 运行的很慢
+rrcov::Wilks.test(y, shelf, method="mcd")
 
 ```
+*interpret: *
+
+
+##### *from vegan package: *
+
+在很多生物、生态和环境数据集中，多元方差分析的前提假设通常难以满足。
+
+一些鲁棒性更强、对数据分布依赖更少的检验方法被提出来并且获得广泛应用，如ANOSIM (analysis of similarities), PERMANOVA (permutational multivariate analysis of variance) (也称为NPMANOVA, non-parametric MNOAVA), 和Mantel test。这些方法都通过一个样本间的距离矩阵或相似性矩阵构建ANOVA分析类似的统计量，然后对每组的观测结果进行随机置换来计算显著性P-value。对于单因素分析，对数据唯一的假设条件就是观察指标数据存在可置换性 (exchangeability)。
+
+`PERMANOVA`利用距离矩阵(如欧式距离、Bray-Curtis距离)对总方差进行分解，分析不同分组因素或不同环境因子对样品差异的解释度，并使用置换检验对各个变量解释的统计学意义进行显著性分析。目的是检测不同分组的响应变量如菌群构成是否有显著差异。原始假设 (null hypothesis)是每组样本在其检测指标构成的检测空间中的中心点 (centroid)和离散度dispersion无差别。
+
+
+*在做PCoA、NMDS的时候通常会采用这些方法来进行统计检验，其主要是*
+
+
+```{r}
+library(vegan)
+
+data(dune)
+data("dune.env")
+```
+
 
 ```{r}
 # or a nonparametric
 # 此函数在16S测序中经常用到，可参考对应笔记
-vegan::adonis()
+# 基于bray-curtis距离进行计算
+dune.div <- vegan::adonis2(dune ~ Management, data = dune.env, 
+                           permutations = 999, method="bray")
+
+dune.div
 ```
 
+PERMANOVA采用数据置换的方式计算pseudo F-值的统计显著性，比较随机置换数据获得的pseudo F-值是否高于或等于实际观测到的值。如果多于5%随机置换计算的pseudo-F值高于实际观测值，则表示不同组的样品之间不存在显著差异 (p-value > 0.05)。
+
+
+*两两事后检验：*
+```{r}
+dune.pairwise.adonis <- pairwiseAdonis::pairwise.adonis(
+  x = dune,
+  factors = dune.env$Management, sim.function = "vegdist",
+  sim.method = "bray",
+  p.adjust.m = "BH",
+  reduce = NULL,
+  perm = 999
+)
+```
+ANOSIM和PERMANOVA的pairwise analysis声明：“Pairwise tests are not possible in vegan. My understanding is that the non-R software with such tests makes separate pairwise tests using subsets of data with only two levels of a factor in one test. We don’t provide that in vegan and have no plans to provide this in the future.” 
 
 
