@@ -1,0 +1,188 @@
+---
+title: "consistency test"
+format: html
+---
+
+## consistency test/ agreement analysis
+
+
+一些常见的一致性检验方法的总结笔记。
+
+
+*常见的一致性检验方法有:*
+检验一致性的方法有很多比如：Kappa检验、ICC(Intra-class Correlation Coefficient)组内相关系数、Kendall W协调系数、CCC(Concordance Correlation Coefficient)、Bland-Altman图等。
+
+
+ inter-rater agreement and reliability
+
+
+```{r}
+
+library(ICC)
+library(cccrm)
+library(irr)
+
+```
+
+```{r}
+library(SimplyAgree)
+```
+
+
+### kappa
+
+配对χ2检验（McNemar检验）和Kappa一致性检验都可以用于配对设计的列联表分析。
+Kappa一致性检验通常针对于定类数据.
+
+*assumptions for computing Cohen’s Kappa:*
+1. 两组分类变量
+2. 两组分组数目要一致, 比如2x2, 3x3
+3. 需要来自配对样本，即对同一个患者采用两种不同的检验方法
+4. The same two raters are used for all participants.
+
+`rater`指的是，
+
+
+*kappa检验的分类：*
+
+
+```{r}
+data(vision)
+
+t1 <- table(vision)
+```
+
+
+```{r}
+k1 <- psych::cohen.kappa(t1)
+k1
+```
+
+*和上面的结果对比，weighted kappa差别较大*
+```{r}
+# unweighted and weighted Kappa
+k2 <- vcd::Kappa(t1)
+
+k2
+```
+
+
+```{r}
+confint(k2)
+```
+
+
+
+### ICC
+
+ICC是基于变异分解思想的一种一致性评价方法。
+
+
+*ICC的诸多用法：*
+`ICC(A,1)`: 考虑误差，且针对原始数据
+`ICC(C,1)`: 不考虑误差，且针对原始数据
+`ICC(A,k)`: 考虑误差，且针对计算后数据
+`ICC(C,k)`: 不考虑误差，且针对计算后数据
+`ICC(1)`:
+
+
+```{r}
+data(anxiety)
+
+
+df <- data.frame(A=c(1, 1, 3, 6, 6, 7, 8, 9, 8, 7),
+                   B=c(2, 3, 8, 4, 5, 5, 7, 9, 8, 8),
+                   C=c(0, 4, 1, 5, 5, 6, 6, 9, 8, 8),
+                   D=c(1, 2, 3, 3, 6, 4, 6, 8, 8, 9))
+
+df_long <- df %>% tidyr::pivot_longer(cols = everything()) %>% 
+  mutate(name = factor(name)) %>% 
+  arrange(name) %>% as.data.frame()
+```
+
+
+```{r}
+# Estimates the one-way intraclass correlation coefficient using the variance components from a linear mixed model.
+icc_res2 <- cccrm::icc(df_long, 'value', 'name')
+
+icc_res2
+```
+
+*和上面的结果对比为什么结果差别这么大*
+model: one-way random effects, two-way random effects or two-way fixed effects.
+unit: single rater or the mean of k raters
+type of relationship considered to be important: consistency or absolute agreement
+
+Should only the subjects be considered as random effects (‘“oneway”’ model) or are subjects and raters randomly chosen from a bigger pool of persons (‘“twoway”’ model).
+
+```{r}
+irr::icc(df, model = "twoway", type = "agreement", unit = "single")
+```
+
+*最为丰富的结果，推荐使用本函数*
+```{r}
+psych::ICC(df)
+```
+
+
+```{r}
+icc_res1 <- ICC::ICCest(x = name, y = value, data = df_long,
+            alpha = 0.05
+            )
+
+icc_res1
+```
+
+
+
+### CCC
+
+在度量Pearson相关系数大小的同时，还考虑了对45度线的偏离情况。如果两个变量的Pearson相关系数较大，且偏离45度线很小，则说明一致性很好。
+
+```{r}
+cccrm::cccvc()
+```
+
+
+```{r}
+method1 <- df$A
+method2 <- df$B
+
+tmp <- data.frame(method1, method2)
+
+tmp.ccc <- epiR::epi.ccc(method1, method2, 
+                         ci = "z-transform", conf.level = 0.95,
+                   rep.measure = FALSE)
+
+tmp.lab <- data.frame(lab = paste("CCC: ",
+                                  round(tmp.ccc$rho.c[,1], digits = 7), " (95% CI ",
+                                  round(tmp.ccc$rho.c[,2], digits = 7), " - ",
+                                  round(tmp.ccc$rho.c[,3], digits = 7), ")", sep = ""))
+
+
+z <- lm(method2 ~ method1)
+alpha <- summary(z)$coefficients[1,1]
+beta <-  summary(z)$coefficients[2,1]
+tmp.lm <- data.frame(alpha, beta)
+
+p <- ggplot(tmp, aes(x = method1, y = method2)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_abline(data = tmp.lm, aes(intercept = alpha, slope = beta),
+              linetype = "dashed") +
+  xlim(0, 3) +
+  ylim(0, 3) +
+  xlab("Method 1") +
+  ylab("Method 2") +
+  geom_text(data = tmp.lab, x = 0.5, y = 2.95, label = tmp.lab$lab) +
+  coord_fixed(ratio = 1 / 1)
+
+p
+```
+
+
+
+
+
+
+
