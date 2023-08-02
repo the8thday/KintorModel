@@ -153,6 +153,7 @@ prop.table(mytable1,1)
 # 求行的和
 margin.table(mytable1, 1)
 ```
+
 ```{r}
 addmargins(mytable1)
 ```
@@ -172,12 +173,21 @@ mytable1 |> fisher.test()
 
 
 *卡方检验：*
-通过调整correct参数可以得出卡方值和连续调整卡方值(Yates)，似然比卡方检验的话，Likelihood Ratio (G test) for contingency tables,
+通过调整correct参数可以得出卡方值和连续调整卡方值(Yates)，对于似然比卡方检验，Likelihood Ratio (G test) for contingency tables,
 可以通过`vcd::assocstats`得到。
 ```{r}
-chisq.test(mytable1)
+c1 <- chisq.test(mytable1)
+
+c1
 ```
 *interpret: *P值小于0.05，两个变量之间相关。
+
+
+```{r}
+effectsize::effectsize(c1)
+
+```
+
 
 
 ```{r}
@@ -189,13 +199,23 @@ foo
 names(foo)
 ```
 
+
+```{r}
+effectsize::effectsize(foo)
+
+effectsize::phi(foo)
+```
+
+0 representing no association, and 1 representing a perfect association.
+
+
 ```{r}
 vcdExtra::CMHtest(mytable1_2)
 ```
 
 
 
-*association 分析*
+*association 分析(关联分析)*
 此处得到的结果和LR chi的结果一致。
 ```{r}
 vcd::assocstats(mytable1)
@@ -217,6 +237,13 @@ DescTools::OddsRatio(mytable1_2, conf.level = 0.95)
 prop.test(mytable1_2)
 ```
 
+
+*贝叶斯实现：*
+```{r}
+BFX <- contingencyTableBF(mytable1_2, sampleType = "jointMulti")
+
+effectsize(BFX, type = "phi") # for 2 * 2
+```
 
 
 ### three-way table 
