@@ -298,6 +298,37 @@ null_dist_2_sample %>%
 
 
 ```{r}
+t_hat <- mydata %>% 
+  observe(score ~ treatment,
+          stat = "t", order = c("A", "B"))
+
+t_hat
+
+null_dist <- mydata %>%
+  specify(score ~ treatment) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "t", order = c("degree", "no degree"))
+
+visualize(null_dist) +
+  shade_p_value(obs_stat = t_hat, direction = "two-sided")
+```
+
+
+```{r}
+
+null_dist_theory <- mydata %>%
+  specify(score ~ treatment) %>%
+  assume("t")
+
+
+visualize(null_dist_theory) +
+  shade_p_value(obs_stat = t_hat, direction = "two-sided")
+```
+
+
+
+```{r}
 null_dist_2_sample |>
   get_p_value(observed_statistic,
               direction = "two-sided")
