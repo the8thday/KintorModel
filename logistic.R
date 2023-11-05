@@ -82,7 +82,7 @@ yardstick::conf_mat()
 p <- predict(glm_model, test, type = "response")
 hd_or_nohd <- ifelse(p > 0.5, 1, 0)
 p_class <- factor(hd_or_nohd, levels = levels(test[["hd"]]))
-confusionMatrix(p_class, test[["hd"]])
+InformationValue::confusionMatrix(p_class, test[["hd"]])
 
 
 # 净重新分类指数(net reclassification improvement NRI)

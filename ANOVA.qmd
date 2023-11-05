@@ -721,7 +721,8 @@ data("dune.env")
 # or a nonparametric
 # 此函数在16S测序中经常用到，可参考对应笔记
 # 基于bray-curtis距离进行计算
-dune.div <- vegan::adonis2(dune ~ Management, data = dune.env, 
+dune.div <- vegan::adonis2(dune ~ Management, 
+                           data = dune.env, 
                            permutations = 999, method="bray")
 
 dune.div

@@ -5,11 +5,12 @@ date: '2022-05-27'
 output: pdf_document
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## PCA_UMAP_tidymodels
+## PCA & UMAP analysis by tidymodels
 
 https://juliasilge.com/blog/cocktail-recipes-umap/
 
@@ -114,6 +115,7 @@ tidied_pca %>%
 
 
 This is the component that explains the most variation in drinks
+
 ```{r}
 library(tidytext)
 

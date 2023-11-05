@@ -41,7 +41,7 @@ library(BayesFactor)
 ```
 
 
-#### 对比频率学派的一般线性回归和贝叶斯线性回归。
+### 对比频率学派的一般线性回归和贝叶斯线性回归。
 
 对于`lm`拟合的简单线性回归，此处不再赘述，其拟合和interpret都较为熟悉。
 
@@ -186,6 +186,12 @@ twosided_p <- onesided_p * 2
 twosided_p
 ```
 
+
+```{r}
+BFt <- BayesFactor::ttestBF(weight ~ feed, data = data)
+
+effectsize(BFt, type = "d")
+```
 
 
 #### correlation 

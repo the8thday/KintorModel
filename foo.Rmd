@@ -1,0 +1,115 @@
+---
+title: "Untitled"
+author: "liuc"
+date: "2023-07-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+## 晓丹要的小小绘图
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggbreak)
+```
+
+
+
+```{r}
+df <- readxl::read_excel(
+  '~/Downloads/hxd.xlsx'
+  )
+
+df
+```
+
+```{r}
+d_p <- df %>% mutate(`CC-223` = ifelse(`CC-223`=='>10μM', 10000, `CC-223`),
+              `CC-223` = as.numeric(`CC-223`),
+              cellline = fct_rev(factor(cellline, 
+                                levels = df$cellline
+                                ))
+              ) %>% pivot_longer(cols = -cellline) %>% 
+  mutate(name = factor(name, levels = c('CC-223', 'GT0486')))
+
+d_p
+```
+
+
+```{r}
+ggplot(d_p, aes(x = cellline, y = value, fill = name)) +
+  geom_col(position = "dodge") +
+  ggprism::theme_prism() +
+  ggsci::scale_fill_aaas() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  xlab('Cellline') + ylab('IC50(nM)')
+```
+
+
+```{r}
+ggplot(d_p, aes(x = cellline, y = log2(value), fill = name)) +
+  geom_col(position = "dodge") +
+  ggprism::theme_prism() +
+  ggsci::scale_fill_aaas() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  xlab('Cellline') + ylab('IC50(nM)')
+```
+
+
+
+```{r}
+p1 <- ggplot(d_p, aes(x = cellline, y = value, fill = name, label = value)) +
+    geom_col(position = "dodge") +
+    geom_text(position = position_dodge(0.9), hjust = -0.2) +
+    # ggrepel::geom_text_repel() +
+    ggprism::theme_prism() +
+    # ggsci::scale_fill_aaas() +
+    scale_fill_manual(values = c('#b12b23','#0c689e','#77C2E7','#6ab8e6','#3883A8','#8C8C8C')) +
+    theme(axis.text.x = element_text(angle = 90),
+          legend.position = "top") +
+    ggbreak::scale_y_break(breaks = c(1000,8000), scales = 0.3) +
+    xlab('Cellline') + ylab('IC50(nM)') + coord_flip()
+
+p1 %>% ggsave(filename = '~/Downloads/xd_p.pdf', width = 8, height = 8)
+```
+
+
+
+```{r}
+p2 <- ggplot(d_p, aes(x = value, y = cellline, fill = name, label = value)) +
+    geom_col(position = "dodge") +
+    geom_text(position = position_dodge(0.9), hjust = -0.2) +
+    # ggrepel::geom_text_repel() +
+    ggprism::theme_prism() +
+    # ggsci::scale_fill_aaas() +
+    scale_fill_manual(values = c('#b12b23','#0c689e','#77C2E7','#6ab8e6','#3883A8','#8C8C8C')) +
+    theme(axis.text.x = element_text(angle = 90),
+          legend.position = "top") +
+    ggbreak::scale_x_break(breaks = c(1000,8000), scales = 0.3) +
+    xlab('IC50(nM)') + ylab('Cellline')
+
+p2 %>% ggsave(filename = '~/Downloads/xd_p.pdf', width = 8, height = 8)
+```
+
+
+
+
+```{r}
+library(ggcharts)
+```
+
+
+
+```{r}
+d_p %>% bar_chart(x = cellline, y = value)
+```
+
+
+
+

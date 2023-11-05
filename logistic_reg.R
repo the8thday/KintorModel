@@ -53,3 +53,5 @@ autoplot(roc_curve(test_res, Class, .pred_One))
 roc_auc(test_res, Class, .pred_One)
 pROC::ci.auc(response = test_res$Class, predictor = test_res$.pred_One)
 pROC::ci.auc(pROC::auc(test_res$Class, test_res$.pred_One))
+
+

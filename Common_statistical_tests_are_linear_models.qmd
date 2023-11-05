@@ -12,7 +12,17 @@ format: html
 线性模型往往需要较多的样本数量才和common statistic的结果趋近。具体的样本数量在上述的链接中有极好的示例，此处不再赘述
 
 
-### 对于correlation中常用的参数和非参数的Pearson和Spearman，其等价于如下的lm模型，
+### 对于correlation中常用的参数和非参数的Pearson和Spearman
+
+对于correlation中常用的参数和非参数的Pearson和Spearman，其等价于如下的lm模型
+
+
+```{r}
+library(effectsize)
+
+options(es.use_symbols = TRUE)
+```
+
 
 
 ```{r}
@@ -31,6 +41,8 @@ x, y 都是连续性数字变量
 ```{r}
 a = cor.test(y, x, method = "pearson") # Built-in
 b = lm(y ~ 1 + x) # Equivalent linear model: y = Beta0*1 + Beta1*x, P值R2虽一样但系数不一致
+
+# 得到和a一样的系数
 c = lm(scale(y) ~ 1 + scale(x)) # On scaled vars to recover r
 
 summary(c) # 的系数既是R， F-statistic的P值既是P值。

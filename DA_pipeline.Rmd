@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 > http://www.sthda.com/english/articles/36-classification-methods-essentials/146-discriminant-analysis-essentials-in-r/
 
-Discriminant Analysis(DA) is more stable than logistic regression for multi-class 
+Discriminant Analysis(DA) is more stable than logistic regression for multi-class.(这句话会不会有些冲动了。)
 
 判别分析包括有多个变种，包括线性判别分析、mixture DA, Flexible DA....
 常用于多分类问题。
