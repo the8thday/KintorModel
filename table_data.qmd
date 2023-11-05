@@ -104,7 +104,7 @@ prop.test(x = x1, n = n1, p = 0.8, alternative = "two.sided", correct = FALSE)
 
 ### two-way table
 
-这是最为常见的列联表的形式，
+这是最为常见的列联表的形式，常见的null假设为rows和columns是否是独立的。
 
 ```{r}
 # 常见的2x2

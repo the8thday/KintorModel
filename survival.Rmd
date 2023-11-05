@@ -536,7 +536,7 @@ How could you perform a Wilcoxon signed rank test, a Peto test or a Fleming-Harr
  to get a "Peto test" is to use rho=1, or we can use the `survMisc` package:
  `library(survMisc) comp(fit)$tests$lrTests`，`comp(ten(fit))`结果里包含一系列的计算结果。R在这种时候容易给人一种不值得信任的感觉，如果有一个R统计联盟就好了。
 
-*SAS*中在计算CI时，默认使用的是loglog方法，可以更改`survfit`的参数，`survfit(Surv(time, status==2) ~ sex, data = lung, conf.type = "log-log")`
+*SAS*中在计算CI时，默认使用的是loglog方法，而R默认的是log，可以更改`survfit`的参数，`survfit(Surv(time, status==2) ~ sex, data = lung, conf.type = "log-log")`
 
 
 查看survfit.formula的帮助页。

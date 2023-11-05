@@ -14,7 +14,11 @@ knitr::opts_chunk$set(echo = TRUE)
 > https://rpruim.github.io/s341/S19/from-class/MathinRmd.html
 
 
-Mathematics in R Markdown
+此处主要记录一些markdown，尤其是Rmarkdown相关的知识点，方便后续的查询。
+
+
+### Mathematics in R Markdown
+
 R Pruim
 October 19, 2016
 Math inside RMarkdown
@@ -34,6 +38,8 @@ macros begin with a backslash (\)
 curly braces ({ and }) are used to surround items that are to be considered as one object from LaTeX’s perspective.
 Without them, usually the next letter or digit will be used, but that isn’t usually what you want. For example $$\sum_x=1^10 x^2$$ produces
 ∑x=110x2
+
+
 Mathematical Notation
 Here are some common mathematical things you might use in statistics
 
@@ -76,6 +82,7 @@ F(x)|ba	$\left. F(x) \right|_{a}^{b}$
 ∏bx=af(x)	$\prod_{x = a}^{b} f(x)$
 limx→∞f(x)	$\lim_{x \to \infty} f(x)$
 limx→∞f(x)	$\displaystyle \lim_{x \to \infty} f(x)$
+
 Greek Letters
 αA	$\alpha A$	νN	$\nu N$
 βB	$\beta B$	ξΞ	$\xi\Xi$
@@ -100,3 +107,23 @@ a & = b \\
 X &\sim {\sf Norm}(10, 3) \\
 5 & \le 10
 \end{align*}
+
+
+
+### 谢大神书的笔记
+
+> https://bookdown.org/yihui/rmarkdown/
+> https://bookdown.org/yihui/rmarkdown-cookbook/
+
+
+
+
+
+
+
+
+
+
+
+
+

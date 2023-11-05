@@ -67,8 +67,10 @@ get.cindex(obj$yvar[,1], obj$yvar[,2], obj$predicted.oob)
 
 ### 重要变量筛选
 
-```{r}
+重要变量。
 
+```{r}
+vip::vip(object = obj)
 ```
 
 

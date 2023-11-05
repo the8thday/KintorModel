@@ -322,6 +322,7 @@ In the lme4a version terms look like (O + lKe|Subject).
 
 ```{r}
 #  It is helpful to use the deriv() function to symbolically differentiate the model function.
+# ?SSfol
 example(SSfol)
 ```
 
